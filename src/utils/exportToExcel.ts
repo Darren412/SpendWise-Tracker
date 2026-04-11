@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
-import { Expense, Income, Category } from '@/types';
+import { Expense, Income, Category, getCategoryBudget } from '@/types';
 
 export type ExportFilter =
   | { scope: 'month'; month: string; year: number }
@@ -86,11 +86,14 @@ function buildMonthlySummary(
   filteredExpenses: Expense[],
   filteredIncome: Income[],
   categories: Category[],
-  label: string
+  label: string,
+  month?: string,
+  year?: number
 ) {
   const totalExpenses = filteredExpenses.reduce((s, e) => s + e.amount, 0);
   const totalIncome   = filteredIncome.reduce((s, i) => s + i.amount, 0);
-  const totalBudget   = categories.reduce((s, c) => s + c.budget, 0);
+  const getBudget = (cat: Category) => month && year ? getCategoryBudget(cat, month, year) : cat.budget;
+  const totalBudget   = categories.reduce((s, c) => s + getBudget(c), 0);
   const remaining     = totalBudget - totalExpenses;
   const netBalance    = totalIncome - totalExpenses;
 
@@ -110,15 +113,16 @@ function buildMonthlySummary(
 
   categories.forEach((cat) => {
     const spent = filteredExpenses.filter(e => e.category === cat.id).reduce((s, e) => s + e.amount, 0);
-    const catRemaining = cat.budget - spent;
-    const pct = cat.budget > 0 ? ((spent / cat.budget) * 100).toFixed(1) + '%' : '0.0%';
+    const catBudget = getBudget(cat);
+    const catRemaining = catBudget - spent;
+    const pct = catBudget > 0 ? ((spent / catBudget) * 100).toFixed(1) + '%' : '0.0%';
     rows.push({
       Metric: `${cat.icon} ${cat.name}`,
-      Value: cat.budget,
+      Value: catBudget,
       'Spent (₹)': spent,
       'Remaining (₹)': catRemaining,
       '% Used': pct,
-      Status: spent > cat.budget ? '⚠ Over Budget' : '✓ Within Budget',
+      Status: spent > catBudget ? '⚠ Over Budget' : '✓ Within Budget',
     });
   });
 
@@ -220,7 +224,7 @@ export function exportToExcel(
 
     XLSX.utils.book_append_sheet(wb, buildExpenseSheet(fe, categories, label), 'Expenses');
     XLSX.utils.book_append_sheet(wb, buildIncomeSheet(fi, label), 'Income');
-    XLSX.utils.book_append_sheet(wb, buildMonthlySummary(fe, fi, categories, label), 'Summary');
+    XLSX.utils.book_append_sheet(wb, buildMonthlySummary(fe, fi, categories, label, month, year), 'Summary');
 
   } else if (filter.scope === 'day') {
     const { date } = filter;

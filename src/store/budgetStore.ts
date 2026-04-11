@@ -40,7 +40,7 @@ const defaultCategories: Category[] = [
   { id: '5', name: 'Health & Fitness', color: '#10b981', icon: '💪', budget: 2000 },
   { id: '6', name: 'Shopping', color: '#ec4899', icon: '🛍️', budget: 4000 },
   { id: '7', name: 'Dining Out', color: '#06b6d4', icon: '🍽️', budget: 3000 },
-  { id: '8', name: 'Other', color: '#6b7280', icon: '📦', budget: 2000 },
+  { id: '8', name: 'Miscellaneous', color: '#6b7280', icon: '📦', budget: 2000 },
 ];
 
 // ── Supabase helpers ────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@
 
 import { TrendingUp, TrendingDown, Target, Wallet, Activity, PiggyBank } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
+import { getCategoryBudget } from '@/types';
 import type { ReactNode } from 'react';
 
 interface StatCardProps {
@@ -41,7 +42,7 @@ export default function CategoryStats() {
 
   const monthlyExpenses = getMonthlyTotal(selectedMonth, selectedYear);
   const monthlyIncome = getMonthlyIncome(selectedMonth, selectedYear);
-  const budgetTotal = categories.reduce((sum, cat) => sum + cat.budget, 0);
+  const budgetTotal = categories.reduce((sum, cat) => sum + getCategoryBudget(cat, selectedMonth, selectedYear), 0);
 
   // Combined across both cities for shared metrics
   const allCitiesExpenses = expenses

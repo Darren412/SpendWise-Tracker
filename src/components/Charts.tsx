@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { getCategoryBudget } from '@/types';
 import {
   BarChart,
   Bar,
@@ -62,11 +63,12 @@ export default function Charts() {
 
   const categoryChartData = filteredCategories.map((cat) => {
     const spent = getCategoryTotal(cat.id, selectedMonth, selectedYear);
+    const budget = getCategoryBudget(cat, selectedMonth, selectedYear);
     return {
       name: cat.name,
       spent,
-      budget: cat.budget,
-      remaining: Math.max(0, cat.budget - spent),
+      budget,
+      remaining: Math.max(0, budget - spent),
     };
   });
 

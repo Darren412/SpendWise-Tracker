@@ -24,6 +24,12 @@ export interface Category {
   color: string;
   icon: string;
   budget: number;
+  monthlyBudgets?: Record<string, number>; // key: "YYYY-MM", e.g. "2026-04"
+}
+
+export function getCategoryBudget(cat: Category, month: string, year: number): number {
+  const key = `${year}-${month}`;
+  return cat.monthlyBudgets?.[key] ?? cat.budget;
 }
 
 export interface MonthlyBudget {

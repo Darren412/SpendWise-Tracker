@@ -2,12 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useBudgetStore } from '@/store/budgetStore';
+import { getCategoryBudget } from '@/types';
 import { ChevronDown, ChevronUp, Trash2, Plus } from 'lucide-react';
 
 const EMOJI_ICONS = ['🍔', '🚗', '💡', '🎬', '💪', '🛍️', '🍽️', '📦', '🏥', '📚', '✈️', '🏠', '💻', '🎮', '⚽', '🛒'];
 
 export default function BudgetEditor() {
-  const { categories, addCategory, updateCategory, deleteCategory, reorderCategory } = useBudgetStore();
+  const { categories, addCategory, updateCategory, deleteCategory, reorderCategory, selectedMonth, selectedYear } = useBudgetStore();
   const [isExpanded, setIsExpanded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -31,11 +32,11 @@ export default function BudgetEditor() {
     color: '#6b7280',
   });
 
-  const totalBudget = categories.reduce((sum, cat) => sum + cat.budget, 0);
+  const totalBudget = categories.reduce((sum, cat) => sum + getCategoryBudget(cat, selectedMonth, selectedYear), 0);
 
   const handleEditStart = (category: any) => {
     setEditingId(category.id);
-    setEditData({ ...category });
+    setEditData({ ...category, budget: getCategoryBudget(category, selectedMonth, selectedYear) });
   };
 
   const handleSave = () => {
@@ -43,11 +44,13 @@ export default function BudgetEditor() {
       alert('Please fill in all fields with valid values');
       return;
     }
+    const budgetKey = `${selectedYear}-${selectedMonth}`;
+    const newBudget = parseFloat(editData.budget);
     updateCategory(editingId!, {
       name: editData.name,
       icon: editData.icon,
       color: editData.color,
-      budget: parseFloat(editData.budget),
+      monthlyBudgets: { ...categories.find(c => c.id === editingId)?.monthlyBudgets, [budgetKey]: newBudget },
     });
     setEditingId(null);
   };
@@ -68,6 +71,7 @@ export default function BudgetEditor() {
       icon: newCategoryForm.icon,
       color: newCategoryForm.color,
       budget: parseFloat(newCategoryForm.budget),
+      monthlyBudgets: { [`${selectedYear}-${selectedMonth}`]: parseFloat(newCategoryForm.budget) },
     };
 
     addCategory(newCategory);
@@ -302,7 +306,7 @@ export default function BudgetEditor() {
                       <div>
                         <p className="font-bold" style={{ color: '#0f172a' }}>{category.name}</p>
                         <p className="text-sm font-mono" style={{ color: '#475569' }}>
-                          ₹{category.budget.toFixed(2)}
+                          ₹{getCategoryBudget(category, selectedMonth, selectedYear).toFixed(2)}
                         </p>
                       </div>
                       <div

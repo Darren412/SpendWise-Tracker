@@ -10,6 +10,7 @@ import IncomeList from '@/components/IncomeList';
 import CategoryStats from '@/components/CategoryStats';
 import Charts from '@/components/Charts';
 import BudgetEditor from '@/components/BudgetEditor';
+import YearlySummary from '@/components/YearlySummary';
 import AllExpensesModal from '@/components/AllExpensesModal';
 import ExportModal from '@/components/ExportModal';
 import { useBudgetStore } from '@/store/budgetStore';
@@ -55,6 +56,11 @@ export default function Home() {
         {/* Budget Editor Section */}
         <div className="mb-8">
           <BudgetEditor />
+        </div>
+
+        {/* Yearly Summary */}
+        <div className="mb-8">
+          <YearlySummary />
         </div>
 
         {/* Lists Section */}

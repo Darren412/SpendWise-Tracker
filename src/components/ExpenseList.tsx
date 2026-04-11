@@ -8,7 +8,7 @@ export default function ExpenseList() {
     useBudgetStore();
   void selectedCity;
 
-  const monthExpenses = [...getExpensesByMonth(selectedMonth, selectedYear)].reverse();
+  const monthExpenses = [...getExpensesByMonth(selectedMonth, selectedYear)].reverse().slice(0, 5);
   const getCategoryIcon = (categoryId: string) => {
     return categories.find((c) => c.id === categoryId)?.icon || '📦';
   };
