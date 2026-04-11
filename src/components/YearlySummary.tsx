@@ -120,19 +120,18 @@ export default function YearlySummary() {
           {activeMonths.length === 0 && (
             <p className="text-center py-4 text-sm" style={{ color: '#94a3b8' }}>No data for {selectedYear}</p>
           )}
-        </div>
 
-        {/* Legend */}
-        <div className="flex items-center justify-center gap-6 pt-2">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-1.5 rounded-full" style={{ background: 'linear-gradient(90deg, #34d399, #059669)' }} />
-            <span className="text-xs" style={{ color: '#64748b' }}>Income</span>
+          {/* Legend */}
+          <div className="flex items-center justify-center gap-6 pt-2">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-1.5 rounded-full" style={{ background: 'linear-gradient(90deg, #34d399, #059669)' }} />
+              <span className="text-xs" style={{ color: '#64748b' }}>Income</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-1.5 rounded-full" style={{ background: 'linear-gradient(90deg, #fb7185, #dc2626)' }} />
+              <span className="text-xs" style={{ color: '#64748b' }}>Expenses</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-1.5 rounded-full" style={{ background: 'linear-gradient(90deg, #fb7185, #dc2626)' }} />
-            <span className="text-xs" style={{ color: '#64748b' }}>Expenses</span>
-          </div>
-        </div>
         </div>
         )}
       </div>
