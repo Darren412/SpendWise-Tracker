@@ -6,6 +6,7 @@ export interface Expense {
   date: string;
   month: string;
   year: number;
+  city?: string;
 }
 
 export interface Income {

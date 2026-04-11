@@ -10,9 +10,10 @@ interface AllExpensesModalProps {
 }
 
 export default function AllExpensesModal({ isOpen, onClose }: AllExpensesModalProps) {
-  const { categories, expenses: allExpenses, selectedMonth, selectedYear } = useBudgetStore();
+  const { categories, expenses: allExpenses, selectedMonth, selectedYear, selectedCity } = useBudgetStore();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedDay, setSelectedDay] = useState<string>('all');
+  const [modalCity, setModalCity] = useState<string>(selectedCity);
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -25,25 +26,30 @@ export default function AllExpensesModal({ isOpen, onClose }: AllExpensesModalPr
   const getCategoryIcon = (categoryId: string) => categories.find((c) => c.id === categoryId)?.icon || '📦';
   const getCategoryName = (categoryId: string) => categories.find((c) => c.id === categoryId)?.name || 'Unknown';
 
-  // All months that have at least one expense, newest first
+  // All months that have at least one expense for selected city, newest first
   const availableMonths = useMemo(() => {
     const seen = new Set<string>();
     const months: { key: string; label: string }[] = [];
-    allExpenses.forEach((e) => {
-      const key = `${e.year}-${e.month}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        months.push({ key, label: `${monthNames[parseInt(e.month, 10) - 1]} ${e.year}` });
-      }
-    });
+    allExpenses
+      .filter(e => modalCity === 'Both' || (e.city ?? 'Bangalore') === modalCity)
+      .forEach((e) => {
+        const key = `${e.year}-${e.month}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          months.push({ key, label: `${monthNames[parseInt(e.month, 10) - 1]} ${e.year}` });
+        }
+      });
     return months.sort((a, b) => b.key.localeCompare(a.key));
-  }, [allExpenses]);
+  }, [allExpenses, modalCity]);
 
-  // Expenses for the selected month
+  // Expenses for the selected month filtered by city
   const monthExpenses = useMemo(() => {
     const [yr, mo] = filterMonthKey.split('-');
-    return allExpenses.filter((e) => e.year === parseInt(yr) && e.month === mo);
-  }, [allExpenses, filterMonthKey]);
+    return allExpenses.filter(
+      (e) => e.year === parseInt(yr) && e.month === mo &&
+        (modalCity === 'Both' || (e.city ?? 'Bangalore') === modalCity)
+    );
+  }, [allExpenses, filterMonthKey, modalCity]);
 
   // Unique days in that month, newest first
   const availableDays = useMemo(() => {
@@ -129,6 +135,26 @@ export default function AllExpensesModal({ isOpen, onClose }: AllExpensesModalPr
 
           {/* Month + Day dropdowns */}
           <div className="flex items-center gap-4 flex-wrap">
+            {/* City toggle */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#94a3b8' }}>City</span>
+              <div className="flex gap-1 p-0.5 rounded-lg" style={{ background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
+                {['Bangalore', 'Mangalore', 'Both'].map(c => (
+                  <button
+                    key={c}
+                    onClick={() => { setModalCity(c); setSelectedDay('all'); }}
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all"
+                    style={{
+                      background: modalCity === c ? '#6366f1' : 'transparent',
+                      color: modalCity === c ? '#fff' : '#64748b',
+                    }}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Month dropdown */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#94a3b8' }}>Month</span>

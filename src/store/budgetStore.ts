@@ -10,9 +10,11 @@ interface BudgetStore {
   categories: Category[];
   selectedMonth: string;
   selectedYear: number;
+  selectedCity: string;
   syncing: boolean;
   setSelectedMonth: (month: string) => void;
   setSelectedYear: (year: number) => void;
+  setSelectedCity: (city: string) => void;
   addExpense: (expense: Expense) => void;
   deleteExpense: (id: string) => void;
   updateExpense: (id: string, expense: Partial<Expense>) => void;
@@ -98,6 +100,7 @@ export const useBudgetStore = create<BudgetStore>((set, get) => ({
   categories: defaultCategories,
   selectedMonth: (new Date().getMonth() + 1).toString().padStart(2, '0'),
   selectedYear: new Date().getFullYear(),
+  selectedCity: 'Bangalore',
   syncing: false,
 
   setSelectedMonth: (month: string) => {
@@ -106,6 +109,10 @@ export const useBudgetStore = create<BudgetStore>((set, get) => ({
 
   setSelectedYear: (year: number) => {
     set({ selectedYear: year });
+  },
+
+  setSelectedCity: (city: string) => {
+    set({ selectedCity: city });
   },
 
   addExpense: (expense: Expense) => {
@@ -188,7 +195,12 @@ export const useBudgetStore = create<BudgetStore>((set, get) => ({
 
   getExpensesByMonth: (month: string, year: number) => {
     const state = get();
-    return state.expenses.filter((e) => e.month === month && e.year === year);
+    if (state.selectedCity === 'Both') {
+      return state.expenses.filter((e) => e.month === month && e.year === year);
+    }
+    return state.expenses.filter(
+      (e) => e.month === month && e.year === year && (e.city ?? 'Bangalore') === state.selectedCity
+    );
   },
 
   getIncomeByMonth: (month: string, year: number) => {

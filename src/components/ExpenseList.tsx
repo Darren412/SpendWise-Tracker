@@ -4,10 +4,11 @@ import { useBudgetStore } from '@/store/budgetStore';
 import { Trash2 } from 'lucide-react';
 
 export default function ExpenseList() {
-  const { deleteExpense, getExpensesByMonth, categories, selectedMonth, selectedYear } =
+  const { deleteExpense, getExpensesByMonth, categories, selectedMonth, selectedYear, selectedCity } =
     useBudgetStore();
+  void selectedCity;
 
-  const monthExpenses = getExpensesByMonth(selectedMonth, selectedYear);
+  const monthExpenses = [...getExpensesByMonth(selectedMonth, selectedYear)].reverse();
   const getCategoryIcon = (categoryId: string) => {
     return categories.find((c) => c.id === categoryId)?.icon || '📦';
   };

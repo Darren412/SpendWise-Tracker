@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { BarChart3, ChevronDown } from 'lucide-react';
+import { BarChart3, ChevronDown, MapPin } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
 
 export default function Header() {
-  const { selectedMonth, selectedYear, setSelectedYear } = useBudgetStore();
+  const { selectedMonth, selectedYear, setSelectedYear, selectedCity, setSelectedCity } = useBudgetStore();
   const [yearOpen, setYearOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const cities = ['Bangalore', 'Mangalore', 'Both'];
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
@@ -47,8 +48,26 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Right — Month + Year picker */}
+        {/* Right — City selector + Month + Year picker */}
         <div className="flex items-center gap-3">
+
+          {/* City Toggle */}
+          <div className="flex items-center gap-1 p-1 rounded-lg" style={{ background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
+            <MapPin size={13} style={{ color: '#64748b', marginLeft: 4 }} />
+            {cities.map(city => (
+              <button
+                key={city}
+                onClick={() => setSelectedCity(city)}
+                className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all"
+                style={{
+                  background: selectedCity === city ? '#6366f1' : 'transparent',
+                  color: selectedCity === city ? '#fff' : '#64748b',
+                }}
+              >
+                {city}
+              </button>
+            ))}
+          </div>
           <div className="text-right hidden sm:block">
             <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#94a3b8' }}>
               Viewing

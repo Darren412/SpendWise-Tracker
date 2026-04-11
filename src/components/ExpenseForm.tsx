@@ -5,9 +5,11 @@ import { useBudgetStore } from '@/store/budgetStore';
 import { Expense } from '@/types';
 
 export default function ExpenseForm() {
-  const { addExpense, categories } = useBudgetStore();
+  const { addExpense, categories, selectedCity } = useBudgetStore();
+  const effectiveCity = selectedCity === 'Both' ? 'Bangalore' : selectedCity;
+  const [formCity, setFormCity] = useState(effectiveCity);
   const [formData, setFormData] = useState({
-    category: categories[0]?.id || 'food',
+    category: categories[0]?.id || '',
     description: '',
     amount: '',
     date: new Date().toISOString().split('T')[0],
@@ -30,6 +32,7 @@ export default function ExpenseForm() {
       date: formData.date,
       month: String(d.getMonth() + 1).padStart(2, '0'),
       year: d.getFullYear(),
+      city: selectedCity === 'Both' ? formCity : selectedCity,
     };
 
     addExpense(expense);
@@ -52,6 +55,30 @@ export default function ExpenseForm() {
       </div>
 
       <div className="space-y-4">
+        {selectedCity === 'Both' && (
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#475569' }}>
+              City
+            </label>
+            <div className="flex gap-2">
+              {['Bangalore', 'Mangalore'].map(c => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setFormCity(c)}
+                  className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all"
+                  style={{
+                    background: formCity === c ? '#e11d48' : '#f1f5f9',
+                    color: formCity === c ? '#fff' : '#64748b',
+                    border: `1px solid ${formCity === c ? '#e11d48' : '#e2e8f0'}`,
+                  }}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div>
           <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#475569' }}>
             Category

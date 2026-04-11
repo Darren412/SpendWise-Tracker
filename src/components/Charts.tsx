@@ -18,7 +18,8 @@ import {
 import { useBudgetStore } from '@/store/budgetStore';
 
 export default function Charts() {
-  const { categories, getCategoryTotal, selectedMonth, selectedYear } = useBudgetStore();
+  const { categories, getCategoryTotal, selectedMonth, selectedYear, selectedCity } = useBudgetStore();
+  void selectedCity;
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
     new Set(categories.map((cat) => cat.id))
   );
@@ -59,14 +60,19 @@ export default function Charts() {
   const filteredCategories = categories.filter((cat) => selectedCategories.has(cat.id));
   const selectedCount = selectedCategories.size;
 
-  const categoryChartData = filteredCategories.map((cat) => ({
-    name: cat.name,
-    spent: getCategoryTotal(cat.id, selectedMonth, selectedYear),
-    budget: cat.budget,
-  }));
+  const categoryChartData = filteredCategories.map((cat) => {
+    const spent = getCategoryTotal(cat.id, selectedMonth, selectedYear);
+    return {
+      name: cat.name,
+      spent,
+      budget: cat.budget,
+      remaining: Math.max(0, cat.budget - spent),
+    };
+  });
 
   const pieChartData = filteredCategories
     .map((cat) => ({
+      id: cat.id,
       name: cat.name,
       value: getCategoryTotal(cat.id, selectedMonth, selectedYear),
       color: cat.color,
@@ -136,8 +142,20 @@ export default function Charts() {
             <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} angle={-40} textAnchor="end" height={65} interval={0} />
             <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} width={44} />
             <Tooltip
-              formatter={(value) => `₹${typeof value === 'number' ? value.toFixed(2) : value}`}
-              contentStyle={{ backgroundColor: '#ffffff', border: '1px solid rgba(124,58,237,0.2)', borderRadius: '10px', color: '#0f172a', fontSize: '12px' }}
+              content={({ active, payload, label }) => {
+                if (!active || !payload?.length) return null;
+                const budget = payload.find(p => p.dataKey === 'budget')?.value as number ?? 0;
+                const spent = payload.find(p => p.dataKey === 'spent')?.value as number ?? 0;
+                const remaining = Math.max(0, budget - spent);
+                return (
+                  <div style={{ background: '#fff', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#0f172a', minWidth: 160 }}>
+                    <p style={{ fontWeight: 700, marginBottom: 6, color: '#1e293b' }}>{label}</p>
+                    <p style={{ color: '#34d399', marginBottom: 2 }}>Budget: ₹{budget.toFixed(2)}</p>
+                    <p style={{ color: '#fb7185', marginBottom: 2 }}>Spent: ₹{spent.toFixed(2)}</p>
+                    <p style={{ color: '#6366f1', fontWeight: 600 }}>Remaining: ₹{remaining.toFixed(2)}</p>
+                  </div>
+                );
+              }}
             />
             <Legend wrapperStyle={{ paddingTop: '6px', color: '#64748b', fontSize: '11px' }} />
             <Bar dataKey="budget" fill="#34d399" name="Budget" radius={[4, 4, 0, 0]} />
@@ -223,7 +241,7 @@ export default function Charts() {
                 {sorted.map((item) => {
                   const pct = (item.value / totalSpent) * 100;
                   return (
-                    <div key={item.name} className="flex items-center gap-3">
+                    <div key={item.id} className="flex items-center gap-3">
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: item.color }} />
                       <span className="text-xs font-medium flex-1 truncate" style={{ color: '#334155' }}>{item.name}</span>
                       <div className="w-20 h-1.5 rounded-full flex-shrink-0" style={{ background: '#f1f5f9' }}>
