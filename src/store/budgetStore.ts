@@ -55,7 +55,19 @@ interface RemoteData {
   categories: Category[];
 }
 
+function backupToLocalStorage(data: RemoteData) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('budget_expenses', JSON.stringify(data.expenses));
+    localStorage.setItem('budget_income', JSON.stringify(data.income));
+    localStorage.setItem('budget_categories', JSON.stringify(data.categories));
+  } catch { /* quota exceeded — non-critical */ }
+}
+
 async function syncToSupabase(data: RemoteData) {
+  // Always backup to localStorage first
+  backupToLocalStorage(data);
+
   const userId = useBudgetStore.getState().userId;
   if (!userId) return;
 
@@ -75,7 +87,7 @@ async function loadFromSupabase() {
     .single();
 
   if (error || !data) {
-    // No remote data yet — migrate from localStorage if available
+    // No remote data yet — restore from localStorage backup if available
     if (typeof window !== 'undefined') {
       const savedExpenses   = localStorage.getItem('budget_expenses');
       const savedIncome     = localStorage.getItem('budget_income');
@@ -97,11 +109,15 @@ async function loadFromSupabase() {
     return;
   }
 
-  useBudgetStore.setState({
+  const remote: RemoteData = {
     expenses:   data.expenses   ?? [],
     income:     data.income     ?? [],
     categories: data.categories ?? defaultCategories,
-  });
+  };
+
+  useBudgetStore.setState(remote);
+  // Keep localStorage in sync with latest Supabase data
+  backupToLocalStorage(remote);
 }
 
 export const useBudgetStore = create<BudgetStore>((set, get) => ({
