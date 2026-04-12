@@ -57,11 +57,23 @@ interface RemoteData {
 
 function backupToLocalStorage(data: RemoteData) {
   if (typeof window === 'undefined') return;
+  const userId = useBudgetStore.getState().userId;
+  const prefix = userId ? `budget_${userId}_` : 'budget_';
   try {
-    localStorage.setItem('budget_expenses', JSON.stringify(data.expenses));
-    localStorage.setItem('budget_income', JSON.stringify(data.income));
-    localStorage.setItem('budget_categories', JSON.stringify(data.categories));
+    localStorage.setItem(`${prefix}expenses`, JSON.stringify(data.expenses));
+    localStorage.setItem(`${prefix}income`, JSON.stringify(data.income));
+    localStorage.setItem(`${prefix}categories`, JSON.stringify(data.categories));
   } catch { /* quota exceeded — non-critical */ }
+}
+
+function getLocalBackup(userId: string | null): { expenses: string | null; income: string | null; categories: string | null } {
+  if (typeof window === 'undefined') return { expenses: null, income: null, categories: null };
+  const prefix = userId ? `budget_${userId}_` : 'budget_';
+  return {
+    expenses:   localStorage.getItem(`${prefix}expenses`) ?? localStorage.getItem('budget_expenses'),
+    income:     localStorage.getItem(`${prefix}income`) ?? localStorage.getItem('budget_income'),
+    categories: localStorage.getItem(`${prefix}categories`) ?? localStorage.getItem('budget_categories'),
+  };
 }
 
 async function syncToSupabase(data: RemoteData) {
@@ -88,23 +100,19 @@ async function loadFromSupabase() {
 
   if (error || !data) {
     // No remote data yet — restore from localStorage backup if available
-    if (typeof window !== 'undefined') {
-      const savedExpenses   = localStorage.getItem('budget_expenses');
-      const savedIncome     = localStorage.getItem('budget_income');
-      const savedCategories = localStorage.getItem('budget_categories');
+    const local = getLocalBackup(userId);
 
-      const migrated: RemoteData = {
-        expenses:   savedExpenses   ? JSON.parse(savedExpenses)   : [],
-        income:     savedIncome     ? JSON.parse(savedIncome)     : [],
-        categories: savedCategories ? JSON.parse(savedCategories) : defaultCategories,
-      };
+    const migrated: RemoteData = {
+      expenses:   local.expenses   ? JSON.parse(local.expenses)   : [],
+      income:     local.income     ? JSON.parse(local.income)     : [],
+      categories: local.categories ? JSON.parse(local.categories) : defaultCategories,
+    };
 
-      useBudgetStore.setState(migrated);
+    useBudgetStore.setState(migrated);
 
-      // Push existing localStorage data up to Supabase
-      if (savedExpenses || savedIncome || savedCategories) {
-        await syncToSupabase(migrated);
-      }
+    // Push existing localStorage data up to Supabase
+    if (local.expenses || local.income || local.categories) {
+      await syncToSupabase(migrated);
     }
     return;
   }
@@ -116,26 +124,23 @@ async function loadFromSupabase() {
   };
 
   // Merge localStorage backup with Supabase data to prevent data loss
-  if (typeof window !== 'undefined') {
-    const savedExpenses = localStorage.getItem('budget_expenses');
-    const savedIncome   = localStorage.getItem('budget_income');
+  const local = getLocalBackup(userId);
 
-    const localExpenses: Expense[] = savedExpenses ? JSON.parse(savedExpenses) : [];
-    const localIncome: Income[]    = savedIncome   ? JSON.parse(savedIncome)   : [];
+  const localExpenses: Expense[] = local.expenses ? JSON.parse(local.expenses) : [];
+  const localIncome: Income[]    = local.income   ? JSON.parse(local.income)   : [];
 
-    // Merge: add any local items not present in Supabase (by id)
-    const remoteExpenseIds = new Set(remote.expenses.map((e) => e.id));
-    const missingExpenses  = localExpenses.filter((e) => !remoteExpenseIds.has(e.id));
+  // Merge: add any local items not present in Supabase (by id)
+  const remoteExpenseIds = new Set(remote.expenses.map((e) => e.id));
+  const missingExpenses  = localExpenses.filter((e) => !remoteExpenseIds.has(e.id));
 
-    const remoteIncomeIds = new Set(remote.income.map((i) => i.id));
-    const missingIncome   = localIncome.filter((i) => !remoteIncomeIds.has(i.id));
+  const remoteIncomeIds = new Set(remote.income.map((i) => i.id));
+  const missingIncome   = localIncome.filter((i) => !remoteIncomeIds.has(i.id));
 
-    if (missingExpenses.length > 0 || missingIncome.length > 0) {
-      remote.expenses = [...remote.expenses, ...missingExpenses];
-      remote.income   = [...remote.income, ...missingIncome];
-      // Push merged data back to Supabase
-      await syncToSupabase(remote);
-    }
+  if (missingExpenses.length > 0 || missingIncome.length > 0) {
+    remote.expenses = [...remote.expenses, ...missingExpenses];
+    remote.income   = [...remote.income, ...missingIncome];
+    // Push merged data back to Supabase
+    await syncToSupabase(remote);
   }
 
   useBudgetStore.setState(remote);
@@ -155,6 +160,12 @@ export const useBudgetStore = create<BudgetStore>((set, get) => ({
 
   setUserId: (userId: string | null) => {
     set({ userId });
+    // Clean up old unscoped localStorage keys to prevent cross-user contamination
+    if (userId && typeof window !== 'undefined') {
+      localStorage.removeItem('budget_expenses');
+      localStorage.removeItem('budget_income');
+      localStorage.removeItem('budget_categories');
+    }
   },
 
   setCurrency: (currency: string) => {
