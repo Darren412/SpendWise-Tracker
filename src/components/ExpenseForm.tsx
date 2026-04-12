@@ -23,15 +23,15 @@ export default function ExpenseForm() {
       return;
     }
 
-    const d = new Date(formData.date);
+    const [yearStr, monthStr] = formData.date.split('-');
     const expense: Expense = {
       id: Date.now().toString(),
       category: formData.category,
       description: formData.description,
       amount: parseFloat(formData.amount),
       date: formData.date,
-      month: String(d.getMonth() + 1).padStart(2, '0'),
-      year: d.getFullYear(),
+      month: monthStr,
+      year: parseInt(yearStr, 10),
       city: selectedCity === 'Both' ? formCity : selectedCity,
     };
 

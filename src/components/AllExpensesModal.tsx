@@ -29,20 +29,26 @@ export default function AllExpensesModal({ isOpen, onClose }: AllExpensesModalPr
     setEditCategory(expense.category);
   };
 
-  const cancelEditing = () => setEditingId(null);
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditDesc('');
+    setEditAmount('');
+    setEditDate('');
+    setEditCategory('');
+  };
 
   const saveEdit = () => {
     if (!editingId) return;
     const parsed = parseFloat(editAmount);
     if (!editDesc.trim() || isNaN(parsed) || parsed <= 0 || !editDate) return;
-    const dateObj = new Date(editDate);
+    const [yearStr, monthStr] = editDate.split('-');
     updateExpense(editingId, {
       description: editDesc.trim(),
       amount: parsed,
       date: editDate,
       category: editCategory,
-      month: String(dateObj.getMonth() + 1).padStart(2, '0'),
-      year: dateObj.getFullYear(),
+      month: monthStr,
+      year: parseInt(yearStr, 10),
     });
     setEditingId(null);
   };
