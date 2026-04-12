@@ -76,16 +76,32 @@ function getLocalBackup(userId: string | null): { expenses: string | null; incom
   };
 }
 
-async function syncToSupabase(data: RemoteData) {
-  // Always backup to localStorage first
-  backupToLocalStorage(data);
 
+// --- Supabase sync with retry and network status ---
+let syncRetryCount = 0;
+let syncRetryTimeout: ReturnType<typeof setTimeout> | null = null;
+
+async function syncToSupabase(data: RemoteData) {
+  backupToLocalStorage(data);
   const userId = useBudgetStore.getState().userId;
   if (!userId) return;
-
-  await supabase
-    .from('budget_data')
-    .upsert({ user_id: userId, ...data }, { onConflict: 'user_id' });
+  useBudgetStore.setState({ syncing: true, networkError: false });
+  try {
+    const { error } = await supabase
+      .from('budget_data')
+      .upsert({ user_id: userId, ...data }, { onConflict: 'user_id' });
+    if (error) throw error;
+    syncRetryCount = 0;
+    if (syncRetryTimeout) clearTimeout(syncRetryTimeout);
+    useBudgetStore.setState({ syncing: false, networkError: false });
+  } catch (err) {
+    useBudgetStore.setState({ syncing: false, networkError: true });
+    // Exponential backoff retry
+    syncRetryCount++;
+    const delay = Math.min(60000, 2000 * Math.pow(2, syncRetryCount));
+    if (syncRetryTimeout) clearTimeout(syncRetryTimeout);
+    syncRetryTimeout = setTimeout(() => syncToSupabase(data), delay);
+  }
 }
 
 async function loadFromSupabase() {
@@ -147,7 +163,7 @@ async function loadFromSupabase() {
   backupToLocalStorage(remote);
 }
 
-export const useBudgetStore = create<BudgetStore>((set, get) => ({
+export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((set, get) => ({
   expenses: [],
   income: [],
   categories: defaultCategories,
@@ -155,6 +171,7 @@ export const useBudgetStore = create<BudgetStore>((set, get) => ({
   selectedYear: new Date().getFullYear(),
   selectedCity: 'Bangalore',
   syncing: false,
+  networkError: false,
   userId: null,
   currency: 'INR',
 

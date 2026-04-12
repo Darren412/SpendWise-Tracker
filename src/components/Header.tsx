@@ -7,7 +7,21 @@ import { useAuth } from '@/components/AuthProvider';
 import { currencies } from '@/utils/currency';
 
 export default function Header() {
-  const { selectedMonth, selectedYear, setSelectedYear, selectedCity, setSelectedCity, currency, setCurrency } = useBudgetStore();
+  const { selectedMonth, selectedYear, setSelectedYear, selectedCity, setSelectedCity, currency, setCurrency, syncing, networkError } = useBudgetStore();
+    // Network status
+    const [isOnline, setIsOnline] = useState(true);
+    useEffect(() => {
+      function updateStatus() {
+        setIsOnline(navigator.onLine);
+      }
+      window.addEventListener('online', updateStatus);
+      window.addEventListener('offline', updateStatus);
+      updateStatus();
+      return () => {
+        window.removeEventListener('online', updateStatus);
+        window.removeEventListener('offline', updateStatus);
+      };
+    }, []);
   const { user, signOut } = useAuth();
   const [yearOpen, setYearOpen] = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
@@ -43,6 +57,12 @@ export default function Header() {
 
   return (
     <header style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+      {/* Network status warning */}
+      {(!isOnline || networkError) && (
+        <div className="w-full text-center py-2 bg-yellow-100 text-yellow-800 text-xs font-semibold border-b border-yellow-300">
+          { !isOnline ? 'You are offline. Changes will be saved locally and synced when back online.' : 'Network error: Could not sync with server. Retrying...' }
+        </div>
+      )}
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
 
         {/* Left — Logo + Brand */}
