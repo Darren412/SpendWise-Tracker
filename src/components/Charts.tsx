@@ -22,11 +22,25 @@ import { useBudgetStore } from '@/store/budgetStore';
 export default function Charts() {
   const { categories, getCategoryTotal, selectedMonth, selectedYear, selectedCity, currency } = useBudgetStore();
   void selectedCity;
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
-    new Set(categories.map((cat) => cat.id))
-  );
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('filter_categories');
+      if (saved) {
+        try {
+          const arr: string[] = JSON.parse(saved);
+          return new Set(arr);
+        } catch { /* ignore */ }
+      }
+    }
+    return new Set(categories.map((cat) => cat.id));
+  });
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+
+  // Persist filter selection to localStorage
+  useEffect(() => {
+    localStorage.setItem('filter_categories', JSON.stringify([...selectedCategories]));
+  }, [selectedCategories]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
