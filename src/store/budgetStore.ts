@@ -115,8 +115,30 @@ async function loadFromSupabase() {
     categories: data.categories ?? defaultCategories,
   };
 
+  // Merge localStorage backup with Supabase data to prevent data loss
+  if (typeof window !== 'undefined') {
+    const savedExpenses = localStorage.getItem('budget_expenses');
+    const savedIncome   = localStorage.getItem('budget_income');
+
+    const localExpenses: Expense[] = savedExpenses ? JSON.parse(savedExpenses) : [];
+    const localIncome: Income[]    = savedIncome   ? JSON.parse(savedIncome)   : [];
+
+    // Merge: add any local items not present in Supabase (by id)
+    const remoteExpenseIds = new Set(remote.expenses.map((e) => e.id));
+    const missingExpenses  = localExpenses.filter((e) => !remoteExpenseIds.has(e.id));
+
+    const remoteIncomeIds = new Set(remote.income.map((i) => i.id));
+    const missingIncome   = localIncome.filter((i) => !remoteIncomeIds.has(i.id));
+
+    if (missingExpenses.length > 0 || missingIncome.length > 0) {
+      remote.expenses = [...remote.expenses, ...missingExpenses];
+      remote.income   = [...remote.income, ...missingIncome];
+      // Push merged data back to Supabase
+      await syncToSupabase(remote);
+    }
+  }
+
   useBudgetStore.setState(remote);
-  // Keep localStorage in sync with latest Supabase data
   backupToLocalStorage(remote);
 }
 
