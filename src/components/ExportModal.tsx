@@ -18,7 +18,7 @@ interface Props {
 }
 
 export default function ExportModal({ isOpen, onClose }: Props) {
-  const { expenses, income, categories, selectedMonth, selectedYear } = useBudgetStore();
+  const { expenses, income, categories, selectedMonth, selectedYear, currency } = useBudgetStore();
 
   const [scope, setScope] = useState<Scope>('current-month');
   const [chosenMonth, setChosenMonth] = useState(selectedMonth);
@@ -47,7 +47,7 @@ export default function ExportModal({ isOpen, onClose }: Props) {
       filter = { scope: 'all' };
     }
 
-    exportToExcel(expenses, income, categories, filter);
+    exportToExcel(expenses, income, categories, filter, currency);
     onClose();
   };
 

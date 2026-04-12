@@ -2,9 +2,10 @@
 
 import { useBudgetStore } from '@/store/budgetStore';
 import { Trash2 } from 'lucide-react';
+import { formatCurrency } from '@/utils/currency';
 
 export default function IncomeList() {
-  const { deleteIncome, getIncomeByMonth, selectedMonth, selectedYear } =
+  const { deleteIncome, getIncomeByMonth, selectedMonth, selectedYear, currency } =
     useBudgetStore();
 
   const monthIncome = getIncomeByMonth(selectedMonth, selectedYear);
@@ -45,7 +46,7 @@ export default function IncomeList() {
                 <td className="font-medium" style={{ color: '#1e293b' }}>{inc.source}</td>
                 <td style={{ color: '#64748b' }}>{new Date(inc.date).toLocaleDateString()}</td>
                 <td className="text-right font-bold font-mono" style={{ color: '#059669' }}>
-                  +₹{inc.amount.toFixed(2)}
+                  +{formatCurrency(inc.amount, currency)}
                 </td>
                 <td className="text-center">
                   <button

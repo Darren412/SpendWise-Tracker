@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { TrendingUp, TrendingDown, PiggyBank, Calendar, ChevronDown } from 'lucide-react';
+import { formatCurrency } from '@/utils/currency';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export default function YearlySummary() {
-  const { expenses, income, selectedYear } = useBudgetStore();
+  const { expenses, income, selectedYear, currency } = useBudgetStore();
 
   const yearExpenses = expenses.filter(e => e.year === selectedYear);
   const yearIncome = income.filter(i => i.year === selectedYear);
@@ -46,14 +47,14 @@ export default function YearlySummary() {
             <TrendingUp size={14} color="#059669" />
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#059669' }}>Total Income</span>
           </div>
-          <p className="text-xl font-bold num-mono" style={{ color: '#065f46' }}>₹{totalIncome.toLocaleString('en-IN')}</p>
+          <p className="text-xl font-bold num-mono" style={{ color: '#065f46' }}>{formatCurrency(totalIncome, currency)}</p>
         </div>
         <div className="rounded-xl p-4" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
           <div className="flex items-center gap-2 mb-2">
             <TrendingDown size={14} color="#dc2626" />
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#dc2626' }}>Total Spent</span>
           </div>
-          <p className="text-xl font-bold num-mono" style={{ color: '#991b1b' }}>₹{totalSpent.toLocaleString('en-IN')}</p>
+          <p className="text-xl font-bold num-mono" style={{ color: '#991b1b' }}>{formatCurrency(totalSpent, currency)}</p>
         </div>
         <div className="rounded-xl p-4" style={{ background: totalSavings >= 0 ? '#f0fdf4' : '#fef2f2', border: `1px solid ${totalSavings >= 0 ? '#bbf7d0' : '#fecaca'}` }}>
           <div className="flex items-center gap-2 mb-2">
@@ -61,7 +62,7 @@ export default function YearlySummary() {
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: totalSavings >= 0 ? '#16a34a' : '#dc2626' }}>Total Savings</span>
           </div>
           <p className="text-xl font-bold num-mono" style={{ color: totalSavings >= 0 ? '#166534' : '#991b1b' }}>
-            {totalSavings >= 0 ? '+' : ''}₹{totalSavings.toLocaleString('en-IN')}
+            {totalSavings >= 0 ? '+' : ''}{formatCurrency(totalSavings, currency)}
           </p>
         </div>
         <div className="rounded-xl p-4" style={{ background: '#eef2ff', border: '1px solid #c7d2fe' }}>
@@ -99,10 +100,10 @@ export default function YearlySummary() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold w-8" style={{ color: '#334155' }}>{m.month}</span>
                   <div className="flex items-center gap-4 text-xs num-mono">
-                    <span style={{ color: '#059669' }}>+₹{m.income.toLocaleString('en-IN')}</span>
-                    <span style={{ color: '#dc2626' }}>-₹{m.expense.toLocaleString('en-IN')}</span>
+                    <span style={{ color: '#059669' }}>+{formatCurrency(m.income, currency)}</span>
+                    <span style={{ color: '#dc2626' }}>-{formatCurrency(m.expense, currency)}</span>
                     <span className="font-bold" style={{ color: monthlySavings >= 0 ? '#059669' : '#dc2626' }}>
-                      {monthlySavings >= 0 ? '+' : ''}₹{monthlySavings.toLocaleString('en-IN')}
+                      {monthlySavings >= 0 ? '+' : ''}{formatCurrency(monthlySavings, currency)}
                     </span>
                   </div>
                 </div>

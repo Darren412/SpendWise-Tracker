@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { Expense, Income, Category } from '@/types';
-import { supabase, DATA_ROW_ID } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 interface BudgetStore {
   expenses: Expense[];
@@ -12,6 +12,10 @@ interface BudgetStore {
   selectedYear: number;
   selectedCity: string;
   syncing: boolean;
+  userId: string | null;
+  currency: string;
+  setUserId: (userId: string | null) => void;
+  setCurrency: (currency: string) => void;
   setSelectedMonth: (month: string) => void;
   setSelectedYear: (year: number) => void;
   setSelectedCity: (city: string) => void;
@@ -52,16 +56,22 @@ interface RemoteData {
 }
 
 async function syncToSupabase(data: RemoteData) {
+  const userId = useBudgetStore.getState().userId;
+  if (!userId) return;
+
   await supabase
     .from('budget_data')
-    .upsert({ id: DATA_ROW_ID, ...data }, { onConflict: 'id' });
+    .upsert({ user_id: userId, ...data }, { onConflict: 'user_id' });
 }
 
 async function loadFromSupabase() {
+  const userId = useBudgetStore.getState().userId;
+  if (!userId) return;
+
   const { data, error } = await supabase
     .from('budget_data')
     .select('expenses, income, categories')
-    .eq('id', DATA_ROW_ID)
+    .eq('user_id', userId)
     .single();
 
   if (error || !data) {
@@ -102,6 +112,16 @@ export const useBudgetStore = create<BudgetStore>((set, get) => ({
   selectedYear: new Date().getFullYear(),
   selectedCity: 'Bangalore',
   syncing: false,
+  userId: null,
+  currency: 'INR',
+
+  setUserId: (userId: string | null) => {
+    set({ userId });
+  },
+
+  setCurrency: (currency: string) => {
+    set({ currency });
+  },
 
   setSelectedMonth: (month: string) => {
     set({ selectedMonth: month });

@@ -1,7 +1,7 @@
 {
   "name": "budget-tracker",
   "version": "1.0.0",
-  "description": "Comprehensive monthly household budget tracker",
+  "description": "Spendwise — your personal finance dashboard",
   "private": true,
   "scripts": {
     "dev": "next dev",

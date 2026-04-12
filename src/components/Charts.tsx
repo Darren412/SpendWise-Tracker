@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { getCategoryBudget } from '@/types';
+import { formatCurrency, formatCurrencyShort, currencySymbol } from '@/utils/currency';
 import {
   BarChart,
   Bar,
@@ -19,7 +20,7 @@ import {
 import { useBudgetStore } from '@/store/budgetStore';
 
 export default function Charts() {
-  const { categories, getCategoryTotal, selectedMonth, selectedYear, selectedCity } = useBudgetStore();
+  const { categories, getCategoryTotal, selectedMonth, selectedYear, selectedCity, currency } = useBudgetStore();
   void selectedCity;
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
     new Set(categories.map((cat) => cat.id))
@@ -122,7 +123,7 @@ export default function Charts() {
                     <input type="checkbox" checked={selectedCategories.has(category.id)} onChange={() => toggleCategory(category.id)} className="w-4 h-4 rounded cursor-pointer accent-purple-500" />
                     <span className="text-xl">{category.icon}</span>
                     <span className="flex-1 text-sm font-medium" style={{ color: '#374151' }}>{category.name}</span>
-                    <span className="text-xs font-mono" style={{ color: '#94a3b8' }}>₹{getCategoryTotal(category.id, selectedMonth, selectedYear).toFixed(2)}</span>
+                    <span className="text-xs font-mono" style={{ color: '#94a3b8' }}>{formatCurrency(getCategoryTotal(category.id, selectedMonth, selectedYear), currency)}</span>
                   </label>
                 ))}
               </div>
@@ -152,9 +153,9 @@ export default function Charts() {
                 return (
                   <div style={{ background: '#fff', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#0f172a', minWidth: 160 }}>
                     <p style={{ fontWeight: 700, marginBottom: 6, color: '#1e293b' }}>{label}</p>
-                    <p style={{ color: '#34d399', marginBottom: 2 }}>Budget: ₹{budget.toFixed(2)}</p>
-                    <p style={{ color: '#fb7185', marginBottom: 2 }}>Spent: ₹{spent.toFixed(2)}</p>
-                    <p style={{ color: '#6366f1', fontWeight: 600 }}>Remaining: ₹{remaining.toFixed(2)}</p>
+                    <p style={{ color: '#34d399', marginBottom: 2 }}>Budget: {formatCurrency(budget, currency)}</p>
+                    <p style={{ color: '#fb7185', marginBottom: 2 }}>Spent: {formatCurrency(spent, currency)}</p>
+                    <p style={{ color: '#6366f1', fontWeight: 600 }}>Remaining: {formatCurrency(remaining, currency)}</p>
                   </div>
                 );
               }}
@@ -193,9 +194,9 @@ export default function Charts() {
               {/* Summary Stats Row */}
               <div className="grid grid-cols-3 gap-3 mb-5">
                 {[
-                  { label: 'Total Spent', value: `₹${totalSpent.toFixed(0)}`, color: '#6366f1' },
+                  { label: 'Total Spent', value: formatCurrencyShort(totalSpent, currency), color: '#6366f1' },
                   { label: 'Top Category', value: topCat.name, color: '#dc2626' },
-                  { label: 'Avg / Category', value: `₹${avgSpend.toFixed(0)}`, color: '#0891b2' },
+                  { label: 'Avg / Category', value: formatCurrencyShort(avgSpend, currency), color: '#0891b2' },
                 ].map(({ label, value, color }) => (
                   <div key={label} className="rounded-xl p-3 text-center" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                     <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: '#94a3b8' }}>{label}</p>
@@ -224,7 +225,7 @@ export default function Charts() {
                     <Tooltip
                       formatter={(value, name) => {
                         const pct = ((Number(value) / totalSpent) * 100).toFixed(1);
-                        return [`₹${Number(value).toFixed(2)} (${pct}%)`, name];
+                        return [`${formatCurrency(Number(value), currency)} (${pct}%)`, name];
                       }}
                       contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', color: '#0f172a', fontSize: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
                     />
@@ -233,7 +234,7 @@ export default function Charts() {
                 {/* Center Label */}
                 <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
                   <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#94a3b8' }}>Total</p>
-                  <p className="text-xl font-bold num-mono" style={{ color: '#0f172a' }}>₹{totalSpent.toFixed(0)}</p>
+                  <p className="text-xl font-bold num-mono" style={{ color: '#0f172a' }}>{formatCurrencyShort(totalSpent, currency)}</p>
                 </div>
               </div>
 
@@ -250,7 +251,7 @@ export default function Charts() {
                         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: item.color }} />
                       </div>
                       <span className="text-xs font-bold w-10 text-right num-mono flex-shrink-0" style={{ color: '#64748b' }}>{pct.toFixed(1)}%</span>
-                      <span className="text-xs num-mono w-20 text-right flex-shrink-0" style={{ color: '#94a3b8' }}>₹{item.value.toFixed(0)}</span>
+                      <span className="text-xs num-mono w-20 text-right flex-shrink-0" style={{ color: '#94a3b8' }}>{formatCurrencyShort(item.value, currency)}</span>
                     </div>
                   );
                 })}

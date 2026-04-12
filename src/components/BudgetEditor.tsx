@@ -4,11 +4,12 @@ import { useState, useRef, useEffect } from 'react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { getCategoryBudget } from '@/types';
 import { ChevronDown, ChevronUp, Trash2, Plus } from 'lucide-react';
+import { formatCurrency } from '@/utils/currency';
 
 const EMOJI_ICONS = ['🍔', '🚗', '💡', '🎬', '💪', '🛍️', '🍽️', '📦', '🏥', '📚', '✈️', '🏠', '💻', '🎮', '⚽', '🛒'];
 
 export default function BudgetEditor() {
-  const { categories, addCategory, updateCategory, deleteCategory, reorderCategory, selectedMonth, selectedYear } = useBudgetStore();
+  const { categories, addCategory, updateCategory, deleteCategory, reorderCategory, selectedMonth, selectedYear, currency } = useBudgetStore();
   const [isExpanded, setIsExpanded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -110,7 +111,7 @@ export default function BudgetEditor() {
           <div className="text-right">
             <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#475569' }}>Total Budget</p>
             <p className="graffiti-font text-3xl" style={{ color: '#d97706' }}>
-              ₹{totalBudget.toFixed(2)}
+              {formatCurrency(totalBudget, currency)}
             </p>
           </div>
           <ChevronDown
@@ -306,7 +307,7 @@ export default function BudgetEditor() {
                       <div>
                         <p className="font-bold" style={{ color: '#0f172a' }}>{category.name}</p>
                         <p className="text-sm font-mono" style={{ color: '#475569' }}>
-                          ₹{getCategoryBudget(category, selectedMonth, selectedYear).toFixed(2)}
+                          {formatCurrency(getCategoryBudget(category, selectedMonth, selectedYear), currency)}
                         </p>
                       </div>
                       <div

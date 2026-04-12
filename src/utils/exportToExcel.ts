@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { Expense, Income, Category, getCategoryBudget } from '@/types';
+import { currencySymbol } from '@/utils/currency';
 
 export type ExportFilter =
   | { scope: 'month'; month: string; year: number }
@@ -18,23 +19,23 @@ function fmtDate(iso: string) {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function fmtCurrency(n: number) {
-  return `₹${n.toFixed(2)}`;
+function fmtCurrency(n: number, sym: string) {
+  return `${sym}${n.toFixed(2)}`;
 }
 
 type AnyRow = Record<string, string | number>;
 
-function buildExpenseSheet(filtered: Expense[], categories: Category[], label: string) {
+function buildExpenseSheet(filtered: Expense[], categories: Category[], label: string, sym: string) {
   const resolveName = (id: string) => categories.find((c) => c.id === id)?.name ?? id;
 
   const rows: AnyRow[] = [
     { '': `Expenses — ${label}` },
     { '': '' },
-    { 'No.': 'No.', Date: 'Date', Category: 'Category', Description: 'Description', 'Amount (₹)': 'Amount (₹)' },
+    { 'No.': 'No.', Date: 'Date', Category: 'Category', Description: 'Description', [`Amount (${sym})`]: `Amount (${sym})` },
   ];
 
   if (filtered.length === 0) {
-    rows.push({ 'No.': '', Date: '', Category: '', Description: 'No expenses recorded', 'Amount (₹)': '' });
+    rows.push({ 'No.': '', Date: '', Category: '', Description: 'No expenses recorded', [`Amount (${sym})`]: '' });
   } else {
     filtered.forEach((e, i) => {
       rows.push({
@@ -42,11 +43,11 @@ function buildExpenseSheet(filtered: Expense[], categories: Category[], label: s
         Date: fmtDate(e.date),
         Category: `${categories.find(c => c.id === e.category)?.icon ?? ''} ${resolveName(e.category)}`,
         Description: e.description,
-        'Amount (₹)': e.amount,
+        [`Amount (${sym})`]: e.amount,
       });
     });
     const total = filtered.reduce((s, e) => s + e.amount, 0);
-    rows.push({ 'No.': '', Date: '', Category: '', Description: 'TOTAL', 'Amount (₹)': total });
+    rows.push({ 'No.': '', Date: '', Category: '', Description: 'TOTAL', [`Amount (${sym})`]: total });
   }
 
   const ws = XLSX.utils.json_to_sheet(rows, { skipHeader: true });
@@ -54,26 +55,26 @@ function buildExpenseSheet(filtered: Expense[], categories: Category[], label: s
   return ws;
 }
 
-function buildIncomeSheet(filtered: Income[], label: string) {
+function buildIncomeSheet(filtered: Income[], label: string, sym: string) {
   const rows: AnyRow[] = [
     { '': `Income — ${label}` },
     { '': '' },
-    { 'No.': 'No.', Date: 'Date', Source: 'Source', 'Amount (₹)': 'Amount (₹)' },
+    { 'No.': 'No.', Date: 'Date', Source: 'Source', [`Amount (${sym})`]: `Amount (${sym})` },
   ];
 
   if (filtered.length === 0) {
-    rows.push({ 'No.': '', Date: '', Source: 'No income recorded', 'Amount (₹)': '' });
+    rows.push({ 'No.': '', Date: '', Source: 'No income recorded', [`Amount (${sym})`]: '' });
   } else {
     filtered.forEach((i, idx) => {
       rows.push({
         'No.': idx + 1,
         Date: fmtDate(i.date),
         Source: i.source,
-        'Amount (₹)': i.amount,
+        [`Amount (${sym})`]: i.amount,
       });
     });
     const total = filtered.reduce((s, i) => s + i.amount, 0);
-    rows.push({ 'No.': '', Date: '', Source: 'TOTAL', 'Amount (₹)': total });
+    rows.push({ 'No.': '', Date: '', Source: 'TOTAL', [`Amount (${sym})`]: total });
   }
 
   const ws = XLSX.utils.json_to_sheet(rows, { skipHeader: true });
@@ -87,6 +88,7 @@ function buildMonthlySummary(
   filteredIncome: Income[],
   categories: Category[],
   label: string,
+  sym: string,
   month?: string,
   year?: number
 ) {
@@ -101,14 +103,14 @@ function buildMonthlySummary(
     { Metric: `Summary — ${label}`, Value: '' },
     { Metric: '', Value: '' },
     { Metric: 'OVERVIEW', Value: '' },
-    { Metric: 'Total Income',                  Value: fmtCurrency(totalIncome) },
-    { Metric: 'Total Spent',                   Value: fmtCurrency(totalExpenses) },
-    { Metric: 'Total Budget',                  Value: fmtCurrency(totalBudget) },
-    { Metric: 'Remaining Budget',              Value: fmtCurrency(remaining) },
-    { Metric: 'Net Balance (Income − Spent)',   Value: fmtCurrency(netBalance) },
+    { Metric: 'Total Income',                  Value: fmtCurrency(totalIncome, sym) },
+    { Metric: 'Total Spent',                   Value: fmtCurrency(totalExpenses, sym) },
+    { Metric: 'Total Budget',                  Value: fmtCurrency(totalBudget, sym) },
+    { Metric: 'Remaining Budget',              Value: fmtCurrency(remaining, sym) },
+    { Metric: 'Net Balance (Income − Spent)',   Value: fmtCurrency(netBalance, sym) },
     { Metric: '', Value: '' },
     { Metric: 'CATEGORY BREAKDOWN', Value: '' },
-    { Metric: 'Category', Value: 'Budget (₹)', 'Spent (₹)': 'Spent (₹)', 'Remaining (₹)': 'Remaining (₹)', '% Used': '% Used', Status: 'Status' },
+    { Metric: 'Category', Value: `Budget (${sym})`, [`Spent (${sym})`]: `Spent (${sym})`, [`Remaining (${sym})`]: `Remaining (${sym})`, '% Used': '% Used', Status: 'Status' },
   ];
 
   categories.forEach((cat) => {
@@ -119,8 +121,8 @@ function buildMonthlySummary(
     rows.push({
       Metric: `${cat.icon} ${cat.name}`,
       Value: catBudget,
-      'Spent (₹)': spent,
-      'Remaining (₹)': catRemaining,
+      [`Spent (${sym})`]: spent,
+      [`Remaining (${sym})`]: catRemaining,
       '% Used': pct,
       Status: spent > catBudget ? '⚠ Over Budget' : '✓ Within Budget',
     });
@@ -130,8 +132,8 @@ function buildMonthlySummary(
   rows.push({
     Metric: 'TOTAL',
     Value: totalBudget,
-    'Spent (₹)': totalExpenses,
-    'Remaining (₹)': remaining,
+    [`Spent (${sym})`]: totalExpenses,
+    [`Remaining (${sym})`]: remaining,
     '% Used': totalBudget > 0 ? ((totalExpenses / totalBudget) * 100).toFixed(1) + '%' : '0.0%',
     Status: totalExpenses > totalBudget ? '⚠ Over Budget' : '✓ Within Budget',
   });
@@ -145,7 +147,8 @@ function buildMonthlySummary(
 function buildYearlySummary(
   allExpenses: Expense[],
   allIncome: Income[],
-  year: number
+  year: number,
+  sym: string
 ) {
   const yearExp = allExpenses.filter(e => e.year === year);
   const yearInc = allIncome.filter(i => i.year === year);
@@ -153,7 +156,7 @@ function buildYearlySummary(
   const rows: AnyRow[] = [
     { Month: `Yearly Summary — ${year}`, Income: '' },
     { Month: '', Income: '' },
-    { Month: 'Month', Income: 'Income (₹)', 'Expenses (₹)': 'Expenses (₹)', 'Net (₹)': 'Net (₹)', Transactions: 'Transactions' },
+    { Month: 'Month', Income: `Income (${sym})`, [`Expenses (${sym})`]: `Expenses (${sym})`, [`Net (${sym})`]: `Net (${sym})`, Transactions: 'Transactions' },
   ];
 
   let grandIncome = 0, grandExpenses = 0;
@@ -166,12 +169,12 @@ function buildYearlySummary(
     rows.push({
       Month: MONTH_NAMES[m - 1],
       Income: mInc,
-      'Expenses (₹)': mExp,
-      'Net (₹)': mInc - mExp,
+      [`Expenses (${sym})`]: mExp,
+      [`Net (${sym})`]: mInc - mExp,
       Transactions: mTx,
     });
   }
-  rows.push({ Month: 'TOTAL', Income: grandIncome, 'Expenses (₹)': grandExpenses, 'Net (₹)': grandIncome - grandExpenses, Transactions: '' });
+  rows.push({ Month: 'TOTAL', Income: grandIncome, [`Expenses (${sym})`]: grandExpenses, [`Net (${sym})`]: grandIncome - grandExpenses, Transactions: '' });
 
   const ws = XLSX.utils.json_to_sheet(rows, { skipHeader: true });
   ws['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
@@ -179,13 +182,13 @@ function buildYearlySummary(
 }
 
 // Summary sheet for all data — shows yearly breakdown
-function buildAllDataSummary(allExpenses: Expense[], allIncome: Income[]) {
+function buildAllDataSummary(allExpenses: Expense[], allIncome: Income[], sym: string) {
   const years = [...new Set([...allExpenses.map(e => e.year), ...allIncome.map(i => i.year)])].sort((a, b) => a - b);
 
   const rows: AnyRow[] = [
     { Year: 'All Data Summary', Income: '' },
     { Year: '', Income: '' },
-    { Year: 'Year', Income: 'Income (₹)', 'Expenses (₹)': 'Expenses (₹)', 'Net (₹)': 'Net (₹)', Transactions: 'Transactions' },
+    { Year: 'Year', Income: `Income (${sym})`, [`Expenses (${sym})`]: `Expenses (${sym})`, [`Net (${sym})`]: `Net (${sym})`, Transactions: 'Transactions' },
   ];
 
   let grandIncome = 0, grandExpenses = 0;
@@ -194,7 +197,7 @@ function buildAllDataSummary(allExpenses: Expense[], allIncome: Income[]) {
     const yExp = allExpenses.filter(e => e.year === yr).reduce((s, e) => s + e.amount, 0);
     const yTx  = allExpenses.filter(e => e.year === yr).length + allIncome.filter(i => i.year === yr).length;
     grandIncome += yInc; grandExpenses += yExp;
-    rows.push({ Year: yr, Income: yInc, 'Expenses (₹)': yExp, 'Net (₹)': yInc - yExp, Transactions: yTx });
+    rows.push({ Year: yr, Income: yInc, [`Expenses (${sym})`]: yExp, [`Net (${sym})`]: yInc - yExp, Transactions: yTx });
   }
   rows.push({ Year: 'TOTAL', Income: grandIncome, 'Expenses (₹)': grandExpenses, 'Net (₹)': grandIncome - grandExpenses, Transactions: '' });
 
@@ -207,9 +210,11 @@ export function exportToExcel(
   expenses: Expense[],
   income: Income[],
   categories: Category[],
-  filter: ExportFilter
+  filter: ExportFilter,
+  currencyCode: string = 'INR'
 ) {
   const wb = XLSX.utils.book_new();
+  const sym = currencySymbol(currencyCode);
   let filename = 'Budget_Export';
 
   if (filter.scope === 'month') {
@@ -222,9 +227,9 @@ export function exportToExcel(
     const fi = income.filter(i => i.month === month && i.year === year)
                      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    XLSX.utils.book_append_sheet(wb, buildExpenseSheet(fe, categories, label), 'Expenses');
-    XLSX.utils.book_append_sheet(wb, buildIncomeSheet(fi, label), 'Income');
-    XLSX.utils.book_append_sheet(wb, buildMonthlySummary(fe, fi, categories, label, month, year), 'Summary');
+    XLSX.utils.book_append_sheet(wb, buildExpenseSheet(fe, categories, label, sym), 'Expenses');
+    XLSX.utils.book_append_sheet(wb, buildIncomeSheet(fi, label, sym), 'Income');
+    XLSX.utils.book_append_sheet(wb, buildMonthlySummary(fe, fi, categories, label, sym, month, year), 'Summary');
 
   } else if (filter.scope === 'day') {
     const { date } = filter;
@@ -235,8 +240,8 @@ export function exportToExcel(
                        .sort((a, b) => a.description.localeCompare(b.description));
     const fi = income.filter(i => i.date === date);
 
-    XLSX.utils.book_append_sheet(wb, buildExpenseSheet(fe, categories, label), 'Expenses');
-    XLSX.utils.book_append_sheet(wb, buildIncomeSheet(fi, label), 'Income');
+    XLSX.utils.book_append_sheet(wb, buildExpenseSheet(fe, categories, label, sym), 'Expenses');
+    XLSX.utils.book_append_sheet(wb, buildIncomeSheet(fi, label, sym), 'Income');
 
     // Simple day summary
     const totalExp = fe.reduce((s, e) => s + e.amount, 0);
@@ -244,9 +249,9 @@ export function exportToExcel(
     const summaryRows: AnyRow[] = [
       { Metric: `Day Summary — ${label}`, Value: '' },
       { Metric: '', Value: '' },
-      { Metric: 'Total Expenses', Value: fmtCurrency(totalExp) },
-      { Metric: 'Total Income',   Value: fmtCurrency(totalInc) },
-      { Metric: 'Net Balance',    Value: fmtCurrency(totalInc - totalExp) },
+      { Metric: 'Total Expenses', Value: fmtCurrency(totalExp, sym) },
+      { Metric: 'Total Income',   Value: fmtCurrency(totalInc, sym) },
+      { Metric: 'Net Balance',    Value: fmtCurrency(totalInc - totalExp, sym) },
       { Metric: '', Value: '' },
       { Metric: 'Expense Transactions', Value: fe.length },
       { Metric: 'Income Transactions',  Value: fi.length },
@@ -264,9 +269,9 @@ export function exportToExcel(
     const fi = income.filter(i => i.year === year)
                      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    XLSX.utils.book_append_sheet(wb, buildExpenseSheet(fe, categories, String(year)), 'Expenses');
-    XLSX.utils.book_append_sheet(wb, buildIncomeSheet(fi, String(year)), 'Income');
-    XLSX.utils.book_append_sheet(wb, buildYearlySummary(expenses, income, year), 'Monthly Breakdown');
+    XLSX.utils.book_append_sheet(wb, buildExpenseSheet(fe, categories, String(year), sym), 'Expenses');
+    XLSX.utils.book_append_sheet(wb, buildIncomeSheet(fi, String(year), sym), 'Income');
+    XLSX.utils.book_append_sheet(wb, buildYearlySummary(expenses, income, year, sym), 'Monthly Breakdown');
 
   } else {
     // all
@@ -274,9 +279,9 @@ export function exportToExcel(
     const fe = [...expenses].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const fi = [...income].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    XLSX.utils.book_append_sheet(wb, buildExpenseSheet(fe, categories, 'All Data'), 'Expenses');
-    XLSX.utils.book_append_sheet(wb, buildIncomeSheet(fi, 'All Data'), 'Income');
-    XLSX.utils.book_append_sheet(wb, buildAllDataSummary(expenses, income), 'Yearly Breakdown');
+    XLSX.utils.book_append_sheet(wb, buildExpenseSheet(fe, categories, 'All Data', sym), 'Expenses');
+    XLSX.utils.book_append_sheet(wb, buildIncomeSheet(fi, 'All Data', sym), 'Income');
+    XLSX.utils.book_append_sheet(wb, buildAllDataSummary(expenses, income, sym), 'Yearly Breakdown');
   }
 
   const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });

@@ -3,6 +3,7 @@
 import { TrendingUp, TrendingDown, Target, Wallet, Activity, PiggyBank } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { getCategoryBudget } from '@/types';
+import { formatCurrency, currencySymbol } from '@/utils/currency';
 import type { ReactNode } from 'react';
 
 interface StatCardProps {
@@ -14,7 +15,7 @@ interface StatCardProps {
   icon: ReactNode;
 }
 
-function StatCard({ label, value, subtext, accentColor, bgColor, icon }: StatCardProps) {
+function StatCard({ label, value, subtext, accentColor, bgColor, icon, prefix = '' }: StatCardProps & { prefix?: string }) {
   return (
     <div className="dark-card p-5" style={{ borderTop: `3px solid ${accentColor}` }}>
       <div className="flex items-start justify-between mb-3">
@@ -26,7 +27,7 @@ function StatCard({ label, value, subtext, accentColor, bgColor, icon }: StatCar
         </div>
       </div>
       <p className="text-2xl font-bold num-mono mb-1" style={{ color: '#0f172a' }}>
-        ₹{value}
+        {prefix}{value}
       </p>
       <p className="text-xs font-medium" style={{ color: '#94a3b8' }}>
         {subtext}
@@ -36,7 +37,7 @@ function StatCard({ label, value, subtext, accentColor, bgColor, icon }: StatCar
 }
 
 export default function CategoryStats() {
-  const { categories, getMonthlyTotal, getMonthlyIncome, selectedMonth, selectedYear, selectedCity, expenses } =
+  const { categories, getMonthlyTotal, getMonthlyIncome, selectedMonth, selectedYear, selectedCity, expenses, currency } =
     useBudgetStore();
   void selectedCity; // subscribe to city changes so component re-renders
 
@@ -62,6 +63,7 @@ export default function CategoryStats() {
       <StatCard
         label="Total Income"
         value={monthlyIncome.toFixed(2)}
+        prefix={currencySymbol(currency)}
         subtext="This month"
         accentColor="#059669"
         bgColor="#ecfdf5"
@@ -70,6 +72,7 @@ export default function CategoryStats() {
       <StatCard
         label="Total Spent"
         value={monthlyExpenses.toFixed(2)}
+        prefix={currencySymbol(currency)}
         subtext={`${useBudgetStore.getState().selectedCity} this month`}
         accentColor="#dc2626"
         bgColor="#fef2f2"
@@ -78,6 +81,7 @@ export default function CategoryStats() {
       <StatCard
         label="Total Budget"
         value={budgetTotal.toFixed(2)}
+        prefix={currencySymbol(currency)}
         subtext="All categories"
         accentColor="#0891b2"
         bgColor="#ecfeff"
@@ -86,6 +90,7 @@ export default function CategoryStats() {
       <StatCard
         label="Remaining"
         value={remaining.toFixed(2)}
+        prefix={currencySymbol(currency)}
         subtext={remaining >= 0 ? 'To spend' : 'Over budget'}
         accentColor={remaining >= 0 ? '#6366f1' : '#dc2626'}
         bgColor={remaining >= 0 ? '#eef2ff' : '#fef2f2'}
@@ -94,6 +99,7 @@ export default function CategoryStats() {
       <StatCard
         label="Net Balance"
         value={netBalance.toFixed(2)}
+        prefix={currencySymbol(currency)}
         subtext={netBalance >= 0 ? 'Surplus' : 'Deficit'}
         accentColor={netBalance >= 0 ? '#d97706' : '#dc2626'}
         bgColor={netBalance >= 0 ? '#fffbeb' : '#fef2f2'}
@@ -115,7 +121,7 @@ export default function CategoryStats() {
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold num-mono" style={{ color: savingsPositive ? '#059669' : '#dc2626' }}>
-              {savingsPositive ? '+' : ''}₹{savings.toFixed(2)}
+              {savingsPositive ? '+' : ''}{formatCurrency(savings, currency)}
             </p>
             <p className="text-xs font-semibold mt-0.5" style={{ color: savingsPositive ? '#059669' : '#dc2626' }}>
               {savingsRate.toFixed(1)}% savings rate
@@ -124,8 +130,8 @@ export default function CategoryStats() {
         </div>
         <div className="mt-2">
           <div className="flex justify-between text-xs mb-1.5" style={{ color: '#94a3b8' }}>
-            <span>₹0</span>
-            <span>Income: ₹{monthlyIncome.toFixed(2)}</span>
+            <span>{currencySymbol(currency)}0</span>
+            <span>Income: {formatCurrency(monthlyIncome, currency)}</span>
           </div>
           <div className="w-full rounded-full h-2.5" style={{ background: '#f1f5f9' }}>
             <div
@@ -139,8 +145,8 @@ export default function CategoryStats() {
             />
           </div>
           <div className="flex justify-between text-xs mt-1.5" style={{ color: '#94a3b8' }}>
-            <span>Spent: ₹{allCitiesExpenses.toFixed(2)}</span>
-            <span>Saved: ₹{Math.max(0, savings).toFixed(2)}</span>
+            <span>Spent: {formatCurrency(allCitiesExpenses, currency)}</span>
+            <span>Saved: {formatCurrency(Math.max(0, savings), currency)}</span>
           </div>
         </div>
       </div>

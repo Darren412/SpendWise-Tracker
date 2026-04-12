@@ -13,16 +13,35 @@ import BudgetEditor from '@/components/BudgetEditor';
 import YearlySummary from '@/components/YearlySummary';
 import AllExpensesModal from '@/components/AllExpensesModal';
 import ExportModal from '@/components/ExportModal';
+import LoginPage from '@/components/LoginPage';
 import { useBudgetStore } from '@/store/budgetStore';
+import { useAuth } from '@/components/AuthProvider';
+import { Loader2 } from 'lucide-react';
 
 export default function Home() {
-  const { loadFromLocalStorage } = useBudgetStore();
+  const { user, loading: authLoading } = useAuth();
+  const { loadFromLocalStorage, setUserId } = useBudgetStore();
   const [showAllExpensesModal, setShowAllExpensesModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
 
   useEffect(() => {
-    loadFromLocalStorage();
-  }, [loadFromLocalStorage]);
+    if (user) {
+      setUserId(user.id);
+      loadFromLocalStorage();
+    }
+  }, [user, loadFromLocalStorage, setUserId]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+        <Loader2 size={32} className="animate-spin" style={{ color: 'var(--accent-purple)' }} />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
 
   return (
     <main className="min-h-screen graffiti-bg">

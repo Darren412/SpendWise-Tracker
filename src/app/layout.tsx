@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import AuthProvider from "@/components/AuthProvider";
 
 export const metadata: Metadata = {
-  title: "Budget Tracker",
-  description: "Comprehensive monthly household budget tracker",
+  title: "Spendwise",
+  description: "Your personal finance dashboard",
 };
 
 export default function RootLayout({
@@ -18,7 +19,9 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body>{children}</body>
+      <body>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

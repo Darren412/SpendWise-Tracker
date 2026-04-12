@@ -1,13 +1,18 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { BarChart3, ChevronDown, MapPin } from 'lucide-react';
+import { BarChart3, ChevronDown, MapPin, LogOut, DollarSign } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
+import { useAuth } from '@/components/AuthProvider';
+import { currencies } from '@/utils/currency';
 
 export default function Header() {
-  const { selectedMonth, selectedYear, setSelectedYear, selectedCity, setSelectedCity } = useBudgetStore();
+  const { selectedMonth, selectedYear, setSelectedYear, selectedCity, setSelectedCity, currency, setCurrency } = useBudgetStore();
+  const { user, signOut } = useAuth();
   const [yearOpen, setYearOpen] = useState(false);
+  const [currencyOpen, setCurrencyOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const currencyRef = useRef<HTMLDivElement>(null);
   const cities = ['Bangalore', 'Mangalore', 'Both'];
 
   const currentYear = new Date().getFullYear();
@@ -17,6 +22,9 @@ export default function Header() {
     function handleClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setYearOpen(false);
+      }
+      if (currencyRef.current && !currencyRef.current.contains(e.target as Node)) {
+        setCurrencyOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -29,6 +37,10 @@ export default function Header() {
   ];
   const monthName = monthNames[parseInt(selectedMonth) - 1];
 
+  const displayName = user?.user_metadata?.full_name
+    || user?.email?.split('@')[0]
+    || '';
+
   return (
     <header style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
@@ -40,7 +52,7 @@ export default function Header() {
           </div>
           <div>
             <h1 className="text-lg font-bold tracking-tight" style={{ color: '#0f172a', lineHeight: 1.2 }}>
-              Budget Tracker
+              {displayName ? `${displayName}'s Spendwise` : 'Spendwise'}
             </h1>
             <p className="text-xs font-medium" style={{ color: '#94a3b8' }}>
               Personal Finance Dashboard
@@ -51,7 +63,8 @@ export default function Header() {
         {/* Right — City selector + Month + Year picker */}
         <div className="flex items-center gap-3">
 
-          {/* City Toggle */}
+          {/* City Toggle — only for darren412 */}
+          {user?.email === 'darren412@gmail.com' && (
           <div className="flex items-center gap-1 p-1 rounded-lg" style={{ background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
             <MapPin size={13} style={{ color: '#64748b', marginLeft: 4 }} />
             {cities.map(city => (
@@ -67,6 +80,45 @@ export default function Header() {
                 {city}
               </button>
             ))}
+          </div>
+          )}
+
+          {/* Currency Selector */}
+          <div className="relative" ref={currencyRef}>
+            <button
+              onClick={() => setCurrencyOpen(!currencyOpen)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-semibold text-xs transition-all"
+              style={{
+                background: '#f1f5f9',
+                border: '1px solid #e2e8f0',
+                color: '#1e293b',
+              }}
+            >
+              <DollarSign size={13} style={{ color: '#64748b' }} />
+              {currencies.find(c => c.code === currency)?.label ?? 'INR'}
+              <ChevronDown size={12} style={{ color: '#64748b' }} className={`transition-transform duration-200 ${currencyOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {currencyOpen && (
+              <div
+                className="absolute top-full right-0 mt-1.5 rounded-xl z-50 overflow-hidden"
+                style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 8px 24px rgba(0,0,0,0.10)', minWidth: '120px' }}
+              >
+                {currencies.map((c) => (
+                  <button
+                    key={c.code}
+                    onClick={() => { setCurrency(c.code); setCurrencyOpen(false); }}
+                    className="w-full px-4 py-2.5 text-left text-xs font-semibold transition-colors"
+                    style={{
+                      color: c.code === currency ? '#6366f1' : '#334155',
+                      background: c.code === currency ? '#eef2ff' : 'transparent',
+                    }}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="text-right hidden sm:block">
             <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#94a3b8' }}>
@@ -112,6 +164,21 @@ export default function Header() {
               </div>
             )}
           </div>
+
+          {/* Sign Out */}
+          <button
+            onClick={signOut}
+            title={user?.email ?? 'Sign out'}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
+            style={{
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#dc2626',
+            }}
+          >
+            <LogOut size={14} />
+            <span className="hidden sm:inline">Sign Out</span>
+          </button>
         </div>
       </div>
     </header>

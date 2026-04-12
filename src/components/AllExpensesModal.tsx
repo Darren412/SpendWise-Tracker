@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { X, Calendar } from 'lucide-react';
+import { X, Calendar, Pencil, Check, XCircle } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
+import { formatCurrency } from '@/utils/currency';
 
 interface AllExpensesModalProps {
   isOpen: boolean;
@@ -10,10 +11,41 @@ interface AllExpensesModalProps {
 }
 
 export default function AllExpensesModal({ isOpen, onClose }: AllExpensesModalProps) {
-  const { categories, expenses: allExpenses, selectedMonth, selectedYear, selectedCity } = useBudgetStore();
+  const { categories, expenses: allExpenses, selectedMonth, selectedYear, selectedCity, currency, updateExpense } = useBudgetStore();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedDay, setSelectedDay] = useState<string>('all');
   const [modalCity, setModalCity] = useState<string>(selectedCity);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDesc, setEditDesc] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+
+  const startEditing = (expense: { id: string; description: string; amount: number; date: string; category: string }) => {
+    setEditingId(expense.id);
+    setEditDesc(expense.description);
+    setEditAmount(String(expense.amount));
+    setEditDate(expense.date);
+    setEditCategory(expense.category);
+  };
+
+  const cancelEditing = () => setEditingId(null);
+
+  const saveEdit = () => {
+    if (!editingId) return;
+    const parsed = parseFloat(editAmount);
+    if (!editDesc.trim() || isNaN(parsed) || parsed <= 0 || !editDate) return;
+    const dateObj = new Date(editDate);
+    updateExpense(editingId, {
+      description: editDesc.trim(),
+      amount: parsed,
+      date: editDate,
+      category: editCategory,
+      month: String(dateObj.getMonth() + 1).padStart(2, '0'),
+      year: dateObj.getFullYear(),
+    });
+    setEditingId(null);
+  };
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -121,7 +153,7 @@ export default function AllExpensesModal({ isOpen, onClose }: AllExpensesModalPr
             <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>
               {headerLabel}
               &nbsp;·&nbsp;
-              <span className="font-semibold" style={{ color: '#dc2626' }}>₹{totalVisible.toFixed(2)}</span>
+              <span className="font-semibold" style={{ color: '#dc2626' }}>{formatCurrency(totalVisible, currency)}</span>
               &nbsp;·&nbsp;{visibleExpenses.length} transaction{visibleExpenses.length !== 1 ? 's' : ''}
             </p>
           </div>
@@ -243,18 +275,36 @@ export default function AllExpensesModal({ isOpen, onClose }: AllExpensesModalPr
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>{dayExpenses.length} item{dayExpenses.length !== 1 ? 's' : ''}</span>
-                      <span className="text-sm font-bold num-mono" style={{ color: '#dc2626' }}>₹{dayTotal.toFixed(2)}</span>
+                      <span className="text-sm font-bold num-mono" style={{ color: '#dc2626' }}>{formatCurrency(dayTotal, currency)}</span>
                     </div>
                   </div>
                   <div className="divide-y divide-slate-100">
                     {dayExpenses.map((expense) => (
                       <div key={expense.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
-                        <span className="text-lg">{getCategoryIcon(expense.category)}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate" style={{ color: '#1e293b' }}>{expense.description}</p>
-                          <p className="text-xs" style={{ color: '#94a3b8' }}>{getCategoryName(expense.category)}</p>
-                        </div>
-                        <span className="text-sm font-bold num-mono flex-shrink-0" style={{ color: '#dc2626' }}>₹{expense.amount.toFixed(2)}</span>
+                        {editingId === expense.id ? (
+                          <>
+                            <div className="flex-1 flex flex-wrap items-center gap-2">
+                              <input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="px-2 py-1 text-sm rounded-md border border-slate-200 flex-1 min-w-[100px]" placeholder="Description" />
+                              <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="px-2 py-1 text-sm rounded-md border border-slate-200">
+                                {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>)}
+                              </select>
+                              <input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className="px-2 py-1 text-sm rounded-md border border-slate-200 w-24" placeholder="Amount" min="0" step="0.01" />
+                              <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="px-2 py-1 text-sm rounded-md border border-slate-200" />
+                            </div>
+                            <button onClick={saveEdit} className="p-1.5 rounded-md hover:bg-green-50 transition-colors" style={{ color: '#16a34a' }}><Check size={15} /></button>
+                            <button onClick={cancelEditing} className="p-1.5 rounded-md hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><XCircle size={15} /></button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-lg">{getCategoryIcon(expense.category)}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate" style={{ color: '#1e293b' }}>{expense.description}</p>
+                              <p className="text-xs" style={{ color: '#94a3b8' }}>{getCategoryName(expense.category)}</p>
+                            </div>
+                            <span className="text-sm font-bold num-mono flex-shrink-0" style={{ color: '#dc2626' }}>{formatCurrency(expense.amount, currency)}</span>
+                            <button onClick={() => startEditing(expense)} className="p-1.5 rounded-md hover:bg-slate-100 transition-colors" style={{ color: '#64748b' }}><Pencil size={14} /></button>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -274,18 +324,36 @@ export default function AllExpensesModal({ isOpen, onClose }: AllExpensesModalPr
                       <span className="text-sm font-bold" style={{ color: '#0f172a' }}>{getCategoryName(catId)}</span>
                       <span className="ml-2 text-xs" style={{ color: '#94a3b8' }}>{catExpenses.length} transaction{catExpenses.length !== 1 ? 's' : ''}</span>
                     </div>
-                    <span className="text-sm font-bold num-mono" style={{ color: '#dc2626' }}>₹{catTotal.toFixed(2)}</span>
+                    <span className="text-sm font-bold num-mono" style={{ color: '#dc2626' }}>{formatCurrency(catTotal, currency)}</span>
                   </div>
                   <div>
                     {catExpenses.map((expense) => (
                       <div key={expense.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors" style={{ borderBottom: '1px solid #f8fafc' }}>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate" style={{ color: '#1e293b' }}>{expense.description}</p>
-                          <p className="text-xs" style={{ color: '#94a3b8' }}>
-                            {new Date(expense.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </p>
-                        </div>
-                        <span className="text-sm font-bold num-mono flex-shrink-0" style={{ color: '#dc2626' }}>₹{expense.amount.toFixed(2)}</span>
+                        {editingId === expense.id ? (
+                          <>
+                            <div className="flex-1 flex flex-wrap items-center gap-2">
+                              <input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="px-2 py-1 text-sm rounded-md border border-slate-200 flex-1 min-w-[100px]" placeholder="Description" />
+                              <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="px-2 py-1 text-sm rounded-md border border-slate-200">
+                                {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>)}
+                              </select>
+                              <input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className="px-2 py-1 text-sm rounded-md border border-slate-200 w-24" placeholder="Amount" min="0" step="0.01" />
+                              <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="px-2 py-1 text-sm rounded-md border border-slate-200" />
+                            </div>
+                            <button onClick={saveEdit} className="p-1.5 rounded-md hover:bg-green-50 transition-colors" style={{ color: '#16a34a' }}><Check size={15} /></button>
+                            <button onClick={cancelEditing} className="p-1.5 rounded-md hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><XCircle size={15} /></button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate" style={{ color: '#1e293b' }}>{expense.description}</p>
+                              <p className="text-xs" style={{ color: '#94a3b8' }}>
+                                {new Date(expense.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </p>
+                            </div>
+                            <span className="text-sm font-bold num-mono flex-shrink-0" style={{ color: '#dc2626' }}>{formatCurrency(expense.amount, currency)}</span>
+                            <button onClick={() => startEditing(expense)} className="p-1.5 rounded-md hover:bg-slate-100 transition-colors" style={{ color: '#64748b' }}><Pencil size={14} /></button>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
