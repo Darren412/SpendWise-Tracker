@@ -1,131 +1,145 @@
-'use client';
+﻿'use client';
 
-import { useEffect, useState } from 'react';
-import Header from '@/components/Header';
-import MonthYearFilter from '@/components/MonthYearFilter';
-import ExpenseForm from '@/components/ExpenseForm';
-import IncomeForm from '@/components/IncomeForm';
-import ExpenseList from '@/components/ExpenseList';
-import IncomeList from '@/components/IncomeList';
-import CategoryStats from '@/components/CategoryStats';
-import Charts from '@/components/Charts';
-import BudgetEditor from '@/components/BudgetEditor';
-import YearlySummary from '@/components/YearlySummary';
-import AllExpensesModal from '@/components/AllExpensesModal';
-import ExportModal from '@/components/ExportModal';
+import { useEffect, useState, lazy, Suspense } from 'react';
+import LeftPane from '@/components/LeftPane';
+import TopToolbar from '@/components/TopToolbar';
+import AddTransactionModal from '@/components/AddTransactionModal';
 import LoginPage from '@/components/LoginPage';
 import { useBudgetStore } from '@/store/budgetStore';
 import { useAuth } from '@/components/AuthProvider';
-import { Loader2 } from 'lucide-react';
+import { Loader2, WifiOff } from 'lucide-react';
+
+const OverviewWorkspace     = lazy(() => import('@/workspaces/OverviewWorkspace'));
+const AnalyticsWorkspace    = lazy(() => import('@/workspaces/AnalyticsWorkspace'));
+const TransactionsWorkspace = lazy(() => import('@/workspaces/TransactionsWorkspace'));
+const InsightsWorkspace     = lazy(() => import('@/workspaces/InsightsWorkspace'));
+const ReportsWorkspace      = lazy(() => import('@/workspaces/ReportsWorkspace'));
+const SettingsWorkspace     = lazy(() => import('@/workspaces/SettingsWorkspace'));
+
+type Workspace = 'overview' | 'analytics' | 'transactions' | 'insights' | 'reports' | 'settings';
+
+function WorkspaceSkeleton() {
+  return (
+    <div style={{ padding: '28px 28px', maxWidth: 1400 }}>
+      {/* Header skeleton */}
+      <div style={{ marginBottom: 28 }}>
+        <div className="skeleton" style={{ width: 220, height: 32, marginBottom: 8, borderRadius: 8 }} />
+        <div className="skeleton" style={{ width: 320, height: 16, borderRadius: 6 }} />
+      </div>
+      {/* KPI skeleton */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="skeleton" style={{ height: 110, borderRadius: 16 }} />
+        ))}
+      </div>
+      {/* Panels skeleton */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="skeleton" style={{ height: 200, borderRadius: 16 }} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const { user, loading: authLoading } = useAuth();
-  const { loadFromLocalStorage, setUserId } = useBudgetStore();
-  const [showAllExpensesModal, setShowAllExpensesModal] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
+  const { loadFromLocalStorage, setUserId, networkError } = useBudgetStore();
+  const [activeWorkspace, setActiveWorkspace] = useState<Workspace>('overview');
+  const [addModal, setAddModal] = useState<{ open: boolean; tab: 'expense' | 'income' }>({ open: false, tab: 'expense' });
 
   useEffect(() => {
-    if (user) {
-      setUserId(user.id);
-      loadFromLocalStorage();
-    }
+    if (user) { setUserId(user.id); loadFromLocalStorage(); }
   }, [user, loadFromLocalStorage, setUserId]);
 
+  const handleWorkspaceChange = (id: string) => {
+    setActiveWorkspace(id as Workspace);
+  };
+
+  /* ── Auth loading ── */
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
-        <Loader2 size={32} className="animate-spin" style={{ color: 'var(--accent-purple)' }} />
+      <div style={{
+        minHeight: '100dvh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--bg-canvas)',
+      }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <div style={{
+            width: 52,
+            height: 52,
+            borderRadius: 16,
+            background: 'linear-gradient(135deg, var(--brand-500), var(--purple-600))',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: 'var(--shadow-brand)',
+          }}>
+            <Loader2 size={22} color="#fff" className="animate-spin" />
+          </div>
+          <p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-400)' }}>
+            Loading Spendwise…
+          </p>
+        </div>
       </div>
     );
   }
 
-  if (!user) {
-    return <LoginPage />;
-  }
+  if (!user) return <LoginPage />;
 
   return (
-    <main className="min-h-screen graffiti-bg">
-      <Header />
+    <>
+      <div className="sw-app-shell">
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Month/Year Filter */}
-        <div className="mb-8">
-          <MonthYearFilter />
-        </div>
+        {/* ── Fixed sidebar nav ── */}
+        <LeftPane
+          activeWorkspace={activeWorkspace}
+          onWorkspaceChange={handleWorkspaceChange}
+        />
 
-        {/* Stats Section */}
-        <div className="mb-8">
-          <CategoryStats />
-        </div>
+        {/* ── Main column: toolbar + viewport ── */}
+        <div className="sw-workspace-container">
 
-        {/* Main Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          {/* Left Column - Forms */}
-          <div className="space-y-8">
-            <ExpenseForm />
-            <IncomeForm />
+          {/* Sticky toolbar */}
+          <TopToolbar
+            onAddExpense={() => setAddModal({ open: true, tab: 'expense' })}
+            onAddIncome={()  => setAddModal({ open: true, tab: 'income' })}
+            onExport={() => handleWorkspaceChange('reports')}
+          />
+
+          {/* Network error banner */}
+          {networkError && (
+            <div className="sw-network-banner">
+              <WifiOff size={13} />
+              Sync issue — changes saved locally and will sync on reconnect.
+            </div>
+          )}
+
+          {/* Workspace viewport */}
+          <div className="sw-workspace-viewport">
+            <div key={activeWorkspace} className="sw-workspace-fade">
+              <Suspense fallback={<WorkspaceSkeleton />}>
+                {activeWorkspace === 'overview'     && <OverviewWorkspace     onNavigate={handleWorkspaceChange} />}
+                {activeWorkspace === 'analytics'    && <AnalyticsWorkspace    />}
+                {activeWorkspace === 'transactions' && <TransactionsWorkspace onAddExpense={() => setAddModal({ open: true, tab: 'expense' })} onAddIncome={() => setAddModal({ open: true, tab: 'income' })} />}
+                {activeWorkspace === 'insights'     && <InsightsWorkspace     />}
+                {activeWorkspace === 'reports'      && <ReportsWorkspace      />}
+                {activeWorkspace === 'settings'     && <SettingsWorkspace     />}
+              </Suspense>
+            </div>
           </div>
 
-          {/* Right Column - Charts */}
-          <div className="lg:col-span-2 h-full">
-            <Charts />
-          </div>
-        </div>
-
-        {/* Budget Editor Section */}
-        <div className="mb-8">
-          <BudgetEditor />
-        </div>
-
-        {/* Yearly Summary */}
-        <div className="mb-8">
-          <YearlySummary />
-        </div>
-
-        {/* Lists Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <ExpenseList />
-          <IncomeList />
-        </div>
-
-        {/* View All Expenses + Export Buttons */}
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <button
-            onClick={() => setShowAllExpensesModal(true)}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all"
-            style={{
-              background: '#dc2626',
-              color: '#fff',
-              boxShadow: '0 2px 8px rgba(220,38,38,0.25)',
-            }}
-          >
-            View All Expenses
-          </button>
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all"
-            style={{
-              background: '#059669',
-              color: '#fff',
-              boxShadow: '0 2px 8px rgba(5,150,105,0.25)',
-            }}
-          >
-            Export to Excel
-          </button>
         </div>
       </div>
 
-      {/* All Expenses Modal */}
-      <AllExpensesModal
-        isOpen={showAllExpensesModal}
-        onClose={() => setShowAllExpensesModal(false)}
+      {/* ── Add transaction modal ── */}
+      <AddTransactionModal
+        open={addModal.open}
+        defaultTab={addModal.tab}
+        onClose={() => setAddModal(v => ({ ...v, open: false }))}
       />
-
-      {/* Export Modal */}
-      <ExportModal
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-      />
-    </main>
+    </>
   );
 }
