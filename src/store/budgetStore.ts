@@ -371,6 +371,16 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
     });
   },
 
+  updateIncome: (id: string, updates: Partial<Income>) => {
+    set((state) => {
+      const newIncome = state.income.map((i) =>
+        i.id === id ? { ...i, ...updates } : i
+      );
+      syncToSupabase({ expenses: state.expenses, income: newIncome, categories: state.categories });
+      return { income: newIncome };
+    });
+  },
+
   addCategory: (category: Category) => {
     set((state) => {
       const newCategories = [...state.categories, category];
