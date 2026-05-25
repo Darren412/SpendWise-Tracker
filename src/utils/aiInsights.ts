@@ -8,7 +8,6 @@
 
 import { Expense, Income, Category } from '@/types';
 import { getFinancialMonthRange } from './financialCycle';
-import { currencySymbol } from './currency';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

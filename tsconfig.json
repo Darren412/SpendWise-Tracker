@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",
     "target": "ES2017",
     "useDefineForClassFields": true,
     "lib": [
@@ -12,14 +11,12 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "preserve",
-    /* Linting */
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
@@ -42,8 +39,10 @@
     "src",
     ".next/types/**/*.ts"
   ],
-
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "src/app 2",
+    "src/components 2",
+    "src/store 2"
   ]
 }

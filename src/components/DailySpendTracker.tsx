@@ -43,8 +43,7 @@ interface TooltipPassedProps {
 
 interface DayTooltipProps extends TooltipPassedProps {
   active?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: Array<{ payload: DayData; value: number; [key: string]: any }>;
+  payload?: Array<{ payload: DayData; value: number; [key: string]: unknown }>;
 }
 
 function DayTooltip({ active, payload, categories, currency, avgDaily }: DayTooltipProps) {
@@ -186,7 +185,7 @@ export default function DailySpendTracker() {
   );
 
   // Memoised: financial period date list + analytics
-  const { dates, start, endNorm, effectiveDays } = useMemo(() => {
+  const { dates, effectiveDays } = useMemo(() => {
     const { start, end } = getFinancialMonthRange(selectedMonth, selectedYear, financialCycleStart);
     const ds: Date[] = [];
     const cursor = new Date(start);

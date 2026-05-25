@@ -41,7 +41,7 @@ export default function CategoryFilterBar() {
   // excludedCategoryIds = [] means "nothing excluded, show everything" (All Categories).
   // A non-empty array means those IDs are hidden from dashboard calculations.
   const noneExcluded = excludedCategoryIds.length === 0;
-  const excludedCount = excludedCategoryIds.filter(id =>
+  const excludedCount = excludedCategoryIds.filter((id: string) =>
     expenseCategories.some(c => c.id === id)
   ).length;
 
@@ -158,7 +158,7 @@ export default function CategoryFilterBar() {
     if (!deleteState) return;
     deleteCategory(deleteState.categoryId, deleteState.reassignToId || undefined);
     // Remove the deleted category from exclusions (it no longer exists)
-    setExcludedCategoryIds(excludedCategoryIds.filter(id => id !== deleteState.categoryId));
+    setExcludedCategoryIds(excludedCategoryIds.filter((id: string) => id !== deleteState.categoryId));
     setDeleteState(null);
   };
 

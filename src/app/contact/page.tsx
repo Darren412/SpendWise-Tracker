@@ -187,7 +187,7 @@ export default function ContactPage() {
                 {submitted && (
                   <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center">
                     <p className="text-green-700 font-medium">
-                      ✓ Message sent successfully! We'll get back to you soon.
+                      ✓ Message sent successfully! We&apos;ll get back to you soon.
                     </p>
                   </div>
                 )}

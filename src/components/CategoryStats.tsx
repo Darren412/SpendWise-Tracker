@@ -199,7 +199,7 @@ function HealthScoreCard({ score, color, accentBg, statusLabel, insight, trend, 
 // ── Main Component ─────────────────────────────────────────────────────────
 
 export default function CategoryStats() {
-  const { categories, getMonthlyTotal, getMonthlyIncome, selectedMonth, selectedYear, selectedCity, expenses, currency, financialCycleStart } = useBudgetStore();
+  const { getMonthlyTotal, getMonthlyIncome, selectedMonth, selectedYear, selectedCity, expenses, currency, financialCycleStart } = useBudgetStore();
 
   const monthlyExpenses   = getMonthlyTotal(selectedMonth, selectedYear);   // already respects selectedCity
   const monthlyIncome     = getMonthlyIncome(selectedMonth, selectedYear);

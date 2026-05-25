@@ -94,6 +94,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
           !(e.city ?? '').toLowerCase().includes(q)) return false;
     }
     return true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [expenses, start, end, selectedCity, excludedCategoryIds, filterCat, filterCity, amtMin, amtMax, search]);
 
   const filteredIncome = useMemo(() => income.filter(i => {

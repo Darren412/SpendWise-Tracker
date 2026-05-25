@@ -3,8 +3,8 @@ import "./globals.css";
 import AuthProvider from "@/components/AuthProvider";
 
 export const metadata: Metadata = {
-  title: "Spendwise — Personal Finance Dashboard",
-  description: "Track spending, analyse cash flow, and understand your financial health.",
+  title: "SpendWise — Intelligent Personal Finance",
+  description: "SpendWise: AI-powered spending analysis, budget tracking, income management, and financial health scoring.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

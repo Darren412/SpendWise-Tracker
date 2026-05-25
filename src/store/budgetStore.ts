@@ -31,6 +31,9 @@ interface BudgetStore {
   reorderCategory: (fromIndex: number, toIndex: number) => void;
   selectedCategoryIds: string[];
   setSelectedCategoryIds: (ids: string[]) => void;
+  excludedCategoryIds: string[];
+  setExcludedCategoryIds: (ids: string[]) => void;
+  updateIncome: (id: string, updates: Partial<Income>) => void;
   getExpensesByMonth: (month: string, year: number) => Expense[];
   getIncomeByMonth: (month: string, year: number) => Income[];
   getMonthlyTotal: (month: string, year: number) => number;

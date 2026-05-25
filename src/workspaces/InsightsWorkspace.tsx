@@ -2,13 +2,13 @@
 
 import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import {
-  Brain, Sparkles, TrendingUp, TrendingDown, AlertTriangle,
+  Brain, Sparkles, TrendingUp, AlertTriangle,
   CheckCircle, Info, Zap, MessageCircle, Send, ChevronDown,
   ChevronUp, Target, Activity, BarChart2, RefreshCw,
   ArrowUpRight, ArrowDownRight, Minus, ShieldCheck, X, Clock,
 } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
-import { currencySymbol, formatCurrencyShort } from '@/utils/currency';
+import { currencySymbol } from '@/utils/currency';
 import { getFinancialMonthRange } from '@/utils/financialCycle';
 import {
   buildMonthHistory,
@@ -140,7 +140,6 @@ export default function InsightsWorkspace() {
 
   // ── Expanded sections ──────────────────────────────────────────────────────
   const [showAllInsights,  setShowAllInsights]  = useState(false);
-  const [showBehavior,     setShowBehavior]     = useState(false);
   const [showCityComp,     setShowCityComp]     = useState(false);
   const [showHealthDrilldown, setShowHealthDrilldown] = useState(false);
   const [activeTab,        setActiveTab]        = useState<'insights' | 'trends' | 'forecast' | 'behavior'>('insights');
@@ -193,8 +192,6 @@ export default function InsightsWorkspace() {
   // ── Computed display values ────────────────────────────────────────────────
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const selectedMonthLabel = `${MONTH_NAMES[parseInt(selectedMonth) - 1]} ${selectedYear}`;
-
-  const maxExpHistory = Math.max(...monthHistory.map(m => m.expenses), 1);
   const visibleInsights = showAllInsights ? insightCards : insightCards.slice(0, 4);
 
   // ─────────────────────────────────────────────────────────────────────────

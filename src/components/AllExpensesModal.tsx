@@ -78,6 +78,7 @@ export default function AllExpensesModal({ isOpen, onClose }: AllExpensesModalPr
         }
       });
     return months.sort((a, b) => b.key.localeCompare(a.key));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allExpenses, modalCity]);
 
   // Expenses for the selected month filtered by city

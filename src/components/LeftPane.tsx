@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   TrendingUp, LayoutDashboard, BarChart2,
-  ArrowUpDown, Lightbulb, FileBarChart, Settings,
+  ArrowUpDown, FileBarChart, Settings,
   ChevronLeft, ChevronRight, LogOut, Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
