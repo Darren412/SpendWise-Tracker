@@ -16,6 +16,7 @@ export interface Income {
   date: string;
   month: string;
   year: number;
+  category?: string;   // optional — income category id
 }
 
 export interface Category {
@@ -23,18 +24,5 @@ export interface Category {
   name: string;
   color: string;
   icon: string;
-  budget: number;
-  monthlyBudgets?: Record<string, number>; // key: "YYYY-MM", e.g. "2026-04"
-}
-
-export function getCategoryBudget(cat: Category, month: string, year: number): number {
-  const key = `${year}-${month}`;
-  return cat.monthlyBudgets?.[key] ?? cat.budget;
-}
-
-export interface MonthlyBudget {
-  month: string;
-  year: number;
-  total: number;
-  expenses: Expense[];
+  type?: 'expense' | 'income' | 'both';   // undefined treated as 'expense' for backward compat
 }

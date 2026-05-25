@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { Expense, Income, Category } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { getFinancialPeriod, getCurrentFinancialPeriod } from '@/utils/financialCycle';
 
 interface BudgetStore {
   expenses: Expense[];
@@ -26,26 +27,93 @@ interface BudgetStore {
   deleteIncome: (id: string) => void;
   addCategory: (category: Category) => void;
   updateCategory: (id: string, category: Partial<Category>) => void;
-  deleteCategory: (id: string) => void;
+  deleteCategory: (id: string, reassignToId?: string) => void;
   reorderCategory: (fromIndex: number, toIndex: number) => void;
+  selectedCategoryIds: string[];
+  setSelectedCategoryIds: (ids: string[]) => void;
   getExpensesByMonth: (month: string, year: number) => Expense[];
   getIncomeByMonth: (month: string, year: number) => Income[];
   getMonthlyTotal: (month: string, year: number) => number;
   getMonthlyIncome: (month: string, year: number) => number;
   getCategoryTotal: (category: string, month: string, year: number) => number;
+  financialCycleStart: number;
+  setFinancialCycleStart: (day: number) => void;
+  migrateToFinancialCycle: () => void;
   loadFromLocalStorage: () => void;
 }
 
 const defaultCategories: Category[] = [
-  { id: '1', name: 'Food & Groceries', color: '#ef4444', icon: '🍔', budget: 8000 },
-  { id: '2', name: 'Transportation', color: '#f59e0b', icon: '🚗', budget: 4000 },
-  { id: '3', name: 'Utilities', color: '#3b82f6', icon: '💡', budget: 3000 },
-  { id: '4', name: 'Entertainment', color: '#8b5cf6', icon: '🎬', budget: 2000 },
-  { id: '5', name: 'Health & Fitness', color: '#10b981', icon: '💪', budget: 2000 },
-  { id: '6', name: 'Shopping', color: '#ec4899', icon: '🛍️', budget: 4000 },
-  { id: '7', name: 'Dining Out', color: '#06b6d4', icon: '🍽️', budget: 3000 },
-  { id: '8', name: 'Miscellaneous', color: '#6b7280', icon: '📦', budget: 2000 },
+  // ─ Expense categories ────────────────────────────────────────────────────
+  { id: '1', name: 'Dining & Food',           type: 'expense', color: '#ef4444', icon: '🍔' },
+  { id: '2', name: 'Travel & Transport',      type: 'expense', color: '#f59e0b', icon: '🚗' },
+  { id: '3', name: 'Utilities & Bills',       type: 'expense', color: '#3b82f6', icon: '💡' },
+  { id: '4', name: 'Entertainment & Leisure', type: 'expense', color: '#8b5cf6', icon: '🎬' },
+  { id: '5', name: 'Healthcare & Wellness',   type: 'expense', color: '#10b981', icon: '💪' },
+  { id: '6', name: 'Retail & Shopping',       type: 'expense', color: '#ec4899', icon: '🛍️' },
+  { id: '7', name: 'Café & Dining',           type: 'expense', color: '#06b6d4', icon: '🍽️' },
+  { id: '8', name: 'Other Expenses',          type: 'expense', color: '#6b7280', icon: '📦' },
+  // ─ Income categories ─────────────────────────────────────────────────────
+  { id: 'inc_1', name: 'Salary Income',      type: 'income', color: '#10b981', icon: '💼' },
+  { id: 'inc_2', name: 'Freelance Income',   type: 'income', color: '#3b82f6', icon: '💻' },
+  { id: 'inc_3', name: 'Investment Returns', type: 'income', color: '#8b5cf6', icon: '📈' },
+  { id: 'inc_4', name: 'Side Income',        type: 'income', color: '#f59e0b', icon: '🎯' },
+  { id: 'inc_5', name: 'Business Income',    type: 'income', color: '#06b6d4', icon: '🏢' },
+  { id: 'inc_6', name: 'Rental Income',      type: 'income', color: '#ec4899', icon: '🏠' },
+  { id: 'inc_7', name: 'Other Income',       type: 'income', color: '#6b7280', icon: '💰' },
 ];
+
+// ── Category name migration map (old name → new name) ────────────────────
+const CATEGORY_NAME_MIGRATION: Record<string, string> = {
+  // Expense renames
+  'Food & Groceries':  'Dining & Food',
+  'Food':              'Dining & Food',
+  'Groceries':         'Dining & Food',
+  'Groceries & Essentials': 'Dining & Food',
+  'Transportation':    'Travel & Transport',
+  'Travel':            'Travel & Transport',
+  'Utilities':         'Utilities & Bills',
+  'Bills':             'Utilities & Bills',
+  'Entertainment':     'Entertainment & Leisure',
+  'Health & Fitness':  'Healthcare & Wellness',
+  'Health':            'Healthcare & Wellness',
+  'Shopping':          'Retail & Shopping',
+  'Retail & Shopping': 'Retail & Shopping',
+  'Dining Out':        'Café & Dining',
+  'Miscellaneous':     'Other Expenses',
+  'Misc':              'Other Expenses',
+  'Other':             'Other Expenses',
+  // Income renames
+  'Salary':            'Salary Income',
+  'Freelance':         'Freelance Income',
+  'Investment':        'Investment Returns',
+  'Investments':       'Investment Returns',
+  'Business':          'Business Income',
+  'Rental':            'Rental Income',
+};
+
+function migrateCategories(categories: Category[]): { categories: Category[]; changed: boolean } {
+  let changed = false;
+  // Ensure income categories exist (merge if missing)
+  const hasIncomeCategories = categories.some(c => c.type === 'income' || c.id.startsWith('inc_'));
+  let merged = categories;
+  if (!hasIncomeCategories) {
+    const incomeCats = defaultCategories.filter(c => c.type === 'income');
+    merged = [...categories, ...incomeCats];
+    changed = true;
+  }
+  const migrated = merged.map(cat => {
+    const newName = CATEGORY_NAME_MIGRATION[cat.name];
+    // Apply type field if missing
+    const needsType = cat.type === undefined;
+    const inferredType: Category['type'] = cat.id.startsWith('inc_') ? 'income' : 'expense';
+    if ((newName && newName !== cat.name) || needsType) {
+      changed = true;
+      return { ...cat, ...(newName ? { name: newName } : {}), ...(needsType ? { type: inferredType } : {}) };
+    }
+    return cat;
+  });
+  return { categories: migrated, changed };
+}
 
 // ── Supabase helpers ────────────────────────────────────────────────────────
 
@@ -76,6 +144,16 @@ function getLocalBackup(userId: string | null): { expenses: string | null; incom
   };
 }
 
+
+// ── Financial cycle init (reads localStorage before store creation) ─────────
+function getSavedCycleStart(): number {
+  if (typeof window === 'undefined') return 25;
+  const saved = localStorage.getItem('spendwise_cycle_start');
+  const n = saved ? parseInt(saved, 10) : 25;
+  return isNaN(n) ? 25 : Math.min(28, Math.max(1, n));
+}
+const initCycleStart = getSavedCycleStart();
+const initPeriod     = getCurrentFinancialPeriod(initCycleStart);
 
 // --- Supabase sync with retry and network status ---
 let syncRetryCount = 0;
@@ -118,25 +196,36 @@ async function loadFromSupabase() {
     // No remote data yet — restore from localStorage backup if available
     const local = getLocalBackup(userId);
 
+    const rawCategories: Category[] = local.categories ? JSON.parse(local.categories) : defaultCategories;
+    const { categories: migratedCats, changed } = migrateCategories(rawCategories);
+
     const migrated: RemoteData = {
-      expenses:   local.expenses   ? JSON.parse(local.expenses)   : [],
-      income:     local.income     ? JSON.parse(local.income)     : [],
-      categories: local.categories ? JSON.parse(local.categories) : defaultCategories,
+      expenses:   local.expenses ? JSON.parse(local.expenses) : [],
+      income:     local.income   ? JSON.parse(local.income)   : [],
+      categories: migratedCats,
     };
 
     useBudgetStore.setState(migrated);
 
-    // Push existing localStorage data up to Supabase
-    if (local.expenses || local.income || local.categories) {
+    // Push existing localStorage data up to Supabase (and if migration ran, persist it)
+    if (local.expenses || local.income || local.categories || changed) {
       await syncToSupabase(migrated);
+    }
+
+    // Re-apply financial cycle mapping after data loads
+    if (useBudgetStore.getState().financialCycleStart > 1) {
+      useBudgetStore.getState().migrateToFinancialCycle();
     }
     return;
   }
 
+  const rawRemoteCategories: Category[] = data.categories ?? defaultCategories;
+  const { categories: migratedRemoteCats, changed: remoteCatsChanged } = migrateCategories(rawRemoteCategories);
+
   const remote: RemoteData = {
-    expenses:   data.expenses   ?? [],
-    income:     data.income     ?? [],
-    categories: data.categories ?? defaultCategories,
+    expenses:   data.expenses ?? [],
+    income:     data.income   ?? [],
+    categories: migratedRemoteCats,
   };
 
   // Merge localStorage backup with Supabase data to prevent data loss
@@ -152,7 +241,7 @@ async function loadFromSupabase() {
   const remoteIncomeIds = new Set(remote.income.map((i) => i.id));
   const missingIncome   = localIncome.filter((i) => !remoteIncomeIds.has(i.id));
 
-  if (missingExpenses.length > 0 || missingIncome.length > 0) {
+  if (missingExpenses.length > 0 || missingIncome.length > 0 || remoteCatsChanged) {
     remote.expenses = [...remote.expenses, ...missingExpenses];
     remote.income   = [...remote.income, ...missingIncome];
     // Push merged data back to Supabase
@@ -161,19 +250,30 @@ async function loadFromSupabase() {
 
   useBudgetStore.setState(remote);
   backupToLocalStorage(remote);
+
+  // Re-apply financial cycle mapping after data loads (in case cycle != calendar month)
+  if (useBudgetStore.getState().financialCycleStart > 1) {
+    useBudgetStore.getState().migrateToFinancialCycle();
+  }
 }
 
 export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((set, get) => ({
   expenses: [],
   income: [],
   categories: defaultCategories,
-  selectedMonth: (new Date().getMonth() + 1).toString().padStart(2, '0'),
-  selectedYear: new Date().getFullYear(),
+  selectedMonth: initPeriod.month,
+  selectedYear: initPeriod.year,
   selectedCity: 'Bangalore',
   syncing: false,
   networkError: false,
   userId: null,
   currency: 'INR',
+  excludedCategoryIds: [],
+  selectedCategoryIds: [], // deprecated alias — mirrors excludedCategoryIds
+  financialCycleStart: initCycleStart,
+
+  setExcludedCategoryIds: (ids: string[]) => set({ excludedCategoryIds: ids, selectedCategoryIds: ids }),
+  setSelectedCategoryIds: (ids: string[]) => set({ excludedCategoryIds: ids, selectedCategoryIds: ids }),
 
   setUserId: (userId: string | null) => {
     set({ userId });
@@ -201,9 +301,35 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
     set({ selectedCity: city });
   },
 
+  setFinancialCycleStart: (day: number) => {
+    const clamped = Math.min(28, Math.max(1, day));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('spendwise_cycle_start', String(clamped));
+    }
+    set({ financialCycleStart: clamped });
+    // Re-migrate all data and jump to current financial period
+    get().migrateToFinancialCycle();
+    const period = getCurrentFinancialPeriod(clamped);
+    set({ selectedMonth: period.month, selectedYear: period.year });
+  },
+
+  migrateToFinancialCycle: () => {
+    const { financialCycleStart, expenses, income, categories } = get();
+    const newExpenses = expenses.map(e =>
+      e.date ? { ...e, ...getFinancialPeriod(e.date, financialCycleStart) } : e
+    );
+    const newIncome = income.map(i =>
+      i.date ? { ...i, ...getFinancialPeriod(i.date, financialCycleStart) } : i
+    );
+    set({ expenses: newExpenses, income: newIncome });
+    syncToSupabase({ expenses: newExpenses, income: newIncome, categories });
+  },
+
   addExpense: (expense: Expense) => {
+    const period = getFinancialPeriod(expense.date, get().financialCycleStart);
+    const withPeriod = { ...expense, ...period };
     set((state) => {
-      const newExpenses = [...state.expenses, expense];
+      const newExpenses = [...state.expenses, withPeriod];
       syncToSupabase({ expenses: newExpenses, income: state.income, categories: state.categories });
       return { expenses: newExpenses };
     });
@@ -228,8 +354,10 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   },
 
   addIncome: (income: Income) => {
+    const period = getFinancialPeriod(income.date, get().financialCycleStart);
+    const withPeriod = { ...income, ...period };
     set((state) => {
-      const newIncome = [...state.income, income];
+      const newIncome = [...state.income, withPeriod];
       syncToSupabase({ expenses: state.expenses, income: newIncome, categories: state.categories });
       return { income: newIncome };
     });
@@ -261,11 +389,20 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
     });
   },
 
-  deleteCategory: (id: string) => {
+  deleteCategory: (id: string, reassignToId?: string) => {
     set((state) => {
+      // Determine fallback: "Other Expenses" or first remaining category
+      const fallbackId = reassignToId
+        ?? state.categories.find(c => c.id !== id && c.name === 'Other Expenses')?.id
+        ?? state.categories.find(c => c.id !== id)?.id
+        ?? id;
+      // Reassign all expenses in this category
+      const newExpenses = state.expenses.map(e =>
+        e.category === id ? { ...e, category: fallbackId } : e
+      );
       const newCategories = state.categories.filter((c) => c.id !== id);
-      syncToSupabase({ expenses: state.expenses, income: state.income, categories: newCategories });
-      return { categories: newCategories };
+      syncToSupabase({ expenses: newExpenses, income: state.income, categories: newCategories });
+      return { categories: newCategories, expenses: newExpenses };
     });
   },
 

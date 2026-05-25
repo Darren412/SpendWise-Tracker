@@ -5,76 +5,64 @@ import { Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/currency';
 
 export default function ExpenseList() {
-  const { deleteExpense, getExpensesByMonth, categories, selectedMonth, selectedYear, selectedCity, currency } =
-    useBudgetStore();
+  const { deleteExpense, getExpensesByMonth, categories, excludedCategoryIds, selectedMonth, selectedYear, selectedCity, currency } = useBudgetStore();
   void selectedCity;
 
-  const monthExpenses = [...getExpensesByMonth(selectedMonth, selectedYear)].reverse().slice(0, 5);
-  const getCategoryIcon = (categoryId: string) => {
-    return categories.find((c) => c.id === categoryId)?.icon || '📦';
-  };
-
-  const getCategoryName = (categoryId: string) => {
-    return categories.find((c) => c.id === categoryId)?.name || 'Unknown';
-  };
-
-  if (monthExpenses.length === 0) {
-    return (
-      <div className="dark-card glow-pink p-8" style={{ border: '1px solid rgba(225,29,72,0.15)' }}>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-1 h-7 rounded-full" style={{ background: 'linear-gradient(180deg, #e11d48, #be123c)' }} />
-          <h2 className="graffiti-font text-3xl" style={{ color: '#1e293b' }}>RECENT EXPENSES</h2>
-        </div>
-        <p className="text-center py-8 font-medium" style={{ color: '#94a3b8' }}>
-          No expenses recorded yet. Start by adding your first expense!
-        </p>
-      </div>
-    );
-  }
+  const allForMonth = [...getExpensesByMonth(selectedMonth, selectedYear)].reverse();
+  const monthExpenses = (excludedCategoryIds.length === 0
+    ? allForMonth
+    : allForMonth.filter(e => !excludedCategoryIds.includes(e.category))
+  ).slice(0, 8);
+  const getCategoryIcon = (id: string) => categories.find(c => c.id === id)?.icon || '📦';
+  const getCategoryName = (id: string) => categories.find(c => c.id === id)?.name || 'Unknown';
+  const getCategoryColor = (id: string) => categories.find(c => c.id === id)?.color || '#6b7280';
 
   return (
-    <div className="dark-card glow-pink p-8" style={{ border: '1px solid rgba(225,29,72,0.15)' }}>
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-1 h-7 rounded-full" style={{ background: 'linear-gradient(180deg, #e11d48, #be123c)' }} />
-        <h2 className="graffiti-font text-3xl" style={{ color: '#1e293b' }}>RECENT EXPENSES</h2>
+    <div className="dark-card p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="card-header-label mb-0.5">Recent Expenses</p>
+          <p className="text-xs" style={{ color: '#9ca3af' }}>
+            {monthExpenses.length > 0 ? `Latest ${monthExpenses.length} transactions` : 'No expenses this month'}
+          </p>
+        </div>
+        <span className="badge badge-red">{monthExpenses.length}</span>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full dark-table">
-          <thead>
-            <tr>
-              <th className="text-left">Category</th>
-              <th className="text-left">Description</th>
-              <th className="text-left">Date</th>
-              <th className="text-right">Amount</th>
-              <th className="text-center">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {monthExpenses.map((expense) => (
-              <tr key={expense.id}>
-                <td>
-                  <span className="text-xl mr-2">{getCategoryIcon(expense.category)}</span>
-                  <span style={{ color: '#1e293b' }}>{getCategoryName(expense.category)}</span>
-                </td>
-                <td style={{ color: '#64748b' }}>{expense.description}</td>
-                <td style={{ color: '#64748b' }}>{new Date(expense.date).toLocaleDateString()}</td>
-                <td className="text-right font-bold font-mono" style={{ color: '#e11d48' }}>
-                  {formatCurrency(expense.amount, currency)}
-                </td>
-                <td className="text-center">
-                  <button
-                    onClick={() => deleteExpense(expense.id)}
-                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all hover:scale-110"
-                    style={{ color: '#e11d48', background: 'rgba(225,29,72,0.08)', border: '1px solid rgba(225,29,72,0.15)' }}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+
+      {monthExpenses.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-2">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: '#f4f6f9' }}>
+            <span style={{ fontSize: 22 }}>💸</span>
+          </div>
+          <p className="text-sm font-medium" style={{ color: '#9ca3af' }}>No expenses yet</p>
+          <p className="text-xs" style={{ color: '#d1d5db' }}>Add your first expense above</p>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {monthExpenses.map(expense => (
+            <div key={expense.id} className="flex items-center gap-3 p-2.5 rounded-xl transition-colors hover:bg-gray-50 group">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-base"
+                style={{ background: `${getCategoryColor(expense.category)}15` }}>
+                {getCategoryIcon(expense.category)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate" style={{ color: '#111827' }}>{expense.description}</p>
+                <p className="text-xs truncate" style={{ color: '#9ca3af' }}>
+                  {getCategoryName(expense.category)} · {new Date(expense.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-sm font-bold num-mono" style={{ color: '#ef4444' }}>−{formatCurrency(expense.amount, currency)}</span>
+                <button onClick={() => deleteExpense(expense.id)}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                  style={{ color: '#ef4444', background: '#fef2f2', border: '1px solid #fecaca' }}>
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

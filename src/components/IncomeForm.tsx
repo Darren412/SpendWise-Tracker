@@ -3,98 +3,165 @@
 import { useState } from 'react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { Income } from '@/types';
+import CategorySelect from '@/components/CategorySelect';
 
 export default function IncomeForm() {
-  const { addIncome } = useBudgetStore();
+  const { addIncome, categories } = useBudgetStore();
+
+  const incomeCategories = categories.filter(c => c.type === 'income' || c.type === 'both');
+  const defaultIncomeCatId = incomeCategories[0]?.id ?? '';
+
   const [formData, setFormData] = useState({
-    source: '',
-    amount: '',
-    date: new Date().toISOString().split('T')[0],
+    category: defaultIncomeCatId,
+    source:   '',
+    amount:   '',
+    date:     new Date().toISOString().split('T')[0],
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!formData.source || !formData.amount) {
-      alert('Please fill in all fields');
-      return;
-    }
+    if (!formData.amount) { alert('Please enter an amount'); return; }
 
     const d = new Date(formData.date);
     const income: Income = {
-      id: Date.now().toString(),
-      source: formData.source,
-      amount: parseFloat(formData.amount),
-      date: formData.date,
-      month: String(d.getMonth() + 1).padStart(2, '0'),
-      year: d.getFullYear(),
+      id:       Date.now().toString(),
+      source:   formData.source || (incomeCategories.find(c => c.id === formData.category)?.name ?? 'Income'),
+      amount:   parseFloat(formData.amount),
+      date:     formData.date,
+      month:    String(d.getMonth() + 1).padStart(2, '0'),
+      year:     d.getFullYear(),
+      category: formData.category || undefined,
     };
 
     addIncome(income);
     setFormData({
-      source: '',
-      amount: '',
-      date: new Date().toISOString().split('T')[0],
+      category: defaultIncomeCatId,
+      source:   '',
+      amount:   '',
+      date:     new Date().toISOString().split('T')[0],
     });
   };
 
+  const labelStyle: React.CSSProperties = {
+    fontSize: '0.72rem',
+    fontWeight: 700,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    color: 'var(--text-500)',
+    display: 'block',
+    marginBottom: 6,
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '10px 12px',
+    background: 'var(--bg-subtle)',
+    border: '1.5px solid var(--border-default)',
+    borderRadius: 'var(--r-md)',
+    color: 'var(--text-900)',
+    fontSize: '0.875rem',
+    fontFamily: 'inherit',
+    outline: 'none',
+    transition: 'all 0.15s',
+  };
+
+  const focusInput = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.style.background = '#fff';
+    e.target.style.borderColor = 'var(--brand-500)';
+    e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)';
+  };
+  const blurInput = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.style.background = 'var(--bg-subtle)';
+    e.target.style.borderColor = 'var(--border-default)';
+    e.target.style.boxShadow = 'none';
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="dark-card glow-green p-7" style={{ border: '1px solid rgba(5,150,105,0.18)' }}>
-      {/* Title */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-1 h-7 rounded-full" style={{ background: 'linear-gradient(180deg, #059669, #047857)' }} />
-        <h2 className="graffiti-font text-3xl" style={{ color: '#1e293b' }}>
-          ADD INCOME
-        </h2>
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Income category */}
+      <div>
+        <label style={labelStyle}>Income Type</label>
+        <CategorySelect
+          categories={incomeCategories}
+          value={formData.category}
+          onChange={id => setFormData({ ...formData, category: id })}
+          placeholder="Select income type…"
+        />
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#475569' }}>
-            Income Source
-          </label>
-          <input
-            type="text"
-            value={formData.source}
-            onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-            placeholder="e.g., Salary, Bonus, Freelance"
-            className="dark-input w-full px-4 py-3"
-            style={{ '--tw-ring-color': '#34d399' } as React.CSSProperties}
-          />
-        </div>
+      {/* Source */}
+      <div>
+        <label style={labelStyle}>
+          Source{' '}
+          <span style={{ fontWeight: 400, color: 'var(--text-400)', textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+        </label>
+        <input
+          type="text"
+          value={formData.source}
+          onChange={e => setFormData({ ...formData, source: e.target.value })}
+          placeholder="e.g., Acme Corp, Client A…"
+          style={inputStyle}
+          onFocus={focusInput}
+          onBlur={blurInput}
+        />
+      </div>
 
+      {/* Amount + Date */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#475569' }}>
-            Amount
-          </label>
+          <label style={labelStyle}>Amount</label>
           <input
             type="number"
             step="0.01"
             value={formData.amount}
-            onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+            onChange={e => setFormData({ ...formData, amount: e.target.value })}
             placeholder="0.00"
-            className="dark-input w-full px-4 py-3"
+            style={inputStyle}
+            onFocus={focusInput}
+            onBlur={blurInput}
           />
         </div>
-
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#475569' }}>
-            Date
-          </label>
+          <label style={labelStyle}>Date</label>
           <input
             type="date"
             value={formData.date}
-            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-            className="dark-input w-full px-4 py-3"
+            onChange={e => setFormData({ ...formData, date: e.target.value })}
+            style={inputStyle}
+            onFocus={focusInput}
+            onBlur={blurInput}
           />
         </div>
       </div>
 
       <button
         type="submit"
-        className="btn-neon-green mt-6 w-full py-3 px-4 rounded-xl"
+        style={{
+          width: '100%',
+          padding: '12px',
+          borderRadius: 'var(--r-md)',
+          border: 'none',
+          background: 'var(--green-600)',
+          color: '#fff',
+          fontSize: '0.9rem',
+          fontWeight: 700,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          boxShadow: 'var(--shadow-green)',
+          transition: 'background 0.15s, transform 0.1s',
+          marginTop: 2,
+        }}
+        onMouseEnter={e => {
+          (e.currentTarget.style.background = 'var(--green-700)');
+          (e.currentTarget.style.transform = 'translateY(-1px)');
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget.style.background = 'var(--green-600)');
+          (e.currentTarget.style.transform = 'none');
+        }}
       >
-        + Add Income
+        Add Income
       </button>
     </form>
   );

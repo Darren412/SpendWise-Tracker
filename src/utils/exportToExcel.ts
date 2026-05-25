@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
-import { Expense, Income, Category, getCategoryBudget } from '@/types';
+import { Expense, Income, Category } from '@/types';
 import { currencySymbol } from '@/utils/currency';
 
 export type ExportFilter =
@@ -88,15 +88,10 @@ function buildMonthlySummary(
   filteredIncome: Income[],
   categories: Category[],
   label: string,
-  sym: string,
-  month?: string,
-  year?: number
+  sym: string
 ) {
   const totalExpenses = filteredExpenses.reduce((s, e) => s + e.amount, 0);
   const totalIncome   = filteredIncome.reduce((s, i) => s + i.amount, 0);
-  const getBudget = (cat: Category) => month && year ? getCategoryBudget(cat, month, year) : cat.budget;
-  const totalBudget   = categories.reduce((s, c) => s + getBudget(c), 0);
-  const remaining     = totalBudget - totalExpenses;
   const netBalance    = totalIncome - totalExpenses;
 
   const rows: AnyRow[] = [
@@ -105,41 +100,31 @@ function buildMonthlySummary(
     { Metric: 'OVERVIEW', Value: '' },
     { Metric: 'Total Income',                  Value: fmtCurrency(totalIncome, sym) },
     { Metric: 'Total Spent',                   Value: fmtCurrency(totalExpenses, sym) },
-    { Metric: 'Total Budget',                  Value: fmtCurrency(totalBudget, sym) },
-    { Metric: 'Remaining Budget',              Value: fmtCurrency(remaining, sym) },
     { Metric: 'Net Balance (Income − Spent)',   Value: fmtCurrency(netBalance, sym) },
     { Metric: '', Value: '' },
     { Metric: 'CATEGORY BREAKDOWN', Value: '' },
-    { Metric: 'Category', Value: `Budget (${sym})`, [`Spent (${sym})`]: `Spent (${sym})`, [`Remaining (${sym})`]: `Remaining (${sym})`, '% Used': '% Used', Status: 'Status' },
+    { Metric: 'Category', Value: `Spent (${sym})`, Transactions: 'Transactions' },
   ];
 
-  categories.forEach((cat) => {
+  categories.filter(c => c.type !== 'income').forEach((cat) => {
     const spent = filteredExpenses.filter(e => e.category === cat.id).reduce((s, e) => s + e.amount, 0);
-    const catBudget = getBudget(cat);
-    const catRemaining = catBudget - spent;
-    const pct = catBudget > 0 ? ((spent / catBudget) * 100).toFixed(1) + '%' : '0.0%';
+    const txCount = filteredExpenses.filter(e => e.category === cat.id).length;
     rows.push({
       Metric: `${cat.icon} ${cat.name}`,
-      Value: catBudget,
-      [`Spent (${sym})`]: spent,
-      [`Remaining (${sym})`]: catRemaining,
-      '% Used': pct,
-      Status: spent > catBudget ? '⚠ Over Budget' : '✓ Within Budget',
+      Value: spent,
+      Transactions: txCount,
     });
   });
 
   // Totals row
   rows.push({
     Metric: 'TOTAL',
-    Value: totalBudget,
-    [`Spent (${sym})`]: totalExpenses,
-    [`Remaining (${sym})`]: remaining,
-    '% Used': totalBudget > 0 ? ((totalExpenses / totalBudget) * 100).toFixed(1) + '%' : '0.0%',
-    Status: totalExpenses > totalBudget ? '⚠ Over Budget' : '✓ Within Budget',
+    Value: totalExpenses,
+    Transactions: filteredExpenses.length,
   });
 
   const ws = XLSX.utils.json_to_sheet(rows, { skipHeader: true });
-  ws['!cols'] = [{ wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 10 }, { wch: 18 }];
+  ws['!cols'] = [{ wch: 30 }, { wch: 16 }, { wch: 14 }];
   return ws;
 }
 
@@ -215,12 +200,12 @@ export function exportToExcel(
 ) {
   const wb = XLSX.utils.book_new();
   const sym = currencySymbol(currencyCode);
-  let filename = 'Budget_Export';
+  let filename = 'Spendwise_Export';
 
   if (filter.scope === 'month') {
     const { month, year } = filter;
     const label = `${MONTH_NAMES[parseInt(month) - 1]} ${year}`;
-    filename = `Budget_${MONTH_NAMES[parseInt(month) - 1]}_${year}`;
+    filename = `Spendwise_${MONTH_NAMES[parseInt(month) - 1]}_${year}`;
 
     const fe = expenses.filter(e => e.month === month && e.year === year)
                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -229,12 +214,12 @@ export function exportToExcel(
 
     XLSX.utils.book_append_sheet(wb, buildExpenseSheet(fe, categories, label, sym), 'Expenses');
     XLSX.utils.book_append_sheet(wb, buildIncomeSheet(fi, label, sym), 'Income');
-    XLSX.utils.book_append_sheet(wb, buildMonthlySummary(fe, fi, categories, label, sym, month, year), 'Summary');
+    XLSX.utils.book_append_sheet(wb, buildMonthlySummary(fe, fi, categories, label, sym), 'Summary');
 
   } else if (filter.scope === 'day') {
     const { date } = filter;
     const label = fmtDate(date);
-    filename = `Budget_Day_${date}`;
+    filename = `Spendwise_Day_${date}`;
 
     const fe = expenses.filter(e => e.date === date)
                        .sort((a, b) => a.description.localeCompare(b.description));
@@ -262,7 +247,7 @@ export function exportToExcel(
 
   } else if (filter.scope === 'year') {
     const { year } = filter;
-    filename = `Budget_${year}`;
+    filename = `Spendwise_${year}`;
 
     const fe = expenses.filter(e => e.year === year)
                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -275,7 +260,7 @@ export function exportToExcel(
 
   } else {
     // all
-    filename = 'Budget_All_Data';
+    filename = 'Spendwise_All_Data';
     const fe = [...expenses].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const fi = [...income].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 

@@ -3,144 +3,197 @@
 import { useState } from 'react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { Expense } from '@/types';
+import CategorySelect from '@/components/CategorySelect';
 
 export default function ExpenseForm() {
   const { addExpense, categories, selectedCity } = useBudgetStore();
   const effectiveCity = selectedCity === 'Both' ? 'Bangalore' : selectedCity;
   const [formCity, setFormCity] = useState(effectiveCity);
+
+  const expenseCategories = categories.filter(c => c.type !== 'income');
+  const defaultCatId = expenseCategories[0]?.id ?? '';
+
   const [formData, setFormData] = useState({
-    category: categories[0]?.id || '',
+    category:    defaultCatId,
     description: '',
-    amount: '',
-    date: new Date().toISOString().split('T')[0],
+    amount:      '',
+    date:        new Date().toISOString().split('T')[0],
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!formData.category || !formData.description || !formData.amount) {
       alert('Please fill in all fields');
       return;
     }
-
     const [yearStr, monthStr] = formData.date.split('-');
     const expense: Expense = {
-      id: Date.now().toString(),
-      category: formData.category,
+      id:          Date.now().toString(),
+      category:    formData.category,
       description: formData.description,
-      amount: parseFloat(formData.amount),
-      date: formData.date,
-      month: monthStr,
-      year: parseInt(yearStr, 10),
-      city: selectedCity === 'Both' ? formCity : selectedCity,
+      amount:      parseFloat(formData.amount),
+      date:        formData.date,
+      month:       monthStr,
+      year:        parseInt(yearStr, 10),
+      city:        selectedCity === 'Both' ? formCity : selectedCity,
     };
-
     addExpense(expense);
     setFormData({
-      category: categories[0]?.id || 'food',
+      category:    expenseCategories[0]?.id ?? '',
       description: '',
-      amount: '',
-      date: new Date().toISOString().split('T')[0],
+      amount:      '',
+      date:        new Date().toISOString().split('T')[0],
     });
   };
 
+  const labelStyle: React.CSSProperties = {
+    fontSize: '0.72rem',
+    fontWeight: 700,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    color: 'var(--text-500)',
+    display: 'block',
+    marginBottom: 6,
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '10px 12px',
+    background: 'var(--bg-subtle)',
+    border: '1.5px solid var(--border-default)',
+    borderRadius: 'var(--r-md)',
+    color: 'var(--text-900)',
+    fontSize: '0.875rem',
+    fontFamily: 'inherit',
+    outline: 'none',
+    transition: 'all 0.15s',
+  };
+
+  const focusInput = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.style.background = '#fff';
+    e.target.style.borderColor = 'var(--brand-500)';
+    e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)';
+  };
+  const blurInput = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.style.background = 'var(--bg-subtle)';
+    e.target.style.borderColor = 'var(--border-default)';
+    e.target.style.boxShadow = 'none';
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="dark-card glow-pink p-7" style={{ border: '1px solid rgba(225,29,72,0.18)' }}>
-      {/* Title */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-1 h-7 rounded-full" style={{ background: 'linear-gradient(180deg, #e11d48, #be123c)' }} />
-        <h2 className="graffiti-font text-3xl" style={{ color: '#1e293b' }}>
-          ADD EXPENSE
-        </h2>
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* City (Darren only) */}
+      {selectedCity === 'Both' && (
+        <div>
+          <label style={labelStyle}>City</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {['Bangalore', 'Mangalore'].map(c => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setFormCity(c)}
+                style={{
+                  flex: 1,
+                  padding: '9px 0',
+                  borderRadius: 'var(--r-md)',
+                  border: formCity === c ? '1.5px solid var(--brand-300)' : '1.5px solid var(--border-default)',
+                  background: formCity === c ? 'var(--brand-600)' : 'var(--bg-subtle)',
+                  color: formCity === c ? '#fff' : 'var(--text-600)',
+                  fontSize: '0.8125rem',
+                  fontWeight: formCity === c ? 700 : 500,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Category */}
+      <div>
+        <label style={labelStyle}>Category</label>
+        <CategorySelect
+          categories={expenseCategories}
+          value={formData.category}
+          onChange={id => setFormData({ ...formData, category: id })}
+          placeholder="Select expense category…"
+        />
       </div>
 
-      <div className="space-y-4">
-        {selectedCity === 'Both' && (
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#475569' }}>
-              City
-            </label>
-            <div className="flex gap-2">
-              {['Bangalore', 'Mangalore'].map(c => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setFormCity(c)}
-                  className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all"
-                  style={{
-                    background: formCity === c ? '#e11d48' : '#f1f5f9',
-                    color: formCity === c ? '#fff' : '#64748b',
-                    border: `1px solid ${formCity === c ? '#e11d48' : '#e2e8f0'}`,
-                  }}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+      {/* Amount + Date */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#475569' }}>
-            Category
-          </label>
-          <select
-            value={formData.category}
-            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-            className="dark-select w-full px-4 py-3"
-          >
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.icon} {cat.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#475569' }}>
-            Amount
-          </label>
+          <label style={labelStyle}>Amount</label>
           <input
             type="number"
             step="0.01"
             value={formData.amount}
-            onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+            onChange={e => setFormData({ ...formData, amount: e.target.value })}
             placeholder="0.00"
-            className="dark-input w-full px-4 py-3"
+            style={inputStyle}
+            onFocus={focusInput}
+            onBlur={blurInput}
           />
         </div>
-
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#475569' }}>
-            Description
-          </label>
-          <input
-            type="text"
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="e.g., Weekly groceries"
-            className="dark-input w-full px-4 py-3"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#475569' }}>
-            Date
-          </label>
+          <label style={labelStyle}>Date</label>
           <input
             type="date"
             value={formData.date}
-            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-            className="dark-input w-full px-4 py-3"
+            onChange={e => setFormData({ ...formData, date: e.target.value })}
+            style={inputStyle}
+            onFocus={focusInput}
+            onBlur={blurInput}
           />
         </div>
       </div>
 
+      {/* Description */}
+      <div>
+        <label style={labelStyle}>Description</label>
+        <input
+          type="text"
+          value={formData.description}
+          onChange={e => setFormData({ ...formData, description: e.target.value })}
+          placeholder="e.g., Weekly groceries"
+          style={inputStyle}
+          onFocus={focusInput}
+          onBlur={blurInput}
+        />
+      </div>
+
       <button
         type="submit"
-        className="btn-neon-pink mt-6 w-full py-3 px-4 rounded-xl"
+        style={{
+          width: '100%',
+          padding: '12px',
+          borderRadius: 'var(--r-md)',
+          border: 'none',
+          background: 'var(--red-500)',
+          color: '#fff',
+          fontSize: '0.9rem',
+          fontWeight: 700,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          boxShadow: 'var(--shadow-red)',
+          transition: 'background 0.15s, transform 0.1s, box-shadow 0.15s',
+          marginTop: 2,
+        }}
+        onMouseEnter={e => {
+          (e.currentTarget.style.background = 'var(--red-600)');
+          (e.currentTarget.style.transform = 'translateY(-1px)');
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget.style.background = 'var(--red-500)');
+          (e.currentTarget.style.transform = 'none');
+        }}
       >
-        + Add Expense
+        Add Expense
       </button>
     </form>
   );

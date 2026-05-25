@@ -10,7 +10,7 @@ export default function InsightsWorkspace() {
   const {
     expenses, categories,
     selectedMonth, selectedYear, selectedCity,
-    selectedCategoryIds,
+    excludedCategoryIds,
     getMonthlyTotal, getMonthlyIncome,
     financialCycleStart, currency,
   } = useBudgetStore();
@@ -46,7 +46,7 @@ export default function InsightsWorkspace() {
   }).reverse(), [selectedMonth, selectedYear, getMonthlyTotal, getMonthlyIncome]);
 
   const catBreakdown = useMemo(() => categories
-    .filter(c => c.type !== 'income' && (selectedCategoryIds.length === 0 || selectedCategoryIds.includes(c.id)))
+    .filter(c => c.type !== 'income' && (excludedCategoryIds.length === 0 || !excludedCategoryIds.includes(c.id)))
     .map(c => {
       const spent = expenses
         .filter(e => {
@@ -61,7 +61,7 @@ export default function InsightsWorkspace() {
     })
     .filter(c => c.spent > 0)
     .sort((a, b) => b.spent - a.spent),
-    [categories, expenses, start, end, selectedCity, selectedCategoryIds]);
+    [categories, expenses, start, end, selectedCity, excludedCategoryIds]);
 
   const recurringItems = useMemo(() => {
     const descCount: Record<string, number> = {};
