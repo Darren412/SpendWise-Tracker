@@ -155,11 +155,11 @@ export function buildMonthHistory(
     const { start, end } = getFinancialMonthRange(mStr, y, financialCycleStart);
 
     const periodExpenses = expenses.filter(e => {
-      const d = new Date(e.date);
+      const d = new Date(e.date + 'T00:00:00');
       return d >= start && d <= end;
     });
     const periodIncome = income.filter(inc => {
-      const d = new Date(inc.date);
+      const d = new Date(inc.date + 'T00:00:00');
       return d >= start && d <= end;
     });
 
@@ -205,7 +205,7 @@ export function buildCategoryTrends(
 
   const currTotal = expenses
     .filter(e => {
-      const d = new Date(e.date);
+      const d = new Date(e.date + 'T00:00:00');
       return d >= start && d <= end &&
         (selectedCity === 'Both' || !e.city || e.city === selectedCity);
     })
@@ -214,7 +214,7 @@ export function buildCategoryTrends(
   return expCats.map(c => {
     const currSpent = expenses
       .filter(e => {
-        const d = new Date(e.date);
+        const d = new Date(e.date + 'T00:00:00');
         return d >= start && d <= end &&
           e.category === c.id &&
           (selectedCity === 'Both' || !e.city || e.city === selectedCity);
@@ -223,7 +223,7 @@ export function buildCategoryTrends(
 
     const prevSpent = expenses
       .filter(e => {
-        const d = new Date(e.date);
+        const d = new Date(e.date + 'T00:00:00');
         return d >= pStart && d <= pEnd &&
           e.category === c.id &&
           (selectedCity === 'Both' || !e.city || e.city === selectedCity);

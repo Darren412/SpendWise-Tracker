@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { currencySymbol, formatCurrency } from '@/utils/currency';
-import { getFinancialMonthRange } from '@/utils/financialCycle';
+import { getFinancialMonthRange, getFinancialPeriod } from '@/utils/financialCycle';
 
 interface TransactionsWorkspaceProps {
   onAddExpense: () => void;
@@ -79,7 +79,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
 
   // ── Filtered datasets ─────────────────────────────────────────────────────
   const filteredExpenses = useMemo(() => expenses.filter(e => {
-    const d = new Date(e.date);
+    const d = new Date(e.date + 'T00:00:00');
     if (d < start || d > end) return false;
     if (selectedCity !== 'Both' && e.city && e.city !== selectedCity) return false;
     if (excludedCategoryIds.length > 0 && excludedCategoryIds.includes(e.category)) return false;
@@ -98,7 +98,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
   }), [expenses, start, end, selectedCity, excludedCategoryIds, filterCat, filterCity, amtMin, amtMax, search]);
 
   const filteredIncome = useMemo(() => income.filter(i => {
-    const d = new Date(i.date);
+    const d = new Date(i.date + 'T00:00:00');
     if (d < start || d > end) return false;
     if (amtMin && i.amount < parseFloat(amtMin)) return false;
     if (amtMax && i.amount > parseFloat(amtMax)) return false;
@@ -195,23 +195,21 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
     if (!editState) return;
     const amt = parseFloat(editState.amount);
     if (!editState.description.trim() || isNaN(amt) || amt <= 0) return;
-    const [y, m] = editState.date.split('-');
+    const period = getFinancialPeriod(editState.date, financialCycleStart);
     if (editState.type === 'expense') {
       updateExpense(editState.id, {
         description: editState.description.trim(),
         amount: amt,
         date: editState.date,
         category: editState.category,
-        month: m,
-        year: parseInt(y, 10),
+        ...period,
       });
     } else {
       updateIncome(editState.id, {
         source: editState.description.trim(),
         amount: amt,
         date: editState.date,
-        month: m,
-        year: parseInt(y, 10),
+        ...period,
       });
     }
     setEditState(null);

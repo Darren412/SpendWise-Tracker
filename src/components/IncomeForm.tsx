@@ -22,14 +22,14 @@ export default function IncomeForm() {
     e.preventDefault();
     if (!formData.amount) { alert('Please enter an amount'); return; }
 
-    const d = new Date(formData.date);
+    const [yearStr, monthStr] = formData.date.split('-');
     const income: Income = {
       id:       Date.now().toString(),
       source:   formData.source || (incomeCategories.find(c => c.id === formData.category)?.name ?? 'Income'),
       amount:   parseFloat(formData.amount),
       date:     formData.date,
-      month:    String(d.getMonth() + 1).padStart(2, '0'),
-      year:     d.getFullYear(),
+      month:    monthStr,
+      year:     parseInt(yearStr, 10),
       category: formData.category || undefined,
     };
 

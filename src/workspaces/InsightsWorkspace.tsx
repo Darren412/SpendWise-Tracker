@@ -148,7 +148,7 @@ export default function InsightsWorkspace() {
 
   const periodExpenses = useMemo(() =>
     expenses.filter(e => {
-      const d = new Date(e.date);
+      const d = new Date(e.date + 'T00:00:00');
       return d >= start && d <= end &&
         (selectedCity === 'Both' || !e.city || e.city === selectedCity) &&
         (excludedCategoryIds.length === 0 || !excludedCategoryIds.includes(e.category));
@@ -156,7 +156,7 @@ export default function InsightsWorkspace() {
     [expenses, start, end, selectedCity, excludedCategoryIds]);
 
   const periodIncome = useMemo(() =>
-    income.filter(i => { const d = new Date(i.date); return d >= start && d <= end; }),
+    income.filter(i => { const d = new Date(i.date + 'T00:00:00'); return d >= start && d <= end; }),
     [income, start, end]);
 
   const totalExpenses = useMemo(() => periodExpenses.reduce((s, e) => s + e.amount, 0), [periodExpenses]);
