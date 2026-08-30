@@ -118,6 +118,16 @@ function migrateCategories(categories: Category[]): { categories: Category[]; ch
   return { categories: migrated, changed };
 }
 
+// ── Unique ID generator (avoids Date.now() collisions on rapid calls) ───────
+
+let _idCounter = 0;
+export function generateId(prefix = ''): string {
+  const ts = Date.now().toString(36);
+  const rand = Math.random().toString(36).slice(2, 6);
+  const seq = (++_idCounter).toString(36);
+  return prefix ? `${prefix}_${ts}${rand}${seq}` : `${ts}${rand}${seq}`;
+}
+
 // ── Supabase helpers ────────────────────────────────────────────────────────
 
 interface RemoteData {
@@ -158,10 +168,108 @@ function getSavedCycleStart(): number {
 const initCycleStart = getSavedCycleStart();
 const initPeriod     = getCurrentFinancialPeriod(initCycleStart);
 
-// --- Supabase sync with retry and network status ---
+// --- Supabase sync with debounce, retry, and network status ---
+//
+// IMPORTANT: Every store mutation was previously calling syncToSupabase() with a
+// captured data snapshot. When two mutations fired in quick succession (e.g.
+// addCategory → addExpense), two async upserts raced. If the FIRST upsert
+// resolved after the second, it overwrote Supabase with stale data — silently
+// dropping the expense.
+//
+// Fix: debounce writes so rapid mutations consolidate into ONE sync that always
+// reads the latest store state. localStorage backup remains immediate.
+
 let syncRetryCount = 0;
 let syncRetryTimeout: ReturnType<typeof setTimeout> | null = null;
+let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let syncInFlight = false;
+let syncPendingAfterFlight = false;
 
+/** Read the latest state from the store and return the sync payload. */
+function getLatestSyncPayload(): RemoteData {
+  const { expenses, income, categories } = useBudgetStore.getState();
+  return { expenses, income, categories };
+}
+
+/** Actually push data to Supabase (called by the debounce / retry). */
+async function executeSyncToSupabase() {
+  const userId = useBudgetStore.getState().userId;
+  if (!userId) return;
+
+  // Always send the LATEST state, never a stale closure
+  const data = getLatestSyncPayload();
+
+  syncInFlight = true;
+  useBudgetStore.setState({ syncing: true, networkError: false });
+  try {
+    const { error } = await supabase
+      .from('budget_data')
+      .upsert({ user_id: userId, ...data }, { onConflict: 'user_id' });
+    if (error) throw error;
+    syncRetryCount = 0;
+    if (syncRetryTimeout) clearTimeout(syncRetryTimeout);
+    useBudgetStore.setState({ syncing: false, networkError: false });
+  } catch {
+    useBudgetStore.setState({ syncing: false, networkError: true });
+    // Exponential backoff retry — always re-reads latest state
+    syncRetryCount++;
+    const delay = Math.min(60000, 2000 * Math.pow(2, syncRetryCount));
+    if (syncRetryTimeout) clearTimeout(syncRetryTimeout);
+    syncRetryTimeout = setTimeout(() => executeSyncToSupabase(), delay);
+  } finally {
+    syncInFlight = false;
+    // If another mutation happened while we were in-flight, sync again
+    if (syncPendingAfterFlight) {
+      syncPendingAfterFlight = false;
+      scheduleSyncToSupabase();
+    }
+  }
+}
+
+/**
+ * Schedule a debounced sync to Supabase.
+ * - localStorage backup happens immediately (synchronous, no data loss on close).
+ * - Supabase write is debounced by 350 ms so rapid mutations consolidate.
+ * - If a sync is already in-flight, we flag a re-sync for after it completes.
+ */
+function scheduleSyncToSupabase() {
+  // Immediate localStorage backup with latest state
+  backupToLocalStorage(getLatestSyncPayload());
+
+  if (syncInFlight) {
+    // A sync is currently awaiting Supabase — mark that we need to re-sync
+    syncPendingAfterFlight = true;
+    return;
+  }
+
+  if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(() => executeSyncToSupabase(), 350);
+}
+
+/**
+ * Flush any pending debounced sync immediately.
+ * Called on beforeunload to prevent data loss when closing the tab.
+ */
+export function flushPendingSync() {
+  if (syncDebounceTimer) {
+    clearTimeout(syncDebounceTimer);
+    syncDebounceTimer = null;
+    // Fire the sync immediately (best-effort, browser may cut it short)
+    executeSyncToSupabase();
+  }
+}
+
+// Auto-register beforeunload handler (client-side only)
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    // Flush localStorage immediately (synchronous, guaranteed)
+    backupToLocalStorage(getLatestSyncPayload());
+    // Attempt Supabase sync (may not complete, but localStorage is safe)
+    flushPendingSync();
+  });
+}
+
+/** Legacy wrapper — kept for the one-off sync in loadFromSupabase. */
 async function syncToSupabase(data: RemoteData) {
   backupToLocalStorage(data);
   const userId = useBudgetStore.getState().userId;
@@ -173,15 +281,9 @@ async function syncToSupabase(data: RemoteData) {
       .upsert({ user_id: userId, ...data }, { onConflict: 'user_id' });
     if (error) throw error;
     syncRetryCount = 0;
-    if (syncRetryTimeout) clearTimeout(syncRetryTimeout);
     useBudgetStore.setState({ syncing: false, networkError: false });
-  } catch (err) {
+  } catch {
     useBudgetStore.setState({ syncing: false, networkError: true });
-    // Exponential backoff retry
-    syncRetryCount++;
-    const delay = Math.min(60000, 2000 * Math.pow(2, syncRetryCount));
-    if (syncRetryTimeout) clearTimeout(syncRetryTimeout);
-    syncRetryTimeout = setTimeout(() => syncToSupabase(data), delay);
   }
 }
 
@@ -317,7 +419,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   },
 
   migrateToFinancialCycle: () => {
-    const { financialCycleStart, expenses, income, categories } = get();
+    const { financialCycleStart, expenses, income } = get();
     const newExpenses = expenses.map(e =>
       e.date ? { ...e, ...getFinancialPeriod(e.date, financialCycleStart) } : e
     );
@@ -325,81 +427,57 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
       i.date ? { ...i, ...getFinancialPeriod(i.date, financialCycleStart) } : i
     );
     set({ expenses: newExpenses, income: newIncome });
-    syncToSupabase({ expenses: newExpenses, income: newIncome, categories });
+    scheduleSyncToSupabase();
   },
 
   addExpense: (expense: Expense) => {
     const period = getFinancialPeriod(expense.date, get().financialCycleStart);
     const withPeriod = { ...expense, ...period };
-    set((state) => {
-      const newExpenses = [...state.expenses, withPeriod];
-      syncToSupabase({ expenses: newExpenses, income: state.income, categories: state.categories });
-      return { expenses: newExpenses };
-    });
+    set((state) => ({ expenses: [...state.expenses, withPeriod] }));
+    scheduleSyncToSupabase();
   },
 
   deleteExpense: (id: string) => {
-    set((state) => {
-      const newExpenses = state.expenses.filter((e) => e.id !== id);
-      syncToSupabase({ expenses: newExpenses, income: state.income, categories: state.categories });
-      return { expenses: newExpenses };
-    });
+    set((state) => ({ expenses: state.expenses.filter((e) => e.id !== id) }));
+    scheduleSyncToSupabase();
   },
 
   updateExpense: (id: string, updates: Partial<Expense>) => {
-    set((state) => {
-      const newExpenses = state.expenses.map((e) =>
-        e.id === id ? { ...e, ...updates } : e
-      );
-      syncToSupabase({ expenses: newExpenses, income: state.income, categories: state.categories });
-      return { expenses: newExpenses };
-    });
+    set((state) => ({
+      expenses: state.expenses.map((e) => e.id === id ? { ...e, ...updates } : e),
+    }));
+    scheduleSyncToSupabase();
   },
 
   addIncome: (income: Income) => {
     const period = getFinancialPeriod(income.date, get().financialCycleStart);
     const withPeriod = { ...income, ...period };
-    set((state) => {
-      const newIncome = [...state.income, withPeriod];
-      syncToSupabase({ expenses: state.expenses, income: newIncome, categories: state.categories });
-      return { income: newIncome };
-    });
+    set((state) => ({ income: [...state.income, withPeriod] }));
+    scheduleSyncToSupabase();
   },
 
   deleteIncome: (id: string) => {
-    set((state) => {
-      const newIncome = state.income.filter((i) => i.id !== id);
-      syncToSupabase({ expenses: state.expenses, income: newIncome, categories: state.categories });
-      return { income: newIncome };
-    });
+    set((state) => ({ income: state.income.filter((i) => i.id !== id) }));
+    scheduleSyncToSupabase();
   },
 
   updateIncome: (id: string, updates: Partial<Income>) => {
-    set((state) => {
-      const newIncome = state.income.map((i) =>
-        i.id === id ? { ...i, ...updates } : i
-      );
-      syncToSupabase({ expenses: state.expenses, income: newIncome, categories: state.categories });
-      return { income: newIncome };
-    });
+    set((state) => ({
+      income: state.income.map((i) => i.id === id ? { ...i, ...updates } : i),
+    }));
+    scheduleSyncToSupabase();
   },
 
   addCategory: (category: Category) => {
-    set((state) => {
-      const newCategories = [...state.categories, category];
-      syncToSupabase({ expenses: state.expenses, income: state.income, categories: newCategories });
-      return { categories: newCategories };
-    });
+    set((state) => ({ categories: [...state.categories, category] }));
+    scheduleSyncToSupabase();
   },
 
   updateCategory: (id: string, updates: Partial<Category>) => {
-    set((state) => {
-      const newCategories = state.categories.map((c) =>
-        c.id === id ? { ...c, ...updates } : c
-      );
-      syncToSupabase({ expenses: state.expenses, income: state.income, categories: newCategories });
-      return { categories: newCategories };
-    });
+    set((state) => ({
+      categories: state.categories.map((c) => c.id === id ? { ...c, ...updates } : c),
+    }));
+    scheduleSyncToSupabase();
   },
 
   deleteCategory: (id: string, reassignToId?: string) => {
@@ -414,9 +492,9 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
         e.category === id ? { ...e, category: fallbackId } : e
       );
       const newCategories = state.categories.filter((c) => c.id !== id);
-      syncToSupabase({ expenses: newExpenses, income: state.income, categories: newCategories });
       return { categories: newCategories, expenses: newExpenses };
     });
+    scheduleSyncToSupabase();
   },
 
   reorderCategory: (fromIndex: number, toIndex: number) => {
@@ -424,9 +502,9 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
       const newCategories = [...state.categories];
       const [removed] = newCategories.splice(fromIndex, 1);
       newCategories.splice(toIndex, 0, removed);
-      syncToSupabase({ expenses: state.expenses, income: state.income, categories: newCategories });
       return { categories: newCategories };
     });
+    scheduleSyncToSupabase();
   },
 
   getExpensesByMonth: (month: string, year: number) => {

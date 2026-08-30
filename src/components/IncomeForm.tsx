@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useBudgetStore } from '@/store/budgetStore';
+import { useBudgetStore, generateId } from '@/store/budgetStore';
 import { Income } from '@/types';
 import CategorySelect from '@/components/CategorySelect';
 
@@ -24,7 +24,7 @@ export default function IncomeForm() {
 
     const [yearStr, monthStr] = formData.date.split('-');
     const income: Income = {
-      id:       Date.now().toString(),
+      id:       generateId('inc'),
       source:   formData.source || (incomeCategories.find(c => c.id === formData.category)?.name ?? 'Income'),
       amount:   parseFloat(formData.amount),
       date:     formData.date,

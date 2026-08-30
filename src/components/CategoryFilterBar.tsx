@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useBudgetStore } from '@/store/budgetStore';
+import { useBudgetStore, generateId } from '@/store/budgetStore';
 import { Search, Plus, Pencil, Trash2, Check, X, ChevronDown, SlidersHorizontal } from 'lucide-react';
 
 const EMOJI_ICONS = ['🍔', '🚗', '💡', '🎬', '💪', '🛍️', '🍽️', '📦', '🏥', '📚', '✈️', '🏠', '💻', '🎮', '⚽', '🛒', '☕', '🎵', '💊', '🐾', '🧴', '🍕', '🚂', '🎪'];
@@ -170,7 +170,7 @@ export default function CategoryFilterBar() {
   };
   const confirmAdd = () => {
     if (!addState?.name.trim()) return;
-    addCategory({ id: `cat_${Date.now()}`, name: addState.name.trim(), icon: addState.icon, color: addState.color, type: addState.type });
+    addCategory({ id: generateId('cat'), name: addState.name.trim(), icon: addState.icon, color: addState.color, type: addState.type });
     setAddState(null);
   };
 

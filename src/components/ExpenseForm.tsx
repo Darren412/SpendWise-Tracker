@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useBudgetStore } from '@/store/budgetStore';
+import { useBudgetStore, generateId } from '@/store/budgetStore';
 import { Expense } from '@/types';
 import CategorySelect from '@/components/CategorySelect';
 
@@ -28,7 +28,7 @@ export default function ExpenseForm() {
     }
     const [yearStr, monthStr] = formData.date.split('-');
     const expense: Expense = {
-      id:          Date.now().toString(),
+      id:          generateId('exp'),
       category:    formData.category,
       description: formData.description,
       amount:      parseFloat(formData.amount),
