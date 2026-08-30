@@ -2,8 +2,8 @@
 
 import { useMemo } from 'react';
 import {
-  TrendingUp, TrendingDown, Minus, Zap, Activity,
-  ArrowRight, ArrowUpRight, ArrowDownRight,
+  TrendingUp, TrendingDown, Zap, Activity,
+  ArrowRight, ArrowUpRight, ArrowDownRight, Target,
 } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { formatCurrencyShort, currencySymbol } from '@/utils/currency';
@@ -95,7 +95,6 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
 
   const healthLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 65 ? 'Good' : healthScore >= 45 ? 'Fair' : 'Needs work';
   const healthColor = healthScore >= 80 ? 'var(--green-500)' : healthScore >= 65 ? 'var(--blue-500)' : healthScore >= 45 ? 'var(--amber-500)' : 'var(--red-500)';
-  const healthBg    = healthScore >= 80 ? 'var(--green-50)' : healthScore >= 65 ? 'var(--blue-50)' : healthScore >= 45 ? 'var(--amber-50)' : 'var(--red-50)';
 
   // ── Top categories (global — all cities combined) ─────────────────────────
   const topCats = useMemo(() => {
@@ -133,17 +132,30 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
   const isCurrentPeriod = selectedMonth === currentPeriod.month && selectedYear === currentPeriod.year;
   const maxCatSpend = topCats[0]?.spent ?? 1;
 
+  // ── Budget progress ─────────────────────────────────────────────────────
+  const budgetUsedPct = totalIncome > 0 ? Math.round((globalTotalExpenses / totalIncome) * 100) : 0;
+
   return (
     <div style={{ maxWidth: 1400 }}>
 
       {/* ── Page header ── */}
-      <div className="ws-header">
+      <div className="ws-header" style={{ marginBottom: 24 }}>
         <div>
-          <h1 className="ws-title">{months[parseInt(selectedMonth) - 1]} {selectedYear}</h1>
+          <h1 className="ws-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {months[parseInt(selectedMonth) - 1]} {selectedYear}
+            {isCurrentPeriod && (
+              <span style={{
+                fontSize: '0.6875rem', fontWeight: 700, padding: '3px 10px', borderRadius: 99,
+                background: 'var(--green-50)', color: 'var(--green-700)',
+                border: '1px solid var(--green-100)',
+              }}>
+                Current
+              </span>
+            )}
+          </h1>
           <p className="ws-subtitle">
             {periodRange}&nbsp;·&nbsp;
             {selectedCity !== 'Both' ? selectedCity : 'All locations'}
-            {isCurrentPeriod ? ' · Current period' : ''}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -157,7 +169,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
       </div>
 
       {/* ── KPI cards ── */}
-      <div className="ws-kpi-grid">
+      <div className="ws-kpi-grid stagger-fade">
 
         {/* Income — always global */}
         <div className="ws-kpi-card ws-kpi-income">
@@ -203,7 +215,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
         {/* Net balance — global */}
         <div className={`ws-kpi-card ${netBalance >= 0 ? 'ws-kpi-positive' : 'ws-kpi-negative'}`}>
           <div className="ws-kpi-icon">
-            <Minus size={19} />
+            {netBalance >= 0 ? <TrendingUp size={19} /> : <TrendingDown size={19} />}
           </div>
           <div className="ws-kpi-body">
             <div className="ws-kpi-label">Net Balance</div>
@@ -239,47 +251,92 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
 
       </div>
 
+      {/* ── Budget progress bar (if income exists) ── */}
+      {totalIncome > 0 && (
+        <div style={{
+          padding: '14px 20px',
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border-default)',
+          borderRadius: 'var(--r-xl)',
+          marginBottom: 20,
+          boxShadow: 'var(--shadow-xs)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-700)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Target size={13} style={{ color: 'var(--brand-500)' }} />
+              Budget Used
+            </span>
+            <span style={{
+              fontSize: '0.8125rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums',
+              color: budgetUsedPct > 100 ? 'var(--red-500)' : budgetUsedPct > 80 ? 'var(--amber-600)' : 'var(--green-600)',
+            }}>
+              {budgetUsedPct}%
+            </span>
+          </div>
+          <div style={{ height: 8, background: 'var(--bg-muted)', borderRadius: 99, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%',
+              width: `${Math.min(100, budgetUsedPct)}%`,
+              background: budgetUsedPct > 100
+                ? 'linear-gradient(90deg, var(--red-400), var(--red-500))'
+                : budgetUsedPct > 80
+                  ? 'linear-gradient(90deg, var(--amber-400), var(--amber-500))'
+                  : 'linear-gradient(90deg, var(--green-400), var(--green-500))',
+              borderRadius: 99,
+              transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)',
+            }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
+            <span style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>
+              {sym}{Math.round(globalTotalExpenses).toLocaleString('en-IN')} spent
+            </span>
+            <span style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>
+              of {sym}{Math.round(totalIncome).toLocaleString('en-IN')} income
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ── Lower row ── */}
-      <div className="ws-lower-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+      <div className="ws-lower-grid stagger-fade" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
 
         {/* Financial Health — global */}
         <div className="ws-panel">
           <div className="ws-panel-header">
-            <Activity size={14} />
+            <Activity size={14} style={{ color: healthColor }} />
             <span>Financial Health</span>
           </div>
-          <div style={{ textAlign: 'center', padding: '16px 0 12px' }}>
+          <div style={{ textAlign: 'center', padding: '20px 0 16px' }}>
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 88,
-              height: 88,
+              width: 92,
+              height: 92,
               borderRadius: '50%',
-              background: healthBg,
-              border: `3px solid ${healthColor}`,
-              marginBottom: 10,
+              background: `conic-gradient(${healthColor} 0% ${healthScore}%, var(--bg-muted) ${healthScore}% 100%)`,
+              marginBottom: 12,
+              position: 'relative',
             }}>
-              <div>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: healthColor, lineHeight: 1, letterSpacing: '-0.03em' }}>
+              <div style={{
+                width: 72,
+                height: 72,
+                borderRadius: '50%',
+                background: 'var(--bg-surface)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+              }}>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: healthColor, lineHeight: 1, letterSpacing: '-0.03em' }}>
                   {healthScore}
                 </div>
-                <div style={{ fontSize: '0.625rem', color: healthColor, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  score
+                <div style={{ fontSize: '0.5625rem', color: 'var(--text-400)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  / 100
                 </div>
               </div>
             </div>
             <div style={{ fontSize: '0.875rem', fontWeight: 700, color: healthColor }}>{healthLabel}</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-400)', marginTop: 2 }}>out of 100</div>
-          </div>
-          <div style={{ background: 'var(--bg-muted)', borderRadius: 99, height: 7, overflow: 'hidden', marginTop: 6 }}>
-            <div style={{
-              height: '100%',
-              width: `${healthScore}%`,
-              background: `linear-gradient(90deg, ${healthColor}88, ${healthColor})`,
-              borderRadius: 99,
-              transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)',
-            }} />
           </div>
         </div>
 
@@ -289,7 +346,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
             <span style={{ fontSize: '0.8rem' }}>💰</span>
             <span>Savings Rate</span>
           </div>
-          <div style={{ textAlign: 'center', padding: '14px 0 8px' }}>
+          <div style={{ textAlign: 'center', padding: '20px 0 12px' }}>
             <div style={{
               fontSize: '2.5rem',
               fontWeight: 800,
@@ -303,13 +360,13 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
               fontSize: '0.75rem',
               color: savingsRate >= 20 ? 'var(--green-600)' : 'var(--text-400)',
               fontWeight: 500,
-              marginTop: 6,
+              marginTop: 8,
             }}>
-              {savingsRate >= 20 ? 'Above target ✓' : savingsRate >= 10 ? 'Getting there' : totalIncome === 0 ? 'No income recorded' : 'Below target — aim for 20%'}
+              {savingsRate >= 20 ? 'Above target' : savingsRate >= 10 ? 'Getting there' : totalIncome === 0 ? 'No income recorded' : 'Below target — aim for 20%'}
             </div>
           </div>
           {totalIncome > 0 && (
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: '0.72rem', color: 'var(--text-400)' }}>
                 <span>Target: 20%</span>
                 <span>{sym}{Math.round(totalIncome * 0.2).toLocaleString('en-IN')}</span>
@@ -340,21 +397,22 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
             </button>
           </div>
           {topCats.length === 0 ? (
-            <div className="empty-state" style={{ padding: '24px 0' }}>
+            <div className="empty-state" style={{ padding: '28px 0' }}>
               <div className="empty-state-icon">📭</div>
               <div className="empty-state-title" style={{ fontSize: '0.875rem' }}>No expenses yet</div>
               <div className="empty-state-subtitle" style={{ fontSize: '0.78rem' }}>Add some transactions to see breakdown</div>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 6 }}>
               {topCats.map(cat => (
                 <div key={cat.id}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
                     <div style={{
-                      width: 32,
-                      height: 32,
+                      width: 34,
+                      height: 34,
                       borderRadius: 'var(--r-md)',
-                      background: `${cat.color}18`,
+                      background: `${cat.color}14`,
+                      border: `1px solid ${cat.color}22`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -364,21 +422,27 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
                       {cat.icon}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
                         <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-900)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {cat.name}
                         </span>
-                        <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-900)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
-                          {sym}{cat.spent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexShrink: 0 }}>
+                          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-900)', fontVariantNumeric: 'tabular-nums' }}>
+                            {sym}{cat.spent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                          </span>
+                          {globalTotalExpenses > 0 && (
+                            <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-400)' }}>
+                              {Math.round((cat.spent / globalTotalExpenses) * 100)}%
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="progress-track" style={{ marginTop: 4 }}>
+                      <div className="progress-track" style={{ height: 5 }}>
                         <div
                           className="progress-fill"
                           style={{
                             width: `${(cat.spent / maxCatSpend) * 100}%`,
-                            background: cat.color,
-                            opacity: 0.85,
+                            background: `linear-gradient(90deg, ${cat.color}cc, ${cat.color})`,
                           }}
                         />
                       </div>
@@ -407,7 +471,11 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
                   padding: '10px 12px',
                   background: ins.bg,
                   borderRadius: 'var(--r-md)',
+                  border: '1px solid transparent',
+                  transition: 'border-color 0.15s',
                 }}
+                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border-default)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'transparent'; }}
               >
                 <span style={{ fontSize: '0.875rem', flexShrink: 0 }}>{ins.icon}</span>
                 <p style={{ fontSize: '0.78rem', color: ins.color, fontWeight: 500, lineHeight: 1.4 }}>{ins.text}</p>

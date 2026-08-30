@@ -278,6 +278,13 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
       <div className="ws-header">
         <div>
           <h1 className="ws-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 'var(--r-md)',
+              background: 'var(--brand-50)', border: '1px solid var(--brand-100)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <ArrowUpRight size={16} style={{ color: 'var(--brand-600)' }} />
+            </div>
             Activity
             <span style={{
               fontSize: '0.75rem', fontWeight: 700, padding: '3px 10px', borderRadius: 99,
@@ -308,7 +315,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
       {/* ══════════════════════════════════════════════════════════════════════
           KPI STRIP
       ══════════════════════════════════════════════════════════════════════ */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+      <div className="stagger-fade" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
         {[
           {
             label: 'Money Out', value: `${sym}${Math.round(totalExpAmt).toLocaleString('en-IN')}`,
@@ -345,8 +352,11 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
               borderRadius: 'var(--r-xl)',
               padding: '16px 18px',
               display: 'flex', alignItems: 'center', gap: 12,
-              transition: 'box-shadow 0.2s',
+              transition: 'box-shadow 0.25s ease, transform 0.2s ease',
+              boxShadow: 'var(--shadow-xs)',
             }}
+            onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-md)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-xs)'; (e.currentTarget as HTMLDivElement).style.transform = 'none'; }}
           >
             <div style={{
               width: 36, height: 36, borderRadius: 'var(--r-md)',

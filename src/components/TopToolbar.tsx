@@ -198,15 +198,15 @@ export default function TopToolbar({ onAddExpense, onAddIncome, onExport }: TopT
       <div style={{ flex: 1, minWidth: 8 }} />
 
       {/* ── Sync indicator ── */}
-      {syncing && (
+      {syncing ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.75rem', color: 'var(--text-400)', flexShrink: 0 }}>
           <Loader2 size={12} className="animate-spin" />
           <span className="hidden sm:inline">Syncing</span>
         </div>
-      )}
-      {!syncing && (
-        <div title="Synced" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+      ) : (
+        <div title="All changes synced" style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
           <Cloud size={13} style={{ color: 'var(--green-500)' }} />
+          <span className="hidden sm:inline" style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--green-600)' }}>Synced</span>
         </div>
       )}
 

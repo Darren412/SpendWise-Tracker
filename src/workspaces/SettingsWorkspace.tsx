@@ -28,30 +28,42 @@ export default function SettingsWorkspace() {
     <div style={{ maxWidth: 900 }}>
 
       {/* ── Header ── */}
-      <div className="ws-header">
+      <div className="ws-header" style={{ marginBottom: 24 }}>
         <div>
           <h1 className="ws-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Settings size={20} style={{ color: 'var(--brand-600)' }} />
+            <div style={{
+              width: 36, height: 36, borderRadius: 'var(--r-md)',
+              background: 'var(--brand-50)', border: '1px solid var(--brand-100)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Settings size={18} style={{ color: 'var(--brand-600)' }} />
+            </div>
             Settings
           </h1>
           <p className="ws-subtitle">Workspace preferences · Financial cycle · Categories · Display</p>
         </div>
       </div>
 
-      <div className="settings-grid">
+      <div className="settings-grid stagger-fade">
 
         {/* ── Account ── */}
         <div className="settings-card">
           <div className="settings-card-title">
-            <User size={16} style={{ color: 'var(--brand-600)' }} />
+            <div style={{
+              width: 28, height: 28, borderRadius: 'var(--r-sm)',
+              background: 'var(--brand-50)', border: '1px solid var(--brand-100)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <User size={14} style={{ color: 'var(--brand-600)' }} />
+            </div>
             Account
           </div>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-400)', marginBottom: 14 }}>Your profile and authentication</p>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px', background: 'var(--bg-muted)', borderRadius: 'var(--r-lg)', marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--r-lg)', marginBottom: 14, border: '1px solid var(--border-default)' }}>
             <div style={{
-              width: 44,
-              height: 44,
+              width: 46,
+              height: 46,
               borderRadius: '50%',
               background: 'linear-gradient(135deg, var(--brand-500), var(--purple-600))',
               display: 'flex',
@@ -61,7 +73,7 @@ export default function SettingsWorkspace() {
               fontWeight: 700,
               color: '#fff',
               flexShrink: 0,
-              boxShadow: 'var(--shadow-brand)',
+              boxShadow: '0 3px 12px rgba(99,102,241,0.25)',
             }}>
               {initials}
             </div>
@@ -100,7 +112,13 @@ export default function SettingsWorkspace() {
         {/* ── Currency ── */}
         <div className="settings-card">
           <div className="settings-card-title">
-            <DollarSign size={16} style={{ color: 'var(--green-600)' }} />
+            <div style={{
+              width: 28, height: 28, borderRadius: 'var(--r-sm)',
+              background: 'var(--green-50)', border: '1px solid var(--green-100)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <DollarSign size={14} style={{ color: 'var(--green-600)' }} />
+            </div>
             Currency
           </div>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-400)', marginBottom: 12 }}>Select your display currency for all amounts</p>
@@ -139,7 +157,13 @@ export default function SettingsWorkspace() {
         {/* ── Financial Cycle ── */}
         <div className="settings-card" style={{ gridColumn: 'span 2' }}>
           <div className="settings-card-title">
-            <Calendar size={16} style={{ color: 'var(--amber-600)' }} />
+            <div style={{
+              width: 28, height: 28, borderRadius: 'var(--r-sm)',
+              background: 'var(--amber-50)', border: '1px solid var(--amber-100)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Calendar size={14} style={{ color: 'var(--amber-600)' }} />
+            </div>
             Financial Cycle
           </div>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-400)', marginBottom: 4 }}>
@@ -153,7 +177,13 @@ export default function SettingsWorkspace() {
         {isDarren && (
           <div className="settings-card">
             <div className="settings-card-title">
-              <MapPin size={16} style={{ color: 'var(--purple-600)' }} />
+              <div style={{
+                width: 28, height: 28, borderRadius: 'var(--r-sm)',
+                background: 'var(--purple-50)', border: '1px solid #ddd6fe',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <MapPin size={14} style={{ color: 'var(--purple-600)' }} />
+              </div>
               Location Filter
             </div>
             <p style={{ fontSize: '0.78rem', color: 'var(--text-400)', marginBottom: 12 }}>Filter transactions by city</p>
@@ -186,7 +216,13 @@ export default function SettingsWorkspace() {
         {/* ── Category Filter ── */}
         <div className="settings-card">
           <div className="settings-card-title">
-            <Tag size={16} style={{ color: 'var(--cyan-500)' }} />
+            <div style={{
+              width: 28, height: 28, borderRadius: 'var(--r-sm)',
+              background: 'var(--cyan-50)', border: '1px solid #a5f3fc',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Tag size={14} style={{ color: 'var(--cyan-500)' }} />
+            </div>
             Category Filter
           </div>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-400)', marginBottom: 12 }}>Filter which categories appear in analytics</p>

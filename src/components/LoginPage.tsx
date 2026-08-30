@@ -159,8 +159,8 @@ export default function LoginPage() {
         </div>
 
         {/* Bottom tagline */}
-        <div style={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.5)' }}>
-          Built for clarity · Designed for action
+        <div style={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.02em' }}>
+          Built for clarity · Designed for action · Made with care
         </div>
       </div>
 
@@ -171,10 +171,11 @@ export default function LoginPage() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '40px 24px',
+          padding: '40px 32px',
           flex: '0 0 auto',
           width: '100%',
           maxWidth: 480,
+          animation: 'loginSlideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards',
         }}
       >
         {/* Mobile logo */}

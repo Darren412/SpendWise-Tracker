@@ -23,17 +23,20 @@ function WorkspaceSkeleton() {
     <div style={{ padding: '28px 28px', maxWidth: 1400 }}>
       {/* Header skeleton */}
       <div style={{ marginBottom: 28 }}>
-        <div className="skeleton" style={{ width: 220, height: 32, marginBottom: 8, borderRadius: 8 }} />
-        <div className="skeleton" style={{ width: 320, height: 16, borderRadius: 6 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <div className="skeleton" style={{ width: 36, height: 36, borderRadius: 12 }} />
+          <div className="skeleton" style={{ width: 200, height: 28, borderRadius: 8 }} />
+        </div>
+        <div className="skeleton" style={{ width: 320, height: 14, borderRadius: 6 }} />
       </div>
       {/* KPI skeleton */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div className="stagger-fade" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="skeleton" style={{ height: 110, borderRadius: 16 }} />
         ))}
       </div>
       {/* Panels skeleton */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+      <div className="stagger-fade" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="skeleton" style={{ height: 200, borderRadius: 16 }} />
         ))}

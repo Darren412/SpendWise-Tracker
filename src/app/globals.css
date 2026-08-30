@@ -629,11 +629,11 @@ body {
 @keyframes wsFadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
+}
 
 @keyframes cfbDropIn {
   from { opacity: 0; transform: translateY(-6px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
-}
 }
 
 .sw-workspace-fade {
@@ -2544,3 +2544,266 @@ body {
 .ai-insights-grid .ai-insight-card:nth-child(4) { animation-delay: 0.15s; }
 .ai-insights-grid .ai-insight-card:nth-child(5) { animation-delay: 0.20s; }
 .ai-insights-grid .ai-insight-card:nth-child(6) { animation-delay: 0.25s; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ENHANCED MICRO-INTERACTIONS & POLISH (v3.1)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Staggered card entry animation ── */
+@keyframes cardSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cardScaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.stagger-fade > * {
+  opacity: 0;
+  animation: cardSlideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.stagger-fade > *:nth-child(1) { animation-delay: 0.02s; }
+.stagger-fade > *:nth-child(2) { animation-delay: 0.06s; }
+.stagger-fade > *:nth-child(3) { animation-delay: 0.10s; }
+.stagger-fade > *:nth-child(4) { animation-delay: 0.14s; }
+.stagger-fade > *:nth-child(5) { animation-delay: 0.18s; }
+.stagger-fade > *:nth-child(6) { animation-delay: 0.22s; }
+.stagger-fade > *:nth-child(7) { animation-delay: 0.26s; }
+.stagger-fade > *:nth-child(8) { animation-delay: 0.30s; }
+
+/* ── Focus-visible for keyboard users ── */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ── Enhanced sidebar ── */
+.sw-rail {
+  box-shadow: 1px 0 8px rgba(0,0,0,0.03);
+}
+
+.sw-nav-item {
+  transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+}
+
+.sw-nav-item:active {
+  transform: scale(0.98);
+}
+
+.sw-nav-item.active {
+  box-shadow: inset 0 0 0 1px rgba(99,102,241,0.12);
+}
+
+/* ── Enhanced topbar ── */
+.sw-toolbar {
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.sw-tb-btn {
+  transition: all 0.18s ease;
+}
+
+.sw-tb-btn:active {
+  transform: scale(0.97);
+}
+
+.sw-tb-btn.primary:active {
+  transform: scale(0.97) translateY(0);
+}
+
+/* ── Enhanced KPI cards ── */
+.ws-kpi-card {
+  transition: box-shadow 0.25s ease, transform 0.2s ease, border-color 0.25s ease;
+}
+
+.ws-kpi-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-3px);
+}
+
+/* ── Enhanced panel cards ── */
+.ws-panel {
+  transition: box-shadow 0.25s ease, transform 0.2s ease, border-color 0.25s ease;
+}
+
+.ws-panel:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+}
+
+/* ── Button micro-interactions ── */
+.ws-cta-btn {
+  transition: all 0.18s ease;
+}
+
+.ws-cta-btn:active {
+  transform: scale(0.97);
+}
+
+.ws-cta-btn.ws-cta-red:hover {
+  box-shadow: 0 6px 24px rgba(239,68,68,0.3);
+  transform: translateY(-1px);
+}
+
+.ws-cta-btn.ws-cta-green:hover {
+  box-shadow: 0 6px 24px rgba(34,197,94,0.3);
+  transform: translateY(-1px);
+}
+
+/* ── Settings card hover ── */
+.settings-card {
+  transition: box-shadow 0.25s ease, transform 0.2s ease, border-color 0.25s ease;
+}
+
+.settings-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+
+/* ── Smooth panel transitions ── */
+.panel {
+  transition: box-shadow 0.25s ease, transform 0.2s ease, border-color 0.25s ease;
+}
+
+.panel:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+}
+
+/* ── Tab bar refinement ── */
+.ws-tab-bar {
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.ws-tab {
+  transition: all 0.2s ease;
+}
+
+.ws-tab:hover:not(.active) {
+  color: var(--text-700);
+  background: rgba(255,255,255,0.5);
+}
+
+.ws-tab.active {
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Badge refinement ── */
+.badge {
+  transition: transform 0.15s ease;
+}
+
+.badge:hover {
+  transform: scale(1.03);
+}
+
+/* ── Scrollbar subtle refinement ── */
+.sw-workspace-viewport::-webkit-scrollbar { width: 6px; }
+.sw-workspace-viewport::-webkit-scrollbar-track { background: transparent; margin: 8px 0; }
+.sw-workspace-viewport::-webkit-scrollbar-thumb { background: #d4d8e0; border-radius: 99px; }
+.sw-workspace-viewport::-webkit-scrollbar-thumb:hover { background: #b0b6c2; }
+
+/* ── Section header divider helper ── */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, var(--border-default), transparent 80%);
+  margin: 24px 0;
+}
+
+/* ── Gradient text utility ── */
+.gradient-text {
+  background: linear-gradient(135deg, var(--brand-600), var(--purple-600));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Improved workspace fade ── */
+.sw-workspace-fade {
+  animation: wsFadeIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  min-height: 100%;
+}
+
+/* ── Selection highlight ── */
+::selection {
+  background: rgba(99,102,241,0.15);
+  color: var(--text-900);
+}
+
+/* ── Enhanced login page ── */
+@keyframes loginSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes loginFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Loading spinner ── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ── Improved responsive ── */
+@media (max-width: 768px) {
+  .ws-kpi-grid {
+    gap: 10px;
+  }
+
+  .ws-title {
+    font-size: 1.25rem;
+  }
+
+  .ws-subtitle {
+    font-size: 0.75rem;
+  }
+
+  .kpi-card-value,
+  .ws-kpi-value {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .sw-workspace-viewport {
+    padding: 12px 12px 24px;
+  }
+
+  .ws-kpi-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+/* ── Hover glow ring for interactive cards ── */
+.glow-ring {
+  position: relative;
+}
+
+.glow-ring::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.08));
+}
+
+.glow-ring:hover::after {
+  opacity: 1;
+}

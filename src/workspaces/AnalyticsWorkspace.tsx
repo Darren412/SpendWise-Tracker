@@ -232,10 +232,16 @@ export default function AnalyticsWorkspace() {
     <div style={{ maxWidth: 1400 }}>
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="ws-header">
+      <div className="ws-header" style={{ marginBottom: 24 }}>
         <div>
           <h1 className="ws-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <BarChart2 size={20} style={{ color: 'var(--brand-600)' }} />
+            <div style={{
+              width: 36, height: 36, borderRadius: 'var(--r-md)',
+              background: 'var(--brand-50)', border: '1px solid var(--brand-100)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <BarChart2 size={16} style={{ color: 'var(--brand-600)' }} />
+            </div>
             Analytics
           </h1>
           <p className="ws-subtitle">
@@ -245,7 +251,7 @@ export default function AnalyticsWorkspace() {
       </div>
 
       {/* ── Summary Stats Row ──────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
+      <div className="stagger-fade" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
         {statCard(
           <DollarSign size={16} color="#ef4444" />,
           'Total Spent',
@@ -517,7 +523,7 @@ export default function AnalyticsWorkspace() {
       </div>
 
       {/* ── Bottom Analytics Grid (3-col) ─────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
+      <div className="stagger-fade" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 16 }}>
 
         {/* Day-of-Week Patterns */}
         <div className="dark-card p-5">

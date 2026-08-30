@@ -57,13 +57,14 @@ export default function LeftPane({ activeWorkspace = 'overview', onWorkspaceChan
       style={{
         width: expanded ? 240 : 68,
         minWidth: expanded ? 240 : 68,
-        transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1), min-width 0.25s cubic-bezier(0.4,0,0.2,1)',
+        transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), min-width 0.28s cubic-bezier(0.4,0,0.2,1)',
+        borderRight: '1px solid var(--border-default)',
       }}
     >
       {/* ── Logo ── */}
-      <div className="sw-rail-top" style={{ gap: 10, padding: '18px 14px' }}>
+      <div className="sw-rail-top" style={{ gap: 10, padding: '20px 14px 16px' }}>
         <div className="sw-rail-logo" style={{ flex: 1, overflow: 'hidden' }}>
-          <div className="sw-rail-logo-icon">
+          <div className="sw-rail-logo-icon" style={{ boxShadow: '0 2px 12px rgba(99,102,241,0.35)' }}>
             <TrendingUp size={15} color="#fff" strokeWidth={2.5} />
           </div>
           <span
@@ -72,7 +73,7 @@ export default function LeftPane({ activeWorkspace = 'overview', onWorkspaceChan
               opacity: expanded ? 1 : 0,
               width: expanded ? 'auto' : 0,
               overflow: 'hidden',
-              transition: 'opacity 0.2s, width 0.25s',
+              transition: 'opacity 0.2s ease, width 0.28s ease',
               whiteSpace: 'nowrap',
             }}
           >
@@ -150,7 +151,7 @@ export default function LeftPane({ activeWorkspace = 'overview', onWorkspaceChan
       </nav>
 
       {/* ── Footer: user + sign out ── */}
-      <div className="sw-rail-bottom">
+      <div className="sw-rail-bottom" style={{ borderTop: '1px solid var(--border-default)' }}>
 
         {/* User row */}
         <div
@@ -160,18 +161,18 @@ export default function LeftPane({ activeWorkspace = 'overview', onWorkspaceChan
         >
           <div
             style={{
-              width: 28,
-              height: 28,
+              width: 30,
+              height: 30,
               borderRadius: '50%',
               background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '0.6rem',
+              fontSize: '0.625rem',
               fontWeight: 700,
               color: '#fff',
               flexShrink: 0,
-              boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+              boxShadow: '0 2px 10px rgba(99,102,241,0.25)',
             }}
           >
             {initials}

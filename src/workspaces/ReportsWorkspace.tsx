@@ -50,7 +50,13 @@ export default function ReportsWorkspace() {
       <div className="ws-header">
         <div>
           <h1 className="ws-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <FileText size={20} style={{ color: 'var(--brand-600)' }} />
+            <div style={{
+              width: 36, height: 36, borderRadius: 'var(--r-md)',
+              background: 'var(--brand-50)', border: '1px solid var(--brand-100)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <FileText size={16} style={{ color: 'var(--brand-600)' }} />
+            </div>
             Reports
           </h1>
           <p className="ws-subtitle">Annual summaries · Data exports · Historical analytics</p>
@@ -62,6 +68,7 @@ export default function ReportsWorkspace() {
 
       {/* ── Export cards ── */}
       <div
+        className="stagger-fade"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',

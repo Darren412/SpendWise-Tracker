@@ -204,7 +204,7 @@ export default function InsightsWorkspace() {
       <div className="ws-header">
         <div>
           <h1 className="ws-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="ai-icon-glow"><Sparkles size={18} /></span>
+            <span className="ai-icon-glow" style={{ width: 36, height: 36, borderRadius: 'var(--r-md)' }}><Sparkles size={16} /></span>
             AI Insights
             <span style={{ fontSize: '0.6875rem', fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: 'var(--brand-50)', color: 'var(--brand-600)', border: '1px solid var(--brand-200)' }}>
               {selectedMonthLabel}
