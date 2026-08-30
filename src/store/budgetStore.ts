@@ -136,10 +136,18 @@ export function generateId(prefix = ''): string {
 
 // ── Supabase helpers ────────────────────────────────────────────────────────
 
+interface UserSettings {
+  currency: string;
+  financialCycleStart: number;
+  monthlyBudgets: Record<string, number>;
+  budgetCategoryIds: string[];
+}
+
 interface RemoteData {
   expenses: Expense[];
   income: Income[];
   categories: Category[];
+  settings?: UserSettings | null;
 }
 
 function backupToLocalStorage(data: RemoteData) {
@@ -150,6 +158,12 @@ function backupToLocalStorage(data: RemoteData) {
     localStorage.setItem(`${prefix}expenses`, JSON.stringify(data.expenses));
     localStorage.setItem(`${prefix}income`, JSON.stringify(data.income));
     localStorage.setItem(`${prefix}categories`, JSON.stringify(data.categories));
+    if (data.settings) {
+      localStorage.setItem('spendwise_currency', data.settings.currency);
+      localStorage.setItem('spendwise_cycle_start', String(data.settings.financialCycleStart));
+      localStorage.setItem('spendwise_monthly_budgets', JSON.stringify(data.settings.monthlyBudgets));
+      localStorage.setItem('spendwise_budget_categories', JSON.stringify(data.settings.budgetCategoryIds));
+    }
   } catch { /* quota exceeded — non-critical */ }
 }
 
@@ -200,8 +214,11 @@ let loadVersion = 0; // guards against concurrent loadFromSupabase calls
 
 /** Read the latest state from the store and return the sync payload. */
 function getLatestSyncPayload(): RemoteData {
-  const { expenses, income, categories } = useBudgetStore.getState();
-  return { expenses, income, categories };
+  const { expenses, income, categories, currency, financialCycleStart, monthlyBudgets, budgetCategoryIds } = useBudgetStore.getState();
+  return {
+    expenses, income, categories,
+    settings: { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds },
+  };
 }
 
 /** Actually push data to Supabase (called by the debounce / retry). */
@@ -319,7 +336,7 @@ async function loadFromSupabase() {
 
   const { data, error } = await supabase
     .from('budget_data')
-    .select('expenses, income, categories')
+    .select('expenses, income, categories, settings')
     .eq('user_id', userId)
     .single();
 
@@ -366,14 +383,18 @@ async function loadFromSupabase() {
     if (!Array.isArray(rawCategories))  rawCategories  = defaultCategories;
     const { categories: migratedCats, changed } = migrateCategories(rawCategories);
 
+    // Include current local settings in the initial upload
+    const { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds } = useBudgetStore.getState();
     const migrated: RemoteData = {
       expenses:   parsedExpenses,
       income:     parsedIncome,
       categories: migratedCats,
+      settings:   { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds },
     };
 
     if (thisLoad !== loadVersion) return;
-    useBudgetStore.setState(migrated);
+    const { settings: _ms, ...migratedData } = migrated;
+    useBudgetStore.setState(migratedData);
 
     // Push existing localStorage data up to Supabase (and if migration ran, persist it)
     if (local.expenses || local.income || local.categories || changed) {
@@ -393,11 +414,35 @@ async function loadFromSupabase() {
 
   const { categories: migratedRemoteCats, changed: remoteCatsChanged } = migrateCategories(rawCats);
 
+  // Parse remote settings (may be null if column doesn't exist yet or first sync)
+  const remoteSettings: UserSettings | null = data.settings && typeof data.settings === 'object'
+    ? data.settings as UserSettings
+    : null;
+
   const remote: RemoteData = {
     expenses:   rawExpenses,
     income:     rawIncome,
     categories: migratedRemoteCats,
+    settings:   remoteSettings,
   };
+
+  // Apply remote settings to the store
+  if (remoteSettings) {
+    const settingsUpdate: Partial<BudgetStore> = {};
+    if (remoteSettings.currency && typeof remoteSettings.currency === 'string') {
+      settingsUpdate.currency = remoteSettings.currency;
+    }
+    if (typeof remoteSettings.financialCycleStart === 'number' && remoteSettings.financialCycleStart >= 1 && remoteSettings.financialCycleStart <= 28) {
+      settingsUpdate.financialCycleStart = remoteSettings.financialCycleStart;
+    }
+    if (remoteSettings.monthlyBudgets && typeof remoteSettings.monthlyBudgets === 'object') {
+      settingsUpdate.monthlyBudgets = remoteSettings.monthlyBudgets;
+    }
+    if (Array.isArray(remoteSettings.budgetCategoryIds)) {
+      settingsUpdate.budgetCategoryIds = remoteSettings.budgetCategoryIds;
+    }
+    useBudgetStore.setState(settingsUpdate);
+  }
 
   // Merge localStorage backup with Supabase data to prevent data loss
   const local = getLocalBackup(userId);
@@ -433,7 +478,9 @@ async function loadFromSupabase() {
   }
 
   if (thisLoad !== loadVersion) return;
-  useBudgetStore.setState(remote);
+  // Apply data (settings already applied above, strip from setState to avoid stale key)
+  const { settings: _s, ...remoteData } = remote;
+  useBudgetStore.setState(remoteData);
   backupToLocalStorage(remote);
 
   // Re-apply financial cycle mapping after data loads (in case cycle != calendar month)
@@ -485,6 +532,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
     if (typeof window !== 'undefined') {
       localStorage.setItem('spendwise_currency', currency);
     }
+    scheduleSyncToSupabase();
   },
 
   setMonthlyBudget: (month: string, year: number, amount: number) => {
@@ -498,6 +546,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
       }
       return { monthlyBudgets: updated };
     });
+    scheduleSyncToSupabase();
   },
 
   getMonthlyBudget: (month: string, year: number) => {
@@ -511,6 +560,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
     if (typeof window !== 'undefined') {
       localStorage.setItem('spendwise_budget_categories', JSON.stringify(ids));
     }
+    scheduleSyncToSupabase();
   },
 
   setSelectedMonth: (month: string) => {
@@ -535,6 +585,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
     get().migrateToFinancialCycle();
     const period = getCurrentFinancialPeriod(clamped);
     set({ selectedMonth: period.month, selectedYear: period.year });
+    scheduleSyncToSupabase();
   },
 
   migrateToFinancialCycle: () => {
