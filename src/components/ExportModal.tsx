@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { X, FileSpreadsheet, Calendar, CalendarDays, CalendarRange, Database } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { exportToExcel, ExportFilter } from '@/utils/exportToExcel';
+import DateInput from '@/components/DateInput';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -92,12 +93,10 @@ export default function ExportModal({ isOpen, onClose }: Props) {
       label: 'Specific Day',
       sub: (
         <div className="mt-2 ml-6">
-          <input
-            type="date"
-            lang="en-GB"
+          <DateInput
             className="dark-input text-sm rounded-lg px-3 py-1.5 w-full"
             value={chosenDay}
-            onChange={e => setChosenDay(e.target.value)}
+            onChange={setChosenDay}
           />
         </div>
       ),

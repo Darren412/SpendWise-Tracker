@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useBudgetStore, generateId } from '@/store/budgetStore';
 import { Expense } from '@/types';
 import CategorySelect from '@/components/CategorySelect';
+import DateInput from '@/components/DateInput';
 
 export default function ExpenseForm() {
   const { addExpense, categories, selectedCity } = useBudgetStore();
@@ -143,14 +144,10 @@ export default function ExpenseForm() {
         </div>
         <div>
           <label style={labelStyle}>Date</label>
-          <input
-            type="date"
-            lang="en-GB"
+          <DateInput
             value={formData.date}
-            onChange={e => setFormData({ ...formData, date: e.target.value })}
+            onChange={date => setFormData({ ...formData, date })}
             style={inputStyle}
-            onFocus={focusInput}
-            onBlur={blurInput}
           />
         </div>
       </div>
