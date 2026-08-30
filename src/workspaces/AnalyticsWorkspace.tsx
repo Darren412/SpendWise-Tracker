@@ -2,6 +2,7 @@
 
 import { BarChart2 } from 'lucide-react';
 import DailySpendTracker from '@/components/DailySpendTracker';
+import WeeklySpendTracker from '@/components/WeeklySpendTracker';
 import Charts from '@/components/Charts';
 
 export default function AnalyticsWorkspace() {
@@ -15,7 +16,7 @@ export default function AnalyticsWorkspace() {
             <BarChart2 size={20} style={{ color: 'var(--brand-600)' }} />
             Analytics
           </h1>
-          <p className="ws-subtitle">Daily spend patterns · Category breakdown · Spending trends</p>
+          <p className="ws-subtitle">Daily spend patterns · Weekly breakdown · Category trends</p>
         </div>
       </div>
 
@@ -27,6 +28,17 @@ export default function AnalyticsWorkspace() {
         </div>
         <div style={{ padding: '4px 0' }}>
           <DailySpendTracker />
+        </div>
+      </div>
+
+      {/* ── Weekly Spend Breakdown ── */}
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--bg-muted)' }}>
+          <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-900)' }}>Weekly Spend Tracker</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-400)', marginTop: 2 }}>Week-by-week spending across your financial period</div>
+        </div>
+        <div style={{ padding: '4px 0' }}>
+          <WeeklySpendTracker />
         </div>
       </div>
 
