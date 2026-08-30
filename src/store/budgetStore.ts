@@ -43,10 +43,11 @@ interface BudgetStore {
   setFinancialCycleStart: (day: number) => void;
   migrateToFinancialCycle: () => void;
   loadFromLocalStorage: () => void;
-  // Budget tracker
-  monthlyBudget: number;
+  // Budget tracker — per-month budgets keyed by "MM-YYYY"
+  monthlyBudgets: Record<string, number>;
   budgetCategoryIds: string[];
-  setMonthlyBudget: (amount: number) => void;
+  setMonthlyBudget: (month: string, year: number, amount: number) => void;
+  getMonthlyBudget: (month: string, year: number) => number;
   setBudgetCategoryIds: (ids: string[]) => void;
 }
 
@@ -455,7 +456,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   excludedCategoryIds: [],
   selectedCategoryIds: [], // deprecated alias — mirrors excludedCategoryIds
   financialCycleStart: initCycleStart,
-  monthlyBudget: typeof window !== 'undefined' ? parseFloat(localStorage.getItem('spendwise_monthly_budget') ?? '0') || 0 : 0,
+  monthlyBudgets: typeof window !== 'undefined' ? (() => { try { const raw = localStorage.getItem('spendwise_monthly_budgets'); if (raw) return JSON.parse(raw); const legacy = parseFloat(localStorage.getItem('spendwise_monthly_budget') ?? '0'); return legacy > 0 ? { _default: legacy } : {}; } catch { return {}; } })() : {},
   budgetCategoryIds: typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('spendwise_budget_categories') ?? '[]'); } catch { return []; } })() : [],
 
   setExcludedCategoryIds: (ids: string[]) => set({ excludedCategoryIds: ids, selectedCategoryIds: ids }),
@@ -486,12 +487,23 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
     }
   },
 
-  setMonthlyBudget: (amount: number) => {
+  setMonthlyBudget: (month: string, year: number, amount: number) => {
     const safe = Math.max(0, amount);
-    set({ monthlyBudget: safe });
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('spendwise_monthly_budget', String(safe));
-    }
+    const key = `${month}-${year}`;
+    set((state) => {
+      const updated = { ...state.monthlyBudgets, [key]: safe };
+      if (safe === 0) delete updated[key]; // remove zero-budget entries
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('spendwise_monthly_budgets', JSON.stringify(updated));
+      }
+      return { monthlyBudgets: updated };
+    });
+  },
+
+  getMonthlyBudget: (month: string, year: number) => {
+    const budgets = get().monthlyBudgets;
+    const key = `${month}-${year}`;
+    return budgets[key] ?? budgets._default ?? 0;
   },
 
   setBudgetCategoryIds: (ids: string[]) => {

@@ -22,8 +22,8 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
     categories,
     financialCycleStart, currency, selectedCity,
     excludedCategoryIds,
-    monthlyBudget, budgetCategoryIds,
-    setMonthlyBudget, setBudgetCategoryIds,
+    monthlyBudgets, budgetCategoryIds,
+    setMonthlyBudget, getMonthlyBudget, setBudgetCategoryIds,
   } = useBudgetStore();
 
   const sym = currencySymbol(currency);
@@ -137,8 +137,16 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
 
   // ── Budget tracker ──────────────────────────────────────────────────────
   const [budgetConfigOpen, setBudgetConfigOpen] = useState(false);
-  const [budgetInput, setBudgetInput] = useState(monthlyBudget > 0 ? String(monthlyBudget) : '');
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const currentMonthBudget = getMonthlyBudget(selectedMonth, selectedYear);
+  const [budgetInput, setBudgetInput] = useState(currentMonthBudget > 0 ? String(currentMonthBudget) : '');
   const budgetConfigRef = useRef<HTMLDivElement>(null);
+
+  // Sync budget input when month/year changes
+  useEffect(() => {
+    const b = getMonthlyBudget(selectedMonth, selectedYear);
+    setBudgetInput(b > 0 ? String(b) : '');
+  }, [selectedMonth, selectedYear, monthlyBudgets]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close config panel on outside click
   useEffect(() => {
@@ -169,7 +177,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
       .reduce((sum, e) => sum + e.amount, 0);
   }, [allExpenses, selectedMonth, selectedYear, budgetCategoryIds]);
 
-  // Per-category breakdown for budget
+  // Per-category breakdown for budget — only categories with spending
   const budgetCategoryBreakdown = useMemo(() => {
     if (budgetCategoryIds.length === 0) return [];
     const totals: Record<string, number> = {};
@@ -181,12 +189,13 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
     return categories
       .filter(c => budgetCategoryIds.includes(c.id))
       .map(c => ({ ...c, spent: totals[c.id] ?? 0 }))
+      .filter(c => c.spent > 0)
       .sort((a, b) => b.spent - a.spent);
   }, [allExpenses, selectedMonth, selectedYear, budgetCategoryIds, categories]);
 
-  const budgetRemaining = monthlyBudget - budgetTrackedSpending;
-  const budgetUsedPct = monthlyBudget > 0 ? Math.round((budgetTrackedSpending / monthlyBudget) * 100) : 0;
-  const budgetConfigured = monthlyBudget > 0 && budgetCategoryIds.length > 0;
+  const budgetRemaining = currentMonthBudget - budgetTrackedSpending;
+  const budgetUsedPct = currentMonthBudget > 0 ? Math.round((budgetTrackedSpending / currentMonthBudget) * 100) : 0;
+  const budgetConfigured = currentMonthBudget > 0 && budgetCategoryIds.length > 0;
 
   const toggleBudgetCategory = (id: string) => {
     setBudgetCategoryIds(
@@ -195,6 +204,8 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
         : [...budgetCategoryIds, id]
     );
   };
+
+  const monthNames = months;
 
   return (
     <div style={{ maxWidth: 1400 }}>
@@ -338,13 +349,13 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
               </div>
               <div style={{ fontSize: '0.6875rem', color: 'var(--text-400)', marginTop: 1 }}>
                 {budgetConfigured
-                  ? `${budgetCategoryIds.length} categor${budgetCategoryIds.length === 1 ? 'y' : 'ies'} tracked`
+                  ? `${monthNames[parseInt(selectedMonth) - 1]} ${selectedYear} · ${budgetCategoryIds.length} categor${budgetCategoryIds.length === 1 ? 'y' : 'ies'} tracked`
                   : 'Set a budget to track your spending'}
               </div>
             </div>
           </div>
           <button
-            onClick={() => { setBudgetConfigOpen(!budgetConfigOpen); if (!budgetConfigOpen) setBudgetInput(monthlyBudget > 0 ? String(monthlyBudget) : ''); }}
+            onClick={() => { setBudgetConfigOpen(!budgetConfigOpen); if (!budgetConfigOpen) setBudgetInput(currentMonthBudget > 0 ? String(currentMonthBudget) : ''); }}
             style={{
               background: budgetConfigOpen ? 'var(--brand-50)' : 'var(--bg-muted)',
               border: `1px solid ${budgetConfigOpen ? 'var(--brand-200)' : 'var(--border-default)'}`,
@@ -375,7 +386,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
             {/* Budget amount input */}
             <div style={{ marginBottom: 14 }}>
               <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 6 }}>
-                Budget Amount
+                Budget for {monthNames[parseInt(selectedMonth) - 1]} {selectedYear}
               </label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <div style={{
@@ -402,7 +413,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
                   onClick={() => {
                     const val = parseFloat(budgetInput);
                     if (!isNaN(val) && val > 0) {
-                      setMonthlyBudget(val);
+                      setMonthlyBudget(selectedMonth, selectedYear, val);
                     }
                   }}
                   style={{
@@ -482,7 +493,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
                   {sym}{Math.round(budgetTrackedSpending).toLocaleString('en-IN')}
                 </div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-400)', marginTop: 4 }}>
-                  of {sym}{Math.round(monthlyBudget).toLocaleString('en-IN')} budget
+                  of {sym}{Math.round(currentMonthBudget).toLocaleString('en-IN')} budget
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -542,41 +553,58 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
               </div>
             )}
 
-            {/* Per-category breakdown */}
+            {/* Per-category breakdown — collapsible */}
             {budgetCategoryBreakdown.length > 0 && (
-              <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
-                  Category Breakdown
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {budgetCategoryBreakdown.map(cat => {
-                    const catPct = monthlyBudget > 0 ? (cat.spent / monthlyBudget) * 100 : 0;
-                    return (
-                      <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: '0.85rem', width: 22, textAlign: 'center', flexShrink: 0 }}>{cat.icon}</span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-700)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {cat.name}
-                            </span>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-900)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, marginLeft: 8 }}>
-                              {sym}{Math.round(cat.spent).toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                          <div style={{ height: 4, background: 'var(--bg-muted)', borderRadius: 99, overflow: 'hidden' }}>
-                            <div style={{
-                              height: '100%',
-                              width: `${Math.min(100, catPct)}%`,
-                              background: cat.color,
-                              borderRadius: 99,
-                              transition: 'width 0.5s ease',
-                            }} />
+              <div style={{ marginTop: 12 }}>
+                <button
+                  onClick={() => setBreakdownOpen(!breakdownOpen)}
+                  style={{
+                    width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '6px 0',
+                  }}
+                >
+                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Category Breakdown ({budgetCategoryBreakdown.length})
+                  </span>
+                  <svg
+                    width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="var(--text-400)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
+                    style={{ transition: 'transform 0.2s', transform: breakdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                {breakdownOpen && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 6 }}>
+                    {budgetCategoryBreakdown.map(cat => {
+                      const catPct = currentMonthBudget > 0 ? (cat.spent / currentMonthBudget) * 100 : 0;
+                      return (
+                        <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: '0.85rem', width: 22, textAlign: 'center', flexShrink: 0 }}>{cat.icon}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-700)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {cat.name}
+                              </span>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-900)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, marginLeft: 8 }}>
+                                {sym}{Math.round(cat.spent).toLocaleString('en-IN')}
+                              </span>
+                            </div>
+                            <div style={{ height: 4, background: 'var(--bg-muted)', borderRadius: 99, overflow: 'hidden' }}>
+                              <div style={{
+                                height: '100%',
+                                width: `${Math.min(100, catPct)}%`,
+                                background: cat.color,
+                                borderRadius: 99,
+                                transition: 'width 0.5s ease',
+                              }} />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
