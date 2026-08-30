@@ -3,7 +3,7 @@
 import { useBudgetStore } from '@/store/budgetStore';
 import { useAuth } from '@/components/AuthProvider';
 import { currencies } from '@/utils/currency';
-import { formatFinancialPeriodRange } from '@/utils/financialCycle';
+import { formatFinancialPeriodRange, ordinalSuffix } from '@/utils/financialCycle';
 import CategoryFilterBar from '@/components/CategoryFilterBar';
 import FinancialCycleSettings from '@/components/FinancialCycleSettings';
 import { Settings, User, DollarSign, Calendar, MapPin, Tag, LogOut } from 'lucide-react';
@@ -167,7 +167,7 @@ export default function SettingsWorkspace() {
             Financial Cycle
           </div>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-400)', marginBottom: 4 }}>
-            Cycle starts on the {financialCycleStart}{financialCycleStart === 1 ? 'st' : financialCycleStart === 2 ? 'nd' : financialCycleStart === 3 ? 'rd' : 'th'} of each month
+            Cycle starts on the {financialCycleStart}{ordinalSuffix(financialCycleStart)} of each month
           </p>
           <p style={{ fontSize: '0.72rem', color: 'var(--text-300)', marginBottom: 14 }}>Current period: {periodRange}</p>
           <FinancialCycleSettings />

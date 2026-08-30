@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import {
-  ChevronLeft, ChevronRight, DollarSign, Plus,
+  ChevronLeft, ChevronRight, Plus,
   FileSpreadsheet, ChevronDown, RotateCcw, Cloud, Loader2,
 } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
@@ -69,7 +69,7 @@ export default function TopToolbar({ onAddExpense, onAddIncome, onExport }: TopT
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  const currLabel = currencies.find(c => c.code === currency)?.label ?? '₹ INR';
+  const currConfig = currencies.find(c => c.code === currency) ?? currencies[0];
 
   return (
     <div className="sw-toolbar">
@@ -141,8 +141,8 @@ export default function TopToolbar({ onAddExpense, onAddIncome, onExport }: TopT
           onClick={() => setShowCurrency(v => !v)}
           style={{ gap: 4 }}
         >
-          <DollarSign size={11} style={{ color: 'var(--text-400)' }} />
-          {currLabel}
+          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-500)' }}>{currConfig.symbol}</span>
+          <span>{currConfig.code}</span>
           <ChevronDown
             size={10}
             style={{
@@ -156,16 +156,17 @@ export default function TopToolbar({ onAddExpense, onAddIncome, onExport }: TopT
         {showCurrency && (
           <div
             style={{
-              position: 'absolute',
-              top: 'calc(100% + 4px)',
-              left: 0,
+              position: 'fixed',
+              top: 'auto',
+              left: 'auto',
               background: 'var(--bg-surface)',
               border: '1px solid var(--border-default)',
               borderRadius: 'var(--r-lg)',
-              boxShadow: 'var(--shadow-lg)',
-              minWidth: 130,
-              zIndex: 100,
+              boxShadow: '0 12px 40px rgba(0,0,0,0.14), 0 4px 16px rgba(0,0,0,0.08)',
+              minWidth: 150,
+              zIndex: 9999,
               overflow: 'hidden',
+              marginTop: 4,
             }}
           >
             {currencies.map(c => (
@@ -173,10 +174,12 @@ export default function TopToolbar({ onAddExpense, onAddIncome, onExport }: TopT
                 key={c.code}
                 onClick={() => { setCurrency(c.code); setShowCurrency(false); }}
                 style={{
-                  display: 'block',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
                   width: '100%',
                   textAlign: 'left',
-                  padding: '8px 14px',
+                  padding: '9px 14px',
                   border: 'none',
                   cursor: 'pointer',
                   fontSize: '0.8125rem',
@@ -184,10 +187,16 @@ export default function TopToolbar({ onAddExpense, onAddIncome, onExport }: TopT
                   background: c.code === currency ? 'var(--brand-50)' : 'transparent',
                   color: c.code === currency ? 'var(--brand-600)' : 'var(--text-700)',
                   fontWeight: c.code === currency ? 700 : 400,
-                  transition: 'background 0.1s',
+                  transition: 'background 0.12s',
                 }}
+                onMouseEnter={e => { if (c.code !== currency) e.currentTarget.style.background = 'var(--bg-muted)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = c.code === currency ? 'var(--brand-50)' : 'transparent'; }}
               >
-                {c.label}
+                <span style={{ width: 22, fontSize: '0.875rem', fontWeight: 700, opacity: 0.6 }}>{c.symbol}</span>
+                <span>{c.code}</span>
+                {c.code === currency && (
+                  <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--brand-600)' }}>✓</span>
+                )}
               </button>
             ))}
           </div>

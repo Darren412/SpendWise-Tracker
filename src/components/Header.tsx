@@ -47,7 +47,7 @@ export default function Header() {
         <div className="flex items-center justify-center gap-2 py-2 text-xs font-medium"
           style={{ background: '#fffbeb', borderBottom: '1px solid #fde68a', color: '#92400e' }}>
           <WifiOff size={13} />
-          {!isOnline ? 'Offline â€” changes saved locally, will sync on reconnect.' : 'Sync error â€” retryingâ€¦'}
+          {!isOnline ? 'Offline — changes saved locally, will sync on reconnect.' : 'Sync error — retrying…'}
         </div>
       )}
 
@@ -61,7 +61,7 @@ export default function Header() {
           <div>
             <span className="text-base font-bold tracking-tight" style={{ color: '#111827' }}>Spendwise</span>
             {displayName && (
-              <span className="text-sm font-normal" style={{ color: '#9ca3af' }}> Â· {displayName}</span>
+              <span className="text-sm font-normal" style={{ color: '#9ca3af' }}> · {displayName}</span>
             )}
           </div>
         </div>

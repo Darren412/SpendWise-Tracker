@@ -31,11 +31,9 @@ export default function ProductsPage() {
   const [sortBy, setSortBy] = useState('popular')
 
   const filteredProducts = useMemo(() => {
-    let filtered = allProducts
-
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter((p) => p.category === selectedCategory)
-    }
+    let filtered = selectedCategory !== 'all'
+      ? allProducts.filter((p) => p.category === selectedCategory)
+      : [...allProducts]; // copy to avoid mutating the original array
 
     if (sortBy === 'price-low') {
       filtered.sort((a, b) => a.price - b.price)

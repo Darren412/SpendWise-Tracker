@@ -20,13 +20,14 @@ export default function IncomeForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.amount) { alert('Please enter an amount'); return; }
+    const parsedAmount = parseFloat(formData.amount);
+    if (!formData.amount || isNaN(parsedAmount) || parsedAmount <= 0) { alert('Please enter a valid amount'); return; }
 
     const [yearStr, monthStr] = formData.date.split('-');
     const income: Income = {
       id:       generateId('inc'),
       source:   formData.source || (incomeCategories.find(c => c.id === formData.category)?.name ?? 'Income'),
-      amount:   parseFloat(formData.amount),
+      amount:   parsedAmount,
       date:     formData.date,
       month:    monthStr,
       year:     parseInt(yearStr, 10),

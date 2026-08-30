@@ -51,20 +51,20 @@ function DayTooltip({ active, payload, categories, currency, avgDaily }: DayTool
   const data = payload[0].payload;
   if (data.total === 0) return null;
 
-  const { day, total, expenses } = data;
+  const { total, expenses } = data;
   const isHigh = total > avgDaily * 1.5;
   const sym = currencySymbol(currency);
-  // Use the human-readable date label when available
-  const dateLabel = (data as DayData).label ?? `Day ${day}`;
+  const dateLabel = (data as DayData).label ?? `Day ${data.day}`;
+  const topExpenses = expenses.slice(0, 3);
 
   return (
     <div style={{
       background: '#fff',
       border: '1px solid #e8ecf0',
-      borderRadius: 16,
-      boxShadow: '0 12px 40px rgba(0,0,0,0.14)',
-      minWidth: 270,
-      maxWidth: 320,
+      borderRadius: 14,
+      boxShadow: '0 8px 28px rgba(0,0,0,0.12)',
+      minWidth: 200,
+      maxWidth: 260,
       overflow: 'hidden',
       pointerEvents: 'none',
       fontFamily: 'inherit',
@@ -74,82 +74,58 @@ function DayTooltip({ active, payload, categories, currency, avgDaily }: DayTool
         background: isHigh
           ? 'linear-gradient(135deg, #fef2f2 0%, #fff7f7 100%)'
           : 'linear-gradient(135deg, #eff6ff 0%, #f8faff 100%)',
-        padding: '12px 16px 10px',
+        padding: '10px 14px 8px',
         borderBottom: '1px solid #f3f4f6',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+          <p style={{ fontSize: 10, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             {dateLabel}
           </p>
           {isHigh && (
-            <span style={{
-              fontSize: 9, fontWeight: 700, color: '#dc2626',
-              background: '#fef2f2', padding: '2px 8px', borderRadius: 100,
-              border: '1px solid #fecaca', textTransform: 'uppercase', letterSpacing: '0.04em',
-            }}>
-              ↑ High Spend
+            <span style={{ fontSize: 8, fontWeight: 700, color: '#dc2626', background: '#fef2f2', padding: '1px 6px', borderRadius: 100, border: '1px solid #fecaca' }}>
+              High
             </span>
           )}
         </div>
-        <p style={{
-          fontSize: 22, fontWeight: 800,
-          color: isHigh ? '#ef4444' : '#111827',
-          fontVariantNumeric: 'tabular-nums',
-          lineHeight: 1,
-        }}>
+        <p style={{ fontSize: 18, fontWeight: 800, color: isHigh ? '#ef4444' : '#111827', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
           {sym}{total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
         </p>
       </div>
 
-      {/* Transactions list */}
-      {expenses.length === 0 ? (
-        <div style={{ padding: 16, textAlign: 'center' }}>
-          <p style={{ fontSize: 11, color: '#9ca3af' }}>No transactions</p>
+      {/* Top transactions preview */}
+      {topExpenses.length > 0 && (
+        <div style={{ padding: '4px 0' }}>
+          {topExpenses.map(e => {
+            const cat = categories.find(c => c.id === e.category);
+            return (
+              <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 12px' }}>
+                <span style={{ fontSize: 12, flexShrink: 0 }}>{cat?.icon ?? '📦'}</span>
+                <span style={{ fontSize: 11, fontWeight: 500, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {e.description || 'Expense'}
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#374151', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                  {sym}{e.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            );
+          })}
         </div>
-      ) : (
-        <>
-          <div style={{ maxHeight: 260, overflowY: 'auto', padding: '4px 0' }}>
-            {expenses.map(e => {
-              const cat = categories.find(c => c.id === e.category);
-              return (
-                <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: '1px solid #f9fafb' }}>
-                  <div style={{
-                    width: 32, height: 32, borderRadius: 8,
-                    background: cat ? `${cat.color}22` : '#f3f4f6',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 14, flexShrink: 0,
-                  }}>
-                    {cat?.icon ?? '📦'}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 12, fontWeight: 600, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {e.description || 'Expense'}
-                    </p>
-                    <p style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>
-                      {cat?.name ?? 'Uncategorised'}
-                    </p>
-                  </div>
-                  <p style={{ fontSize: 12, fontWeight: 700, color: '#374151', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-                    {sym}{e.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-          {/* Footer */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '10px 14px', background: '#f8fafc', borderTop: '1px solid #f3f4f6',
-          }}>
-            <span style={{ fontSize: 11, color: '#6b7280' }}>
-              {expenses.length} transaction{expenses.length !== 1 ? 's' : ''}
-            </span>
-            <span style={{ fontSize: 13, fontWeight: 800, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>
-              {formatCurrency(total, currency)}
-            </span>
-          </div>
-        </>
       )}
+
+      {/* Footer with click hint */}
+      <div style={{
+        padding: '6px 12px',
+        background: '#f8fafc',
+        borderTop: '1px solid #f3f4f6',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <span style={{ fontSize: 10, color: '#9ca3af' }}>
+          {expenses.length} txn{expenses.length !== 1 ? 's' : ''}
+        </span>
+        <span style={{ fontSize: 9, fontWeight: 600, color: '#6366f1' }}>
+          Click to pin details ↓
+        </span>
+      </div>
     </div>
   );
 }

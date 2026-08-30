@@ -22,8 +22,9 @@ export default function ExpenseForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.category || !formData.description || !formData.amount) {
-      alert('Please fill in all fields');
+    const parsedAmount = parseFloat(formData.amount);
+    if (!formData.category || !formData.description || !formData.amount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      alert('Please fill in all fields with valid values');
       return;
     }
     const [yearStr, monthStr] = formData.date.split('-');
@@ -31,7 +32,7 @@ export default function ExpenseForm() {
       id:          generateId('exp'),
       category:    formData.category,
       description: formData.description,
-      amount:      parseFloat(formData.amount),
+      amount:      parsedAmount,
       date:        formData.date,
       month:       monthStr,
       year:        parseInt(yearStr, 10),

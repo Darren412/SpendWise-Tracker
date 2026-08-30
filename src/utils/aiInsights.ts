@@ -341,8 +341,11 @@ export function buildPrediction(
   today.setHours(0, 0, 0, 0);
 
   const totalDays    = Math.round((periodEnd.getTime() - periodStart.getTime()) / 86400000) + 1;
-  const elapsedDays  = Math.max(1, Math.round((today.getTime() - periodStart.getTime()) / 86400000) + 1);
-  const daysRemaining = Math.max(0, totalDays - elapsedDays);
+  // For past periods, use totalDays so dailyBurnRate reflects the actual completed period rate
+  const isPastPeriod = today.getTime() > periodEnd.getTime();
+  const rawElapsed   = Math.round((today.getTime() - periodStart.getTime()) / 86400000) + 1;
+  const elapsedDays  = isPastPeriod ? totalDays : Math.max(1, Math.min(rawElapsed, totalDays));
+  const daysRemaining = isPastPeriod ? 0 : Math.max(0, totalDays - elapsedDays);
 
   const spentSoFar = currentPeriodExpenses.reduce((s, e) => s + e.amount, 0);
   const dailyBurnRate = spentSoFar / elapsedDays;

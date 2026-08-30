@@ -22,6 +22,7 @@ export function getCurrencyConfig(code: string): CurrencyConfig {
 
 export function formatCurrency(amount: number, code: string): string {
   const config = getCurrencyConfig(code);
+  if (!isFinite(amount)) return `${config.symbol}0`;
   return `${config.symbol}${amount.toLocaleString(config.locale, {
     minimumFractionDigits: config.code === 'JPY' ? 0 : 2,
     maximumFractionDigits: config.code === 'JPY' ? 0 : 2,
@@ -30,6 +31,7 @@ export function formatCurrency(amount: number, code: string): string {
 
 export function formatCurrencyShort(amount: number, code: string): string {
   const config = getCurrencyConfig(code);
+  if (!isFinite(amount)) return `${config.symbol}0`;
   return `${config.symbol}${amount.toLocaleString(config.locale, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,

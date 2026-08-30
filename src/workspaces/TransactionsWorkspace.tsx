@@ -173,7 +173,8 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
 
   const bulkDelete = () => {
     selected.forEach(id => {
-      const isExp = filteredExpenses.some(e => e.id === id);
+      // Check against ALL expenses (not filteredExpenses) to avoid misidentifying type
+      const isExp = expenses.some(e => e.id === id);
       isExp ? deleteExpense(id) : deleteIncome(id);
     });
     clearSelected();
@@ -236,9 +237,13 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
     const rows = sortedRows.filter(r => selected.has(r.id));
     const csv = ['Date,Type,Description,Category,Amount,City',
       ...rows.map(r => {
-        const desc = r._type === 'expense' ? (r as ExpRow).description : (r as IncRow).source ?? '';
-        const cat  = r._type === 'expense' ? getCatName((r as ExpRow).category) : 'Income';
-        const city = (r as ExpRow).city ?? '';
+        const rawDesc = r._type === 'expense' ? (r as ExpRow).description : (r as IncRow).source ?? '';
+        const rawCat  = r._type === 'expense' ? getCatName((r as ExpRow).category) : 'Income';
+        const rawCity = (r as ExpRow).city ?? '';
+        // Escape double-quotes per CSV standard (RFC 4180)
+        const desc = rawDesc.replace(/"/g, '""');
+        const cat  = rawCat.replace(/"/g, '""');
+        const city = rawCity.replace(/"/g, '""');
         const sign = r._type === 'expense' ? -r.amount : r.amount;
         return `${r.date},${r._type},"${desc}","${cat}",${sign},"${city}"`;
       })

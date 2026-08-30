@@ -68,49 +68,149 @@ const SEVERITY_ICON: Record<InsightSeverity, React.ElementType> = {
   neutral:  Brain,
 };
 
-function InsightCardFull({ card }: { card: AIInsightCard }) {
-  const [expanded, setExpanded] = useState(false);
+function InsightCardFull({ card, onOpenModal }: { card: AIInsightCard; onOpenModal: (card: AIInsightCard) => void }) {
   const cfg  = SEVERITY_CFG[card.severity];
   const Icon = SEVERITY_ICON[card.severity];
 
   return (
     <div
       className="ai-insight-card"
-      style={{ background: cfg.bg, borderColor: cfg.border, borderLeftColor: cfg.iconColor }}
+      style={{
+        background: cfg.bg,
+        borderColor: cfg.border,
+        borderLeft: `3px solid ${cfg.iconColor}`,
+        cursor: 'pointer',
+      }}
+      onClick={() => onOpenModal(card)}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-        <div style={{ width: 34, height: 34, borderRadius: 10, background: cfg.iconBg, color: cfg.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: `linear-gradient(135deg, ${cfg.iconBg}, ${cfg.bg})`,
+          color: cfg.iconColor,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          boxShadow: `0 2px 8px ${cfg.iconColor}22`,
+        }}>
           <Icon size={15} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
             <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0f172a' }}>{card.title}</span>
             {card.metric && <MetricPill metric={card.metric} direction={card.metricDirection} />}
-            <span style={{ marginLeft: 'auto', flexShrink: 0 }}><ConfidenceDot confidence={card.confidence} /></span>
           </div>
           <p style={{ fontSize: '0.8125rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>{card.summary}</p>
+        </div>
+        <span style={{ flexShrink: 0 }}><ConfidenceDot confidence={card.confidence} /></span>
+      </div>
+    </div>
+  );
+}
 
-          {expanded && (
-            <p style={{ fontSize: '0.8125rem', color: '#334155', lineHeight: 1.6, margin: '8px 0 0', padding: '10px 12px', background: 'rgba(255,255,255,0.6)', borderRadius: 8, border: `1px solid ${cfg.border}` }}>
-              {card.detail}
-            </p>
+/** Fullscreen insight modal with detailed analysis */
+function InsightModal({ card, onClose }: { card: AIInsightCard; onClose: () => void }) {
+  const cfg  = SEVERITY_CFG[card.severity];
+  const Icon = SEVERITY_ICON[card.severity];
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 10000,
+        background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24,
+        animation: 'fadeIn 0.15s ease',
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{
+        background: '#fff', borderRadius: 20, maxWidth: 520, width: '100%',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+        overflow: 'hidden',
+        animation: 'slideUp 0.2s ease',
+      }}>
+        {/* Modal header */}
+        <div style={{
+          background: `linear-gradient(135deg, ${cfg.bg} 0%, #fff 100%)`,
+          padding: '24px 28px 20px',
+          borderBottom: `1px solid ${cfg.border}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12,
+              background: `linear-gradient(135deg, ${cfg.iconBg}, ${cfg.bg})`,
+              color: cfg.iconColor,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: `0 4px 12px ${cfg.iconColor}22`,
+            }}>
+              <Icon size={20} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ fontSize: '1.0625rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{card.title}</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <span style={{
+                  fontSize: '0.625rem', fontWeight: 700, color: cfg.iconColor,
+                  background: cfg.iconBg, padding: '2px 8px', borderRadius: 99,
+                  textTransform: 'uppercase', letterSpacing: '0.06em',
+                }}>
+                  {cfg.label}
+                </span>
+                <ConfidenceDot confidence={card.confidence} />
+                {card.metric && <MetricPill metric={card.metric} direction={card.metricDirection} />}
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                width: 32, height: 32, borderRadius: 8, background: '#f8fafc',
+                border: '1px solid #e2e8f0', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#94a3b8', flexShrink: 0,
+              }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* Modal body */}
+        <div style={{ padding: '24px 28px' }}>
+          <div style={{ marginBottom: 16 }}>
+            <p style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Summary</p>
+            <p style={{ fontSize: '0.9375rem', color: '#334155', lineHeight: 1.65 }}>{card.summary}</p>
+          </div>
+
+          {card.detail && (
+            <div style={{
+              padding: '16px 18px', borderRadius: 12,
+              background: 'linear-gradient(135deg, #f8fafc, #f0f4ff)',
+              border: '1px solid #e2e8f0',
+            }}>
+              <p style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Detailed Analysis</p>
+              <p style={{ fontSize: '0.875rem', color: '#334155', lineHeight: 1.65 }}>{card.detail}</p>
+            </div>
+          )}
+
+          {card.actionLabel && (
+            <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                width: 24, height: 24, borderRadius: 6, background: cfg.iconBg, color: cfg.iconColor,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <Zap size={11} />
+              </div>
+              <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: cfg.iconColor }}>
+                Recommended: {card.actionLabel}
+              </span>
+            </div>
           )}
         </div>
-        <button
-          onClick={() => setExpanded(v => !v)}
-          style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center' }}
-        >
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
       </div>
-
-      {card.actionLabel && expanded && (
-        <div style={{ marginTop: 10, paddingLeft: 46 }}>
-          <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: cfg.iconColor, padding: '3px 10px', borderRadius: 99, background: cfg.iconBg, border: `1px solid ${cfg.border}`, cursor: 'default' }}>
-            → {card.actionLabel}
-          </span>
-        </div>
-      )}
     </div>
   );
 }
@@ -143,6 +243,7 @@ export default function InsightsWorkspace() {
   const [showCityComp,     setShowCityComp]     = useState(false);
   const [showHealthDrilldown, setShowHealthDrilldown] = useState(false);
   const [activeTab,        setActiveTab]        = useState<'insights' | 'trends' | 'forecast' | 'behavior'>('insights');
+  const [modalCard,        setModalCard]        = useState<AIInsightCard | null>(null);
 
   // ── Computed data ──────────────────────────────────────────────────────────
 
@@ -224,90 +325,121 @@ export default function InsightsWorkspace() {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          HEALTH SCORE + NARRATIVE SUMMARY (top strip)
+          HERO KPI STRIP
       ══════════════════════════════════════════════════════════════════════ */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 16, marginBottom: 20 }}>
-
-        {/* Health Score Card */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
+        {/* Health Score — hero card */}
         <div
-          className="ai-health-card"
           onClick={() => setShowHealthDrilldown(v => !v)}
-          style={{ borderColor: `${healthScore.color}44`, cursor: 'pointer' }}
+          style={{
+            padding: '16px 18px', borderRadius: 16, cursor: 'pointer',
+            background: `linear-gradient(135deg, ${healthScore.color}0d, ${healthScore.color}05)`,
+            border: `1.5px solid ${healthScore.color}30`,
+            transition: 'all 0.2s ease',
+            position: 'relative', overflow: 'hidden',
+          }}
         >
-          <div style={{ textAlign: 'center' }}>
-            <div className="ai-score-ring" style={{ '--score-color': healthScore.color, '--score-pct': `${healthScore.total}%` } as React.CSSProperties}>
-              <span style={{ fontSize: '1.5rem', fontWeight: 900, color: healthScore.color, lineHeight: 1 }}>{healthScore.total}</span>
-              <span style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>/ 100</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="ai-score-ring" style={{ '--score-color': healthScore.color, '--score-pct': `${healthScore.total}%`, width: 56, height: 56, fontSize: '0.625rem' } as React.CSSProperties}>
+              <span style={{ fontSize: '1.25rem', fontWeight: 900, color: healthScore.color, lineHeight: 1 }}>{healthScore.total}</span>
             </div>
-            <div style={{ marginTop: 8, fontSize: '0.8125rem', fontWeight: 800, color: healthScore.color }}>{healthScore.grade}</div>
-            <div style={{ fontSize: '0.6875rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{healthScore.label}</div>
-            <div style={{ fontSize: '0.625rem', color: '#94a3b8', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-              {showHealthDrilldown ? <ChevronUp size={10}/> : <ChevronDown size={10}/>} details
+            <div>
+              <div style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Health Score</div>
+              <div style={{ fontSize: '0.875rem', fontWeight: 800, color: healthScore.color, marginTop: 2 }}>{healthScore.grade}</div>
+              <div style={{ fontSize: '0.6875rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                {showHealthDrilldown ? <ChevronUp size={10}/> : <ChevronDown size={10}/>} details
+              </div>
             </div>
           </div>
+        </div>
 
-          {/* Drilldown */}
-          {showHealthDrilldown && (
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px dashed #e2e8f0' }}>
-              {[
-                { label: 'Savings',    score: healthScore.breakdown.savings,     max: 25 },
-                { label: 'Discipline', score: healthScore.breakdown.discipline,   max: 25 },
-                { label: 'Stability',  score: healthScore.breakdown.volatility,   max: 25 },
-                { label: 'Recurring',  score: healthScore.breakdown.consistency,  max: 25 },
-              ].map(row => (
-                <div key={row.label} style={{ marginBottom: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                    <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: '#475569' }}>{row.label}</span>
-                    <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: healthScore.color }}>{row.score}/{row.max}</span>
-                  </div>
-                  <div style={{ height: 4, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${(row.score / row.max) * 100}%`, background: healthScore.color, borderRadius: 99, transition: 'width 0.6s ease' }} />
-                  </div>
+        {/* KPI Cards */}
+        {[
+          { label: 'Total Spent', value: `${sym}${Math.round(totalExpenses).toLocaleString('en-IN')}`, sub: `${periodExpenses.length} txns`, color: '#ef4444', Icon: TrendingUp },
+          { label: 'Income', value: totalIncome > 0 ? `${sym}${Math.round(totalIncome).toLocaleString('en-IN')}` : '—', sub: totalIncome > 0 ? 'this period' : 'not set', color: '#16a34a', Icon: ArrowUpRight },
+          { label: 'Savings Rate', value: totalIncome > 0 ? `${savingsRate}%` : '—', sub: savingsRate >= 20 ? 'Healthy' : savingsRate > 0 ? 'Below target' : '—', color: savingsRate >= 20 ? '#16a34a' : savingsRate > 0 ? '#d97706' : '#94a3b8', Icon: ShieldCheck },
+          { label: 'Daily Burn', value: `${sym}${Math.round(prediction.dailyBurnRate).toLocaleString('en-IN')}`, sub: `${prediction.daysRemaining}d remaining`, color: '#6366f1', Icon: Activity },
+        ].map(kpi => (
+          <div key={kpi.label} style={{
+            padding: '16px 18px', borderRadius: 16,
+            background: '#fff', border: '1.5px solid #e8ecf0',
+            transition: 'all 0.2s ease',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{kpi.label}</span>
+              <div style={{ width: 26, height: 26, borderRadius: 7, background: `${kpi.color}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <kpi.Icon size={12} color={kpi.color} />
+              </div>
+            </div>
+            <div style={{ fontSize: '1.125rem', fontWeight: 800, color: kpi.color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{kpi.value}</div>
+            <div style={{ fontSize: '0.6875rem', color: '#94a3b8', marginTop: 4 }}>{kpi.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Health Score Drilldown Panel */}
+      {showHealthDrilldown && (
+        <div style={{
+          marginBottom: 20, padding: '20px 24px', borderRadius: 16,
+          background: 'linear-gradient(135deg, #fafbff 0%, #f0f4ff 100%)',
+          border: '1.5px solid #e2e8f0',
+          animation: 'slideUp 0.2s ease',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <ShieldCheck size={16} color={healthScore.color} />
+            <span style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1e293b' }}>Health Score Breakdown</span>
+            <button onClick={() => setShowHealthDrilldown(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={14}/></button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            {[
+              { label: 'Savings',    score: healthScore.breakdown.savings,    max: 25, desc: 'Income saved this period' },
+              { label: 'Discipline', score: healthScore.breakdown.discipline, max: 25, desc: 'Spending consistency' },
+              { label: 'Stability',  score: healthScore.breakdown.volatility, max: 25, desc: 'Month-over-month variance' },
+              { label: 'Recurring',  score: healthScore.breakdown.consistency, max: 25, desc: 'Predictable payments' },
+            ].map(row => (
+              <div key={row.label} style={{ padding: '14px 16px', borderRadius: 12, background: '#fff', border: '1px solid #e8ecf0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b' }}>{row.label}</span>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 900, color: healthScore.color }}>{row.score}<span style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: 600 }}>/{row.max}</span></span>
+                </div>
+                <div style={{ height: 6, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden', marginBottom: 6 }}>
+                  <div style={{ height: '100%', width: `${(row.score / row.max) * 100}%`, background: `linear-gradient(90deg, ${healthScore.color}, ${healthScore.color}aa)`, borderRadius: 99, transition: 'width 0.6s ease' }} />
+                </div>
+                <div style={{ fontSize: '0.6875rem', color: '#94a3b8' }}>{row.desc}</div>
+              </div>
+            ))}
+          </div>
+          {healthScore.explanation.length > 0 && (
+            <div style={{ marginTop: 14, padding: '12px 16px', borderRadius: 10, background: '#fff', border: '1px solid #e8ecf0' }}>
+              {healthScore.explanation.map((line, i) => (
+                <div key={i} style={{ fontSize: '0.8125rem', color: '#475569', lineHeight: 1.6, display: 'flex', gap: 8, padding: '2px 0' }}>
+                  <span style={{ color: healthScore.color, flexShrink: 0, fontWeight: 700 }}>•</span>
+                  <span>{line}</span>
                 </div>
               ))}
-              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {healthScore.explanation.map((line, i) => (
-                  <div key={i} style={{ fontSize: '0.6875rem', color: '#64748b', display: 'flex', gap: 5 }}>
-                    <span style={{ color: healthScore.color, flexShrink: 0 }}>•</span>
-                    <span>{line}</span>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
         </div>
+      )}
 
-        {/* Narrative summary */}
-        <div className="ai-narrative-card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div className="ai-icon-glow" style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0 }}><Brain size={13} /></div>
-            <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b' }}>AI Financial Summary</span>
-            <span style={{ marginLeft: 'auto', fontSize: '0.625rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 3 }}>
-              <RefreshCw size={9} /> Live
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {narrativeLines.map((line, i) => (
-              <p key={i} style={{ fontSize: '0.875rem', color: i === 0 ? '#1e293b' : '#475569', lineHeight: 1.6, fontWeight: i === 0 ? 600 : 400 }}>
-                {line}
-              </p>
-            ))}
-          </div>
-
-          {/* KPI strip inside narrative */}
-          <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-            {[
-              { label: 'Spent', value: `${sym}${Math.round(totalExpenses).toLocaleString('en-IN')}`, color: '#ef4444' },
-              { label: 'Income', value: totalIncome > 0 ? `${sym}${Math.round(totalIncome).toLocaleString('en-IN')}` : '—', color: '#16a34a' },
-              { label: 'Savings Rate', value: totalIncome > 0 ? `${savingsRate}%` : '—', color: savingsRate >= 20 ? '#16a34a' : savingsRate > 0 ? '#d97706' : '#ef4444' },
-              { label: 'Daily Burn', value: `${sym}${Math.round(prediction.dailyBurnRate).toLocaleString('en-IN')}`, color: '#6366f1' },
-            ].map(kpi => (
-              <div key={kpi.label} style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.7)', border: '1px solid #e2e8f0', minWidth: 90 }}>
-                <div style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 2 }}>{kpi.label}</div>
-                <div style={{ fontSize: '1rem', fontWeight: 800, color: kpi.color, fontVariantNumeric: 'tabular-nums' }}>{kpi.value}</div>
-              </div>
-            ))}
-          </div>
+      {/* ══════════════════════════════════════════════════════════════════════
+          AI NARRATIVE SUMMARY
+      ══════════════════════════════════════════════════════════════════════ */}
+      <div className="ai-narrative-card" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <div className="ai-icon-glow" style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0 }}><Brain size={13} /></div>
+          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b' }}>AI Financial Summary</span>
+          <span style={{ marginLeft: 'auto', fontSize: '0.625rem', color: '#16a34a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a', display: 'inline-block', animation: 'aiPulse 2s infinite' }} />
+            Live
+          </span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {narrativeLines.map((line, i) => (
+            <p key={i} style={{ fontSize: '0.875rem', color: i === 0 ? '#1e293b' : '#475569', lineHeight: 1.6, fontWeight: i === 0 ? 600 : 400 }}>
+              {line}
+            </p>
+          ))}
         </div>
       </div>
 
@@ -431,7 +563,7 @@ export default function InsightsWorkspace() {
           {/* Insight cards grid */}
           <div className="ai-insights-grid">
             {visibleInsights.map(card => (
-              <InsightCardFull key={card.id} card={card} />
+              <InsightCardFull key={card.id} card={card} onOpenModal={setModalCard} />
             ))}
           </div>
 
@@ -861,6 +993,11 @@ export default function InsightsWorkspace() {
           </div>
         </div>
       )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          INSIGHT DETAIL MODAL
+      ══════════════════════════════════════════════════════════════════════ */}
+      {modalCard && <InsightModal card={modalCard} onClose={() => setModalCard(null)} />}
 
     </div>
   );

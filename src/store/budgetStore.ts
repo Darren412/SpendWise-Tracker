@@ -190,6 +190,7 @@ let syncRetryTimeout: ReturnType<typeof setTimeout> | null = null;
 let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let syncInFlight = false;
 let syncPendingAfterFlight = false;
+let loadVersion = 0; // guards against concurrent loadFromSupabase calls
 
 /** Read the latest state from the store and return the sync payload. */
 function getLatestSyncPayload(): RemoteData {
@@ -202,10 +203,11 @@ async function executeSyncToSupabase() {
   const userId = useBudgetStore.getState().userId;
   if (!userId) return;
 
+  // Set in-flight flag BEFORE reading payload to close the TOCTOU window
+  syncInFlight = true;
+
   // Always send the LATEST state, never a stale closure
   const data = getLatestSyncPayload();
-
-  syncInFlight = true;
   useBudgetStore.setState({ syncing: true, networkError: false });
   try {
     const { error } = await supabase
@@ -273,6 +275,15 @@ if (typeof window !== 'undefined') {
     // Attempt Supabase sync (may not complete, but localStorage is safe)
     flushPendingSync();
   });
+
+  // Network status awareness — retry sync when coming back online
+  window.addEventListener('online', () => {
+    if (syncRetryCount > 0 || syncPendingAfterFlight) {
+      syncRetryCount = 0;
+      if (syncRetryTimeout) { clearTimeout(syncRetryTimeout); syncRetryTimeout = null; }
+      scheduleSyncToSupabase();
+    }
+  });
 }
 
 /** Legacy wrapper — kept for the one-off sync in loadFromSupabase. */
@@ -297,22 +308,56 @@ async function loadFromSupabase() {
   const userId = useBudgetStore.getState().userId;
   if (!userId) return;
 
+  // Version guard: if another load starts while we're awaiting, discard our stale result
+  const thisLoad = ++loadVersion;
+
   const { data, error } = await supabase
     .from('budget_data')
     .select('expenses, income, categories')
     .eq('user_id', userId)
     .single();
 
-  if (error || !data) {
-    // No remote data yet — restore from localStorage backup if available
-    const local = getLocalBackup(userId);
+  // Stale guard — a newer load started while we were awaiting
+  if (thisLoad !== loadVersion) return;
 
+  // Distinguish "no rows" (PGRST116) from real network/server errors
+  const isNoRows = error?.code === 'PGRST116';
+  const isRealError = error && !isNoRows;
+
+  if (isRealError) {
+    // Network/server failure — restore from localStorage but do NOT push to Supabase
+    // (pushing stale local data could overwrite fresher remote data from another device)
+    const local = getLocalBackup(userId);
     let rawCategories: Category[];
     let parsedExpenses: Expense[];
     let parsedIncome: Income[];
     try { rawCategories  = local.categories ? JSON.parse(local.categories) : defaultCategories; } catch { rawCategories = defaultCategories; }
     try { parsedExpenses = local.expenses   ? JSON.parse(local.expenses)   : [];                } catch { parsedExpenses = []; }
     try { parsedIncome   = local.income     ? JSON.parse(local.income)     : [];                } catch { parsedIncome   = []; }
+    if (!Array.isArray(parsedExpenses)) parsedExpenses = [];
+    if (!Array.isArray(parsedIncome))   parsedIncome   = [];
+    if (!Array.isArray(rawCategories))  rawCategories  = defaultCategories;
+    const { categories: migratedCats } = migrateCategories(rawCategories);
+    useBudgetStore.setState({ expenses: parsedExpenses, income: parsedIncome, categories: migratedCats });
+    useBudgetStore.setState({ networkError: true });
+    if (useBudgetStore.getState().financialCycleStart > 1) {
+      useBudgetStore.getState().migrateToFinancialCycle();
+    }
+    return;
+  }
+
+  if (isNoRows || !data) {
+    // No remote data yet — restore from localStorage backup and push to Supabase
+    const local = getLocalBackup(userId);
+    let rawCategories: Category[];
+    let parsedExpenses: Expense[];
+    let parsedIncome: Income[];
+    try { rawCategories  = local.categories ? JSON.parse(local.categories) : defaultCategories; } catch { rawCategories = defaultCategories; }
+    try { parsedExpenses = local.expenses   ? JSON.parse(local.expenses)   : [];                } catch { parsedExpenses = []; }
+    try { parsedIncome   = local.income     ? JSON.parse(local.income)     : [];                } catch { parsedIncome   = []; }
+    if (!Array.isArray(parsedExpenses)) parsedExpenses = [];
+    if (!Array.isArray(parsedIncome))   parsedIncome   = [];
+    if (!Array.isArray(rawCategories))  rawCategories  = defaultCategories;
     const { categories: migratedCats, changed } = migrateCategories(rawCategories);
 
     const migrated: RemoteData = {
@@ -321,6 +366,7 @@ async function loadFromSupabase() {
       categories: migratedCats,
     };
 
+    if (thisLoad !== loadVersion) return;
     useBudgetStore.setState(migrated);
 
     // Push existing localStorage data up to Supabase (and if migration ran, persist it)
@@ -328,19 +374,22 @@ async function loadFromSupabase() {
       await syncToSupabase(migrated);
     }
 
-    // Re-apply financial cycle mapping after data loads
     if (useBudgetStore.getState().financialCycleStart > 1) {
       useBudgetStore.getState().migrateToFinancialCycle();
     }
     return;
   }
 
-  const rawRemoteCategories: Category[] = data.categories ?? defaultCategories;
-  const { categories: migratedRemoteCats, changed: remoteCatsChanged } = migrateCategories(rawRemoteCategories);
+  // Validate remote data — arrays may be null, undefined, or corrupted
+  const rawExpenses  = Array.isArray(data.expenses)   ? data.expenses   : [];
+  const rawIncome    = Array.isArray(data.income)      ? data.income     : [];
+  const rawCats      = Array.isArray(data.categories)  ? data.categories : defaultCategories;
+
+  const { categories: migratedRemoteCats, changed: remoteCatsChanged } = migrateCategories(rawCats);
 
   const remote: RemoteData = {
-    expenses:   data.expenses ?? [],
-    income:     data.income   ?? [],
+    expenses:   rawExpenses,
+    income:     rawIncome,
     categories: migratedRemoteCats,
   };
 
@@ -353,6 +402,9 @@ async function loadFromSupabase() {
   try { localExpenses   = local.expenses   ? JSON.parse(local.expenses)   : []; } catch { /* corrupted */ }
   try { localIncome     = local.income     ? JSON.parse(local.income)     : []; } catch { /* corrupted */ }
   try { localCategories = local.categories ? JSON.parse(local.categories) : []; } catch { /* corrupted */ }
+  if (!Array.isArray(localExpenses))   localExpenses   = [];
+  if (!Array.isArray(localIncome))     localIncome     = [];
+  if (!Array.isArray(localCategories)) localCategories = [];
 
   // Merge: add any local items not present in Supabase (by id)
   const remoteExpenseIds = new Set(remote.expenses.map((e) => e.id));
@@ -374,6 +426,7 @@ async function loadFromSupabase() {
     await syncToSupabase(remote);
   }
 
+  if (thisLoad !== loadVersion) return;
   useBudgetStore.setState(remote);
   backupToLocalStorage(remote);
 
@@ -402,6 +455,14 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   setSelectedCategoryIds: (ids: string[]) => set({ excludedCategoryIds: ids, selectedCategoryIds: ids }),
 
   setUserId: (userId: string | null) => {
+    // On logout: clear pending sync timers to prevent stale writes
+    if (!userId) {
+      if (syncRetryTimeout) { clearTimeout(syncRetryTimeout); syncRetryTimeout = null; }
+      if (syncDebounceTimer) { clearTimeout(syncDebounceTimer); syncDebounceTimer = null; }
+      syncRetryCount = 0;
+      syncInFlight = false;
+      syncPendingAfterFlight = false;
+    }
     set({ userId });
     // Clean up old unscoped localStorage keys to prevent cross-user contamination
     if (userId && typeof window !== 'undefined') {
@@ -468,7 +529,16 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
 
   updateExpense: (id: string, updates: Partial<Expense>) => {
     set((state) => ({
-      expenses: state.expenses.map((e) => e.id === id ? { ...e, ...updates } : e),
+      expenses: state.expenses.map((e) => {
+        if (e.id !== id) return e;
+        const merged = { ...e, ...updates };
+        // Recalculate financial period when date changes
+        if (updates.date) {
+          const period = getFinancialPeriod(merged.date, state.financialCycleStart);
+          return { ...merged, ...period };
+        }
+        return merged;
+      }),
     }));
     scheduleSyncToSupabase();
   },
@@ -487,7 +557,16 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
 
   updateIncome: (id: string, updates: Partial<Income>) => {
     set((state) => ({
-      income: state.income.map((i) => i.id === id ? { ...i, ...updates } : i),
+      income: state.income.map((i) => {
+        if (i.id !== id) return i;
+        const merged = { ...i, ...updates };
+        // Recalculate financial period when date changes
+        if (updates.date) {
+          const period = getFinancialPeriod(merged.date, state.financialCycleStart);
+          return { ...merged, ...period };
+        }
+        return merged;
+      }),
     }));
     scheduleSyncToSupabase();
   },
@@ -506,23 +585,29 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
 
   deleteCategory: (id: string, reassignToId?: string) => {
     set((state) => {
-      // Determine fallback: "Other Expenses" or first remaining category
+      const remaining = state.categories.filter(c => c.id !== id);
+      // Prevent deletion of the last category
+      if (remaining.length === 0) return state;
+      // Determine fallback: explicit target → "Other Expenses" → first remaining
       const fallbackId = reassignToId
-        ?? state.categories.find(c => c.id !== id && c.name === 'Other Expenses')?.id
-        ?? state.categories.find(c => c.id !== id)?.id
-        ?? id;
-      // Reassign all expenses in this category
+        ?? remaining.find(c => c.name === 'Other Expenses')?.id
+        ?? remaining[0].id;
+      // Reassign all expenses AND income in this category
       const newExpenses = state.expenses.map(e =>
         e.category === id ? { ...e, category: fallbackId } : e
       );
-      const newCategories = state.categories.filter((c) => c.id !== id);
-      return { categories: newCategories, expenses: newExpenses };
+      const newIncome = state.income.map(i =>
+        i.category === id ? { ...i, category: fallbackId } : i
+      );
+      return { categories: remaining, expenses: newExpenses, income: newIncome };
     });
     scheduleSyncToSupabase();
   },
 
   reorderCategory: (fromIndex: number, toIndex: number) => {
     set((state) => {
+      if (fromIndex < 0 || fromIndex >= state.categories.length ||
+          toIndex < 0 || toIndex >= state.categories.length) return state;
       const newCategories = [...state.categories];
       const [removed] = newCategories.splice(fromIndex, 1);
       newCategories.splice(toIndex, 0, removed);

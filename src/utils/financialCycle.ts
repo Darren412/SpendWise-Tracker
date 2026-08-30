@@ -97,7 +97,13 @@ export function formatFinancialPeriodRange(
  * Human-readable label for the financial cycle start day.
  * E.g. 25 → "25th of each month"
  */
+export function ordinalSuffix(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return 'th';
+  const last = v % 10;
+  return last === 1 ? 'st' : last === 2 ? 'nd' : last === 3 ? 'rd' : 'th';
+}
+
 export function cycleDayLabel(day: number): string {
-  const suffix = day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th';
-  return `${day}${suffix} of each month`;
+  return `${day}${ordinalSuffix(day)} of each month`;
 }

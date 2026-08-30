@@ -15,7 +15,8 @@ const MONTH_NAMES = [
 ];
 
 function fmtDate(iso: string) {
-  const d = new Date(iso);
+  // Append T12:00:00 for date-only strings to prevent timezone shift
+  const d = new Date(iso.includes('T') ? iso : iso + 'T12:00:00');
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 

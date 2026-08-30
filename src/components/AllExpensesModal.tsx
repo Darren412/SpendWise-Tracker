@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { X, Calendar, Pencil, Check, XCircle } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { formatCurrency } from '@/utils/currency';
@@ -11,6 +11,14 @@ interface AllExpensesModalProps {
 }
 
 export default function AllExpensesModal({ isOpen, onClose }: AllExpensesModalProps) {
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, onClose]);
+
   const { categories, expenses: allExpenses, selectedMonth, selectedYear, selectedCity, currency, updateExpense } = useBudgetStore();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedDay, setSelectedDay] = useState<string>('all');
@@ -150,7 +158,9 @@ export default function AllExpensesModal({ isOpen, onClose }: AllExpensesModalPr
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)' }}>
       <div className="rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col" style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 25px 50px rgba(0,0,0,0.15)' }}>
 
         {/* ── Header ── */}

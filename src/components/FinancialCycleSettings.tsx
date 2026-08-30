@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Settings, Calendar, Info, Check, RotateCcw } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
-import { formatFinancialPeriodRange, cycleDayLabel, getCurrentFinancialPeriod } from '@/utils/financialCycle';
+import { formatFinancialPeriodRange, cycleDayLabel, getCurrentFinancialPeriod, ordinalSuffix } from '@/utils/financialCycle';
 
 const PRESET_DAYS = [1, 5, 10, 15, 20, 25, 28];
 
@@ -109,7 +109,7 @@ export default function FinancialCycleSettings() {
                       cursor: 'pointer',
                     }}
                   >
-                    {d === 1 ? '1st (Calendar)' : `${d}${d === 2 ? 'nd' : d === 3 ? 'rd' : 'th'}`}
+                    {d === 1 ? '1st (Calendar)' : `${d}${ordinalSuffix(d)}`}
                   </button>
                 );
               })}
