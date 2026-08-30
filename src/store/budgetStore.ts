@@ -43,6 +43,11 @@ interface BudgetStore {
   setFinancialCycleStart: (day: number) => void;
   migrateToFinancialCycle: () => void;
   loadFromLocalStorage: () => void;
+  // Budget tracker
+  monthlyBudget: number;
+  budgetCategoryIds: string[];
+  setMonthlyBudget: (amount: number) => void;
+  setBudgetCategoryIds: (ids: string[]) => void;
 }
 
 const defaultCategories: Category[] = [
@@ -450,6 +455,8 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   excludedCategoryIds: [],
   selectedCategoryIds: [], // deprecated alias — mirrors excludedCategoryIds
   financialCycleStart: initCycleStart,
+  monthlyBudget: typeof window !== 'undefined' ? parseFloat(localStorage.getItem('spendwise_monthly_budget') ?? '0') || 0 : 0,
+  budgetCategoryIds: typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('spendwise_budget_categories') ?? '[]'); } catch { return []; } })() : [],
 
   setExcludedCategoryIds: (ids: string[]) => set({ excludedCategoryIds: ids, selectedCategoryIds: ids }),
   setSelectedCategoryIds: (ids: string[]) => set({ excludedCategoryIds: ids, selectedCategoryIds: ids }),
@@ -476,6 +483,21 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
     set({ currency });
     if (typeof window !== 'undefined') {
       localStorage.setItem('spendwise_currency', currency);
+    }
+  },
+
+  setMonthlyBudget: (amount: number) => {
+    const safe = Math.max(0, amount);
+    set({ monthlyBudget: safe });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('spendwise_monthly_budget', String(safe));
+    }
+  },
+
+  setBudgetCategoryIds: (ids: string[]) => {
+    set({ budgetCategoryIds: ids });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('spendwise_budget_categories', JSON.stringify(ids));
     }
   },
 

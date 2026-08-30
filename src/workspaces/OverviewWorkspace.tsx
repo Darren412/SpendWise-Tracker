@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import {
   TrendingUp, TrendingDown, Zap, Activity,
   ArrowRight, ArrowUpRight, ArrowDownRight, Target,
+  Settings2, Check, Wallet, AlertTriangle,
 } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { formatCurrencyShort, currencySymbol } from '@/utils/currency';
@@ -21,6 +22,8 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
     categories,
     financialCycleStart, currency, selectedCity,
     excludedCategoryIds,
+    monthlyBudget, budgetCategoryIds,
+    setMonthlyBudget, setBudgetCategoryIds,
   } = useBudgetStore();
 
   const sym = currencySymbol(currency);
@@ -132,8 +135,66 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
   const isCurrentPeriod = selectedMonth === currentPeriod.month && selectedYear === currentPeriod.year;
   const maxCatSpend = topCats[0]?.spent ?? 1;
 
-  // ── Budget progress ─────────────────────────────────────────────────────
-  const budgetUsedPct = totalIncome > 0 ? Math.round((globalTotalExpenses / totalIncome) * 100) : 0;
+  // ── Budget tracker ──────────────────────────────────────────────────────
+  const [budgetConfigOpen, setBudgetConfigOpen] = useState(false);
+  const [budgetInput, setBudgetInput] = useState(monthlyBudget > 0 ? String(monthlyBudget) : '');
+  const budgetConfigRef = useRef<HTMLDivElement>(null);
+
+  // Close config panel on outside click
+  useEffect(() => {
+    if (!budgetConfigOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (budgetConfigRef.current && !budgetConfigRef.current.contains(e.target as Node)) {
+        setBudgetConfigOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [budgetConfigOpen]);
+
+  // Expense categories only (for budget selection)
+  const expenseCategories = useMemo(() =>
+    categories.filter(c => c.type !== 'income'),
+    [categories]);
+
+  // Budget-tracked spending: only from selected budget categories
+  const budgetTrackedSpending = useMemo(() => {
+    if (budgetCategoryIds.length === 0) return 0;
+    return allExpenses
+      .filter(e =>
+        e.month === selectedMonth &&
+        e.year === selectedYear &&
+        budgetCategoryIds.includes(e.category)
+      )
+      .reduce((sum, e) => sum + e.amount, 0);
+  }, [allExpenses, selectedMonth, selectedYear, budgetCategoryIds]);
+
+  // Per-category breakdown for budget
+  const budgetCategoryBreakdown = useMemo(() => {
+    if (budgetCategoryIds.length === 0) return [];
+    const totals: Record<string, number> = {};
+    for (const e of allExpenses) {
+      if (e.month === selectedMonth && e.year === selectedYear && budgetCategoryIds.includes(e.category)) {
+        totals[e.category] = (totals[e.category] ?? 0) + e.amount;
+      }
+    }
+    return categories
+      .filter(c => budgetCategoryIds.includes(c.id))
+      .map(c => ({ ...c, spent: totals[c.id] ?? 0 }))
+      .sort((a, b) => b.spent - a.spent);
+  }, [allExpenses, selectedMonth, selectedYear, budgetCategoryIds, categories]);
+
+  const budgetRemaining = monthlyBudget - budgetTrackedSpending;
+  const budgetUsedPct = monthlyBudget > 0 ? Math.round((budgetTrackedSpending / monthlyBudget) * 100) : 0;
+  const budgetConfigured = monthlyBudget > 0 && budgetCategoryIds.length > 0;
+
+  const toggleBudgetCategory = (id: string) => {
+    setBudgetCategoryIds(
+      budgetCategoryIds.includes(id)
+        ? budgetCategoryIds.filter(x => x !== id)
+        : [...budgetCategoryIds, id]
+    );
+  };
 
   return (
     <div style={{ maxWidth: 1400 }}>
@@ -251,51 +312,303 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
 
       </div>
 
-      {/* ── Budget progress bar (if income exists) ── */}
-      {totalIncome > 0 && (
-        <div style={{
-          padding: '14px 20px',
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border-default)',
-          borderRadius: 'var(--r-xl)',
-          marginBottom: 20,
-          boxShadow: 'var(--shadow-xs)',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-700)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Target size={13} style={{ color: 'var(--brand-500)' }} />
-              Budget Used
-            </span>
-            <span style={{
-              fontSize: '0.8125rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums',
-              color: budgetUsedPct > 100 ? 'var(--red-500)' : budgetUsedPct > 80 ? 'var(--amber-600)' : 'var(--green-600)',
-            }}>
-              {budgetUsedPct}%
-            </span>
-          </div>
-          <div style={{ height: 8, background: 'var(--bg-muted)', borderRadius: 99, overflow: 'hidden' }}>
+      {/* ── Budget Tracker ── */}
+      <div ref={budgetConfigRef} style={{
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border-default)',
+        borderRadius: 'var(--r-xl)',
+        marginBottom: 20,
+        boxShadow: 'var(--shadow-xs)',
+        overflow: 'visible',
+        position: 'relative',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '16px 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{
-              height: '100%',
-              width: `${Math.min(100, budgetUsedPct)}%`,
-              background: budgetUsedPct > 100
-                ? 'linear-gradient(90deg, var(--red-400), var(--red-500))'
-                : budgetUsedPct > 80
-                  ? 'linear-gradient(90deg, var(--amber-400), var(--amber-500))'
-                  : 'linear-gradient(90deg, var(--green-400), var(--green-500))',
-              borderRadius: 99,
-              transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)',
-            }} />
+              width: 30, height: 30, borderRadius: 8,
+              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Wallet size={14} color="#fff" />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-900)' }}>
+                Monthly Budget
+              </div>
+              <div style={{ fontSize: '0.6875rem', color: 'var(--text-400)', marginTop: 1 }}>
+                {budgetConfigured
+                  ? `${budgetCategoryIds.length} categor${budgetCategoryIds.length === 1 ? 'y' : 'ies'} tracked`
+                  : 'Set a budget to track your spending'}
+              </div>
+            </div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
-            <span style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>
-              {sym}{Math.round(globalTotalExpenses).toLocaleString('en-IN')} spent
-            </span>
-            <span style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>
-              of {sym}{Math.round(totalIncome).toLocaleString('en-IN')} income
-            </span>
-          </div>
+          <button
+            onClick={() => { setBudgetConfigOpen(!budgetConfigOpen); if (!budgetConfigOpen) setBudgetInput(monthlyBudget > 0 ? String(monthlyBudget) : ''); }}
+            style={{
+              background: budgetConfigOpen ? 'var(--brand-50)' : 'var(--bg-muted)',
+              border: `1px solid ${budgetConfigOpen ? 'var(--brand-200)' : 'var(--border-default)'}`,
+              borderRadius: 8,
+              padding: '6px 12px',
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              color: budgetConfigOpen ? 'var(--brand-700)' : 'var(--text-600)',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+              transition: 'all 0.15s',
+            }}
+          >
+            <Settings2 size={12} />
+            Configure
+          </button>
         </div>
-      )}
+
+        {/* Config panel (expandable) */}
+        {budgetConfigOpen && (
+          <div style={{
+            padding: '16px 20px',
+            margin: '12px 16px 0',
+            background: 'var(--bg-muted)',
+            borderRadius: 12,
+            border: '1px solid var(--border-default)',
+          }}>
+            {/* Budget amount input */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 6 }}>
+                Budget Amount
+              </label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center',
+                  background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 8,
+                  flex: 1, overflow: 'hidden',
+                }}>
+                  <span style={{ padding: '0 0 0 12px', fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-400)' }}>{sym}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="100"
+                    value={budgetInput}
+                    onChange={e => setBudgetInput(e.target.value)}
+                    placeholder="e.g. 50000"
+                    style={{
+                      flex: 1, border: 'none', outline: 'none', padding: '10px 12px 10px 4px',
+                      fontSize: '0.875rem', fontWeight: 600, background: 'transparent',
+                      color: 'var(--text-900)',
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    const val = parseFloat(budgetInput);
+                    if (!isNaN(val) && val > 0) {
+                      setMonthlyBudget(val);
+                    }
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                    color: '#fff', border: 'none', borderRadius: 8,
+                    padding: '10px 16px', fontSize: '0.78rem', fontWeight: 700,
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}
+                >
+                  <Check size={13} /> Set
+                </button>
+              </div>
+            </div>
+
+            {/* Category selector */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Categories to Track
+                </label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={() => setBudgetCategoryIds(expenseCategories.map(c => c.id))}
+                    style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--brand-600)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Select all
+                  </button>
+                  <button
+                    onClick={() => setBudgetCategoryIds([])}
+                    style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-400)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {expenseCategories.map(cat => {
+                  const active = budgetCategoryIds.includes(cat.id);
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => toggleBudgetCategory(cat.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        padding: '5px 10px', borderRadius: 99,
+                        fontSize: '0.72rem', fontWeight: 600,
+                        background: active ? `${cat.color}18` : 'var(--bg-surface)',
+                        border: `1.5px solid ${active ? cat.color : 'var(--border-default)'}`,
+                        color: active ? cat.color : 'var(--text-400)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.8rem' }}>{cat.icon}</span>
+                      {cat.name}
+                      {active && <Check size={11} strokeWidth={3} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Budget display */}
+        {budgetConfigured ? (
+          <div style={{ padding: '16px 20px 18px' }}>
+            {/* Main progress */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 }}>
+              <div>
+                <div style={{
+                  fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.03em',
+                  color: budgetUsedPct > 100 ? 'var(--red-500)' : 'var(--text-900)',
+                  fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+                }}>
+                  {sym}{Math.round(budgetTrackedSpending).toLocaleString('en-IN')}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-400)', marginTop: 4 }}>
+                  of {sym}{Math.round(monthlyBudget).toLocaleString('en-IN')} budget
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{
+                  fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.02em',
+                  color: budgetRemaining >= 0 ? 'var(--green-600)' : 'var(--red-500)',
+                  fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+                }}>
+                  {budgetRemaining >= 0 ? '' : '-'}{sym}{Math.abs(Math.round(budgetRemaining)).toLocaleString('en-IN')}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: budgetRemaining >= 0 ? 'var(--green-500)' : 'var(--red-400)', marginTop: 4, fontWeight: 600 }}>
+                  {budgetRemaining >= 0 ? 'remaining' : 'over budget'}
+                </div>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div style={{ height: 10, background: 'var(--bg-muted)', borderRadius: 99, overflow: 'hidden', position: 'relative' }}>
+              <div style={{
+                height: '100%',
+                width: `${Math.min(100, budgetUsedPct)}%`,
+                background: budgetUsedPct > 100
+                  ? 'linear-gradient(90deg, #ef4444, #dc2626)'
+                  : budgetUsedPct > 80
+                    ? 'linear-gradient(90deg, #f59e0b, #d97706)'
+                    : budgetUsedPct > 50
+                      ? 'linear-gradient(90deg, #3b82f6, #2563eb)'
+                      : 'linear-gradient(90deg, #10b981, #059669)',
+                borderRadius: 99,
+                transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)',
+              }} />
+              {/* 80% warning marker */}
+              <div style={{
+                position: 'absolute', left: '80%', top: 0, bottom: 0, width: 2,
+                background: 'var(--text-300)', opacity: 0.4,
+              }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-400)', fontVariantNumeric: 'tabular-nums' }}>
+                {budgetUsedPct}% used
+              </span>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-300)' }}>80%</span>
+            </div>
+
+            {/* Over-budget warning */}
+            {budgetUsedPct > 100 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 12px', marginTop: 10,
+                background: '#fef2f2', borderRadius: 8,
+                border: '1px solid #fecaca',
+              }}>
+                <AlertTriangle size={14} style={{ color: '#ef4444', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#991b1b' }}>
+                  You&apos;ve exceeded your budget by {sym}{Math.abs(Math.round(budgetRemaining)).toLocaleString('en-IN')}
+                </span>
+              </div>
+            )}
+
+            {/* Per-category breakdown */}
+            {budgetCategoryBreakdown.length > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+                  Category Breakdown
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {budgetCategoryBreakdown.map(cat => {
+                    const catPct = monthlyBudget > 0 ? (cat.spent / monthlyBudget) * 100 : 0;
+                    return (
+                      <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: '0.85rem', width: 22, textAlign: 'center', flexShrink: 0 }}>{cat.icon}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-700)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {cat.name}
+                            </span>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-900)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, marginLeft: 8 }}>
+                              {sym}{Math.round(cat.spent).toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <div style={{ height: 4, background: 'var(--bg-muted)', borderRadius: 99, overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%',
+                              width: `${Math.min(100, catPct)}%`,
+                              background: cat.color,
+                              borderRadius: 99,
+                              transition: 'width 0.5s ease',
+                            }} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Empty state — prompt user to configure */
+          <div style={{ padding: '20px 20px 24px', textAlign: 'center' }}>
+            <div style={{ fontSize: '1.8rem', marginBottom: 8 }}>
+              <Target size={28} style={{ color: 'var(--text-300)', margin: '0 auto' }} />
+            </div>
+            <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-600)', marginBottom: 4 }}>
+              No budget configured yet
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-400)', maxWidth: 320, margin: '0 auto', lineHeight: 1.5 }}>
+              Set a monthly spending budget and choose which categories to track.
+              Exclude recurring fixed costs like rent or debt to focus on discretionary spending.
+            </div>
+            <button
+              onClick={() => { setBudgetConfigOpen(true); setBudgetInput(''); }}
+              style={{
+                marginTop: 12,
+                background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                color: '#fff', border: 'none', borderRadius: 8,
+                padding: '8px 20px', fontSize: '0.78rem', fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+              }}
+            >
+              <Settings2 size={13} /> Set Up Budget
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* ── Lower row ── */}
       <div className="ws-lower-grid stagger-fade" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
