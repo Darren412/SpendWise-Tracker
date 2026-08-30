@@ -141,6 +141,8 @@ interface UserSettings {
   financialCycleStart: number;
   monthlyBudgets: Record<string, number>;
   budgetCategoryIds: string[];
+  excludedCategoryIds: string[];
+  selectedCity: string;
 }
 
 interface RemoteData {
@@ -214,10 +216,10 @@ let loadVersion = 0; // guards against concurrent loadFromSupabase calls
 
 /** Read the latest state from the store and return the sync payload. */
 function getLatestSyncPayload(): RemoteData {
-  const { expenses, income, categories, currency, financialCycleStart, monthlyBudgets, budgetCategoryIds } = useBudgetStore.getState();
+  const { expenses, income, categories, currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity } = useBudgetStore.getState();
   return {
     expenses, income, categories,
-    settings: { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds },
+    settings: { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity },
   };
 }
 
@@ -384,12 +386,12 @@ async function loadFromSupabase() {
     const { categories: migratedCats, changed } = migrateCategories(rawCategories);
 
     // Include current local settings in the initial upload
-    const { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds } = useBudgetStore.getState();
+    const { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity } = useBudgetStore.getState();
     const migrated: RemoteData = {
       expenses:   parsedExpenses,
       income:     parsedIncome,
       categories: migratedCats,
-      settings:   { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds },
+      settings:   { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity },
     };
 
     if (thisLoad !== loadVersion) return;
@@ -440,6 +442,13 @@ async function loadFromSupabase() {
     }
     if (Array.isArray(remoteSettings.budgetCategoryIds)) {
       settingsUpdate.budgetCategoryIds = remoteSettings.budgetCategoryIds;
+    }
+    if (Array.isArray(remoteSettings.excludedCategoryIds)) {
+      settingsUpdate.excludedCategoryIds = remoteSettings.excludedCategoryIds;
+      settingsUpdate.selectedCategoryIds = remoteSettings.excludedCategoryIds;
+    }
+    if (remoteSettings.selectedCity && typeof remoteSettings.selectedCity === 'string') {
+      settingsUpdate.selectedCity = remoteSettings.selectedCity;
     }
     useBudgetStore.setState(settingsUpdate);
   }
@@ -506,8 +515,8 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   monthlyBudgets: typeof window !== 'undefined' ? (() => { try { const raw = localStorage.getItem('spendwise_monthly_budgets'); if (raw) return JSON.parse(raw); const legacy = parseFloat(localStorage.getItem('spendwise_monthly_budget') ?? '0'); return legacy > 0 ? { _default: legacy } : {}; } catch { return {}; } })() : {},
   budgetCategoryIds: typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('spendwise_budget_categories') ?? '[]'); } catch { return []; } })() : [],
 
-  setExcludedCategoryIds: (ids: string[]) => set({ excludedCategoryIds: ids, selectedCategoryIds: ids }),
-  setSelectedCategoryIds: (ids: string[]) => set({ excludedCategoryIds: ids, selectedCategoryIds: ids }),
+  setExcludedCategoryIds: (ids: string[]) => { set({ excludedCategoryIds: ids, selectedCategoryIds: ids }); scheduleSyncToSupabase(); },
+  setSelectedCategoryIds: (ids: string[]) => { set({ excludedCategoryIds: ids, selectedCategoryIds: ids }); scheduleSyncToSupabase(); },
 
   setUserId: (userId: string | null) => {
     // On logout: clear pending sync timers to prevent stale writes
@@ -573,6 +582,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
 
   setSelectedCity: (city: string) => {
     set({ selectedCity: city });
+    scheduleSyncToSupabase();
   },
 
   setFinancialCycleStart: (day: number) => {
