@@ -184,7 +184,7 @@ function buildAllDataSummary(allExpenses: Expense[], allIncome: Income[], sym: s
     grandIncome += yInc; grandExpenses += yExp;
     rows.push({ Year: yr, Income: yInc, [`Expenses (${sym})`]: yExp, [`Net (${sym})`]: yInc - yExp, Transactions: yTx });
   }
-  rows.push({ Year: 'TOTAL', Income: grandIncome, 'Expenses (₹)': grandExpenses, 'Net (₹)': grandIncome - grandExpenses, Transactions: '' });
+  rows.push({ Year: 'TOTAL', Income: grandIncome, [`Expenses (${sym})`]: grandExpenses, [`Net (${sym})`]: grandIncome - grandExpenses, Transactions: '' });
 
   const ws = XLSX.utils.json_to_sheet(rows, { skipHeader: true });
   ws['!cols'] = [{ wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];

@@ -488,7 +488,7 @@ export default function AnalyticsWorkspace() {
                     </Pie>
                     <Tooltip
                       formatter={(value: number, name: string) => [
-                        `${formatCurrency(value, currency)} (${((value / totalSpent) * 100).toFixed(1)}%)`, name
+                        `${formatCurrency(value, currency)} (${totalSpent > 0 ? ((value / totalSpent) * 100).toFixed(1) : '0.0'}%)`, name
                       ]}
                       contentStyle={{ background: '#fff', border: '1px solid #e8ecf0', borderRadius: 10, fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
                     />

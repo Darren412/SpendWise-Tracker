@@ -168,6 +168,12 @@ function getSavedCycleStart(): number {
 const initCycleStart = getSavedCycleStart();
 const initPeriod     = getCurrentFinancialPeriod(initCycleStart);
 
+function getSavedCurrency(): string {
+  if (typeof window === 'undefined') return 'INR';
+  return localStorage.getItem('spendwise_currency') ?? 'INR';
+}
+const initCurrency = getSavedCurrency();
+
 // --- Supabase sync with debounce, retry, and network status ---
 //
 // IMPORTANT: Every store mutation was previously calling syncToSupabase() with a
@@ -301,12 +307,17 @@ async function loadFromSupabase() {
     // No remote data yet — restore from localStorage backup if available
     const local = getLocalBackup(userId);
 
-    const rawCategories: Category[] = local.categories ? JSON.parse(local.categories) : defaultCategories;
+    let rawCategories: Category[];
+    let parsedExpenses: Expense[];
+    let parsedIncome: Income[];
+    try { rawCategories  = local.categories ? JSON.parse(local.categories) : defaultCategories; } catch { rawCategories = defaultCategories; }
+    try { parsedExpenses = local.expenses   ? JSON.parse(local.expenses)   : [];                } catch { parsedExpenses = []; }
+    try { parsedIncome   = local.income     ? JSON.parse(local.income)     : [];                } catch { parsedIncome   = []; }
     const { categories: migratedCats, changed } = migrateCategories(rawCategories);
 
     const migrated: RemoteData = {
-      expenses:   local.expenses ? JSON.parse(local.expenses) : [],
-      income:     local.income   ? JSON.parse(local.income)   : [],
+      expenses:   parsedExpenses,
+      income:     parsedIncome,
       categories: migratedCats,
     };
 
@@ -336,8 +347,12 @@ async function loadFromSupabase() {
   // Merge localStorage backup with Supabase data to prevent data loss
   const local = getLocalBackup(userId);
 
-  const localExpenses: Expense[] = local.expenses ? JSON.parse(local.expenses) : [];
-  const localIncome: Income[]    = local.income   ? JSON.parse(local.income)   : [];
+  let localExpenses: Expense[] = [];
+  let localIncome: Income[]    = [];
+  let localCategories: Category[] = [];
+  try { localExpenses   = local.expenses   ? JSON.parse(local.expenses)   : []; } catch { /* corrupted */ }
+  try { localIncome     = local.income     ? JSON.parse(local.income)     : []; } catch { /* corrupted */ }
+  try { localCategories = local.categories ? JSON.parse(local.categories) : []; } catch { /* corrupted */ }
 
   // Merge: add any local items not present in Supabase (by id)
   const remoteExpenseIds = new Set(remote.expenses.map((e) => e.id));
@@ -346,9 +361,15 @@ async function loadFromSupabase() {
   const remoteIncomeIds = new Set(remote.income.map((i) => i.id));
   const missingIncome   = localIncome.filter((i) => !remoteIncomeIds.has(i.id));
 
-  if (missingExpenses.length > 0 || missingIncome.length > 0 || remoteCatsChanged) {
-    remote.expenses = [...remote.expenses, ...missingExpenses];
-    remote.income   = [...remote.income, ...missingIncome];
+  // Also merge categories created locally but not yet in Supabase
+  const remoteCatIds = new Set(remote.categories.map((c) => c.id));
+  const missingCategories = localCategories.filter((c) => !remoteCatIds.has(c.id));
+
+  const needsMerge = missingExpenses.length > 0 || missingIncome.length > 0 || missingCategories.length > 0 || remoteCatsChanged;
+  if (needsMerge) {
+    remote.expenses   = [...remote.expenses,   ...missingExpenses];
+    remote.income     = [...remote.income,     ...missingIncome];
+    remote.categories = [...remote.categories, ...missingCategories];
     // Push merged data back to Supabase
     await syncToSupabase(remote);
   }
@@ -372,7 +393,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   syncing: false,
   networkError: false,
   userId: null,
-  currency: 'INR',
+  currency: initCurrency,
   excludedCategoryIds: [],
   selectedCategoryIds: [], // deprecated alias — mirrors excludedCategoryIds
   financialCycleStart: initCycleStart,
@@ -392,6 +413,9 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
 
   setCurrency: (currency: string) => {
     set({ currency });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('spendwise_currency', currency);
+    }
   },
 
   setSelectedMonth: (month: string) => {

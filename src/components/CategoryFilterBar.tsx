@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useBudgetStore, generateId } from '@/store/budgetStore';
+import { currencySymbol } from '@/utils/currency';
 import { Search, Plus, Pencil, Trash2, Check, X, ChevronDown, SlidersHorizontal } from 'lucide-react';
 
 const EMOJI_ICONS = ['🍔', '🚗', '💡', '🎬', '💪', '🛍️', '🍽️', '📦', '🏥', '📚', '✈️', '🏠', '💻', '🎮', '⚽', '🛒', '☕', '🎵', '💊', '🐾', '🧴', '🍕', '🚂', '🎪'];
@@ -389,7 +390,7 @@ export default function CategoryFilterBar() {
                             </p>
                             {monthTotal > 0 && active && (
                               <p style={{ fontSize: 10, color: '#9ca3af', margin: 0 }}>
-                                {currency === 'INR' ? '₹' : '$'}{monthTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} this month
+                                {currencySymbol(currency)}{monthTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} this month
                               </p>
                             )}
                           </div>

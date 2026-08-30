@@ -161,7 +161,7 @@ export default function Charts() {
                     {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                   </Pie>
                   <Tooltip
-                    formatter={(value, name) => [`${formatCurrency(Number(value), currency)} (${((Number(value) / totalSpent) * 100).toFixed(1)}%)`, name]}
+                    formatter={(value, name) => [`${formatCurrency(Number(value), currency)} (${totalSpent > 0 ? ((Number(value) / totalSpent) * 100).toFixed(1) : '0.0'}%)`, name]}
                     contentStyle={{ background: '#fff', border: '1px solid #e8ecf0', borderRadius: 10, fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
                   />
                 </PieChart>
@@ -175,7 +175,7 @@ export default function Charts() {
             {/* Legend */}
             <div className="mt-4 space-y-2">
               {[...pieData].sort((a, b) => b.value - a.value).map(item => {
-                const pct = (item.value / totalSpent) * 100;
+                const pct = totalSpent > 0 ? (item.value / totalSpent) * 100 : 0;
                 return (
                   <div key={item.id} className="flex items-center gap-3">
                     <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: item.color }} />

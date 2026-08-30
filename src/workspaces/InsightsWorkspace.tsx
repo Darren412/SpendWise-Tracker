@@ -717,7 +717,7 @@ export default function InsightsWorkspace() {
                   )}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
-                  <span style={{ fontSize: '0.5625rem', color: '#94a3b8' }}>₹0</span>
+                  <span style={{ fontSize: '0.5625rem', color: '#94a3b8' }}>{sym}0</span>
                   <span style={{ fontSize: '0.5625rem', color: '#ef4444', fontWeight: 700 }}>Projected: {Math.min(100, Math.round((prediction.projectedMonthEnd / totalIncome) * 100))}%</span>
                   <span style={{ fontSize: '0.5625rem', color: '#94a3b8' }}>Income {sym}{Math.round(totalIncome).toLocaleString('en-IN')}</span>
                 </div>
