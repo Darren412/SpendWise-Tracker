@@ -306,7 +306,7 @@ export default function AllExpensesModal({ isOpen, onClose }: AllExpensesModalPr
                                 {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>)}
                               </select>
                               <input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className="px-2 py-1 text-sm rounded-md border border-slate-200 w-24" placeholder="Amount" min="0" step="0.01" />
-                              <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="px-2 py-1 text-sm rounded-md border border-slate-200" />
+                              <input type="date" lang="en-GB" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="px-2 py-1 text-sm rounded-md border border-slate-200" />
                             </div>
                             <button onClick={saveEdit} className="p-1.5 rounded-md hover:bg-green-50 transition-colors" style={{ color: '#16a34a' }}><Check size={15} /></button>
                             <button onClick={cancelEditing} className="p-1.5 rounded-md hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><XCircle size={15} /></button>
@@ -354,7 +354,7 @@ export default function AllExpensesModal({ isOpen, onClose }: AllExpensesModalPr
                                 {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>)}
                               </select>
                               <input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className="px-2 py-1 text-sm rounded-md border border-slate-200 w-24" placeholder="Amount" min="0" step="0.01" />
-                              <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="px-2 py-1 text-sm rounded-md border border-slate-200" />
+                              <input type="date" lang="en-GB" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="px-2 py-1 text-sm rounded-md border border-slate-200" />
                             </div>
                             <button onClick={saveEdit} className="p-1.5 rounded-md hover:bg-green-50 transition-colors" style={{ color: '#16a34a' }}><Check size={15} /></button>
                             <button onClick={cancelEditing} className="p-1.5 rounded-md hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><XCircle size={15} /></button>

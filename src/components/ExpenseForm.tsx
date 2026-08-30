@@ -145,6 +145,7 @@ export default function ExpenseForm() {
           <label style={labelStyle}>Date</label>
           <input
             type="date"
+            lang="en-GB"
             value={formData.date}
             onChange={e => setFormData({ ...formData, date: e.target.value })}
             style={inputStyle}

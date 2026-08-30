@@ -972,6 +972,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                                 <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-500)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Date</label>
                                 <input
                                   type="date"
+                                  lang="en-GB"
                                   value={editState!.date}
                                   onChange={e => setEditState(s => s && ({ ...s, date: e.target.value }))}
                                   style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--r-sm)', fontSize: '0.8125rem', background: 'var(--bg-surface)', border: '1.5px solid var(--brand-300)', color: 'var(--text-900)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}

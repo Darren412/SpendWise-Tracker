@@ -94,6 +94,7 @@ export default function ExportModal({ isOpen, onClose }: Props) {
         <div className="mt-2 ml-6">
           <input
             type="date"
+            lang="en-GB"
             className="dark-input text-sm rounded-lg px-3 py-1.5 w-full"
             value={chosenDay}
             onChange={e => setChosenDay(e.target.value)}
