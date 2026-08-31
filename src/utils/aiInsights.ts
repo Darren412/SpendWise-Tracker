@@ -904,3 +904,449 @@ export function processChat(input: string, ctx: ChatContext): string {
   // ── Catch-all ─────────────────────────────────────────────────────────────
   return `I can help you understand your finances. Try asking:\n• "Where did I overspend?"\n• "How can I save more?"\n• "What category increased most?"\n• "Show unusual transactions"\n• "Compare city spending"\n• "What's my projected spend?"\n• "What's my health score?"`;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Yearly Computation Functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface YearSummary {
+  year: number;
+  months: MonthSummary[];           // Jan-Dec (12 entries, some may have 0 if no data)
+  totalExpenses: number;
+  totalIncome: number;
+  totalSavings: number;
+  avgMonthlySavingsRate: number;
+  avgMonthlyExpenses: number;
+  txnCount: number;
+  activeMonths: number;             // number of months with data
+  bestMonth: MonthSummary | null;   // highest savings rate
+  worstMonth: MonthSummary | null;  // lowest savings rate
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// buildYearSummary — aggregate 12 months into a yearly overview
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function buildYearSummary(
+  expenses: Expense[],
+  income: Income[],
+  year: number,
+  financialCycleStart: number,
+): YearSummary {
+  const months: MonthSummary[] = Array.from({ length: 12 }, (_, i) => {
+    const m = (i + 1).toString().padStart(2, '0');
+    const { start, end } = getFinancialMonthRange(m, year, financialCycleStart);
+
+    const periodExpenses = expenses.filter(e => {
+      const d = new Date(e.date + 'T00:00:00');
+      return d >= start && d <= end;
+    });
+    const periodIncome = income.filter(inc => {
+      const d = new Date(inc.date + 'T00:00:00');
+      return d >= start && d <= end;
+    });
+
+    const exp = periodExpenses.reduce((s, e) => s + e.amount, 0);
+    const inc = periodIncome.reduce((s, iv) => s + iv.amount, 0);
+    const sav = inc - exp;
+    const savRate = inc > 0 ? Math.round((sav / inc) * 100) : 0;
+
+    return {
+      month: m,
+      year,
+      label: monthLabel(m, year),
+      expenses: exp,
+      income: inc,
+      savings: sav,
+      savingsRate: savRate,
+      txnCount: periodExpenses.length,
+    };
+  });
+
+  const totalExpenses = months.reduce((s, m) => s + m.expenses, 0);
+  const totalIncome = months.reduce((s, m) => s + m.income, 0);
+  const totalSavings = totalIncome - totalExpenses;
+  const activeMonths = months.filter(m => m.txnCount > 0).length;
+
+  const activeRates = months
+    .filter(m => m.txnCount > 0)
+    .map(m => m.savingsRate);
+  const avgMonthlySavingsRate = activeRates.length > 0
+    ? Math.round(mean(activeRates))
+    : 0;
+
+  const avgMonthlyExpenses = activeMonths > 0
+    ? Math.round(totalExpenses / activeMonths)
+    : 0;
+
+  const txnCount = months.reduce((s, m) => s + m.txnCount, 0);
+
+  // Best/worst: only among months with both income > 0 AND expenses > 0
+  const qualifiedMonths = months.filter(m => m.income > 0 && m.expenses > 0);
+  let bestMonth: MonthSummary | null = null;
+  let worstMonth: MonthSummary | null = null;
+  if (qualifiedMonths.length > 0) {
+    bestMonth = qualifiedMonths.reduce((best, m) =>
+      m.savingsRate > best.savingsRate ? m : best, qualifiedMonths[0]);
+    worstMonth = qualifiedMonths.reduce((worst, m) =>
+      m.savingsRate < worst.savingsRate ? m : worst, qualifiedMonths[0]);
+  }
+
+  return {
+    year,
+    months,
+    totalExpenses,
+    totalIncome,
+    totalSavings,
+    avgMonthlySavingsRate,
+    avgMonthlyExpenses,
+    txnCount,
+    activeMonths,
+    bestMonth,
+    worstMonth,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// buildYearlyCategoryBreakdown — full-year category trends vs previous year
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function buildYearlyCategoryBreakdown(
+  expenses: Expense[],
+  categories: Category[],
+  year: number,
+  selectedCity: string,
+  financialCycleStart: number,
+  excludedCategoryIds: string[],
+  prevYear: number,
+): CategoryTrend[] {
+  // Collect financial month ranges for all 12 months of each year
+  const currRanges = Array.from({ length: 12 }, (_, i) => {
+    const m = (i + 1).toString().padStart(2, '0');
+    return getFinancialMonthRange(m, year, financialCycleStart);
+  });
+  const prevRanges = Array.from({ length: 12 }, (_, i) => {
+    const m = (i + 1).toString().padStart(2, '0');
+    return getFinancialMonthRange(m, prevYear, financialCycleStart);
+  });
+
+  const inRanges = (d: Date, ranges: { start: Date; end: Date }[]): boolean =>
+    ranges.some(r => d >= r.start && d <= r.end);
+
+  const cityMatch = (e: Expense): boolean =>
+    selectedCity === 'Both' || !e.city || e.city === selectedCity;
+
+  const expCats = categories.filter(c =>
+    c.type !== 'income' &&
+    (excludedCategoryIds.length === 0 || !excludedCategoryIds.includes(c.id))
+  );
+
+  // Total current-year spend for pctOfTotal
+  const currTotal = expenses
+    .filter(e => {
+      const d = new Date(e.date + 'T00:00:00');
+      return inRanges(d, currRanges) && cityMatch(e);
+    })
+    .reduce((s, e) => s + e.amount, 0);
+
+  return expCats.map(c => {
+    const currSpent = expenses
+      .filter(e => {
+        const d = new Date(e.date + 'T00:00:00');
+        return inRanges(d, currRanges) && e.category === c.id && cityMatch(e);
+      })
+      .reduce((s, e) => s + e.amount, 0);
+
+    const prevSpent = expenses
+      .filter(e => {
+        const d = new Date(e.date + 'T00:00:00');
+        return inRanges(d, prevRanges) && e.category === c.id && cityMatch(e);
+      })
+      .reduce((s, e) => s + e.amount, 0);
+
+    const changePct = prevSpent > 0
+      ? Math.round(((currSpent - prevSpent) / prevSpent) * 100)
+      : currSpent > 0 ? 100 : 0;
+
+    const pctOfTotal = currTotal > 0
+      ? Math.round((currSpent / currTotal) * 100)
+      : 0;
+
+    return {
+      catId: c.id,
+      name: c.name,
+      icon: c.icon,
+      color: c.color,
+      currSpent,
+      prevSpent,
+      changePct,
+      pctOfTotal,
+    };
+  })
+    .filter(c => c.currSpent > 0 || c.prevSpent > 0)
+    .sort((a, b) => b.currSpent - a.currSpent);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// buildYearlyNarrativeSummary — human-readable narrative lines for the year
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function buildYearlyNarrativeSummary(
+  yearSummary: YearSummary,
+  yearlyCategories: CategoryTrend[],
+  sym: string,
+): string[] {
+  const lines: string[] = [];
+  const fmt = (n: number) => Math.round(n).toLocaleString('en-IN');
+  const { year, totalExpenses, totalIncome, totalSavings, activeMonths, avgMonthlySavingsRate } = yearSummary;
+
+  // Overall summary
+  const overallSavingsRate = totalIncome > 0
+    ? Math.round((totalSavings / totalIncome) * 100)
+    : 0;
+  lines.push(
+    `In ${year}, you spent ${sym}${fmt(totalExpenses)} across ${activeMonths} month${activeMonths !== 1 ? 's' : ''}, earning ${sym}${fmt(totalIncome)} with an overall savings rate of ${overallSavingsRate}%.`
+  );
+
+  // Best and highest-spend months
+  if (yearSummary.bestMonth && yearSummary.worstMonth) {
+    const highestSpendMonth = yearSummary.months
+      .filter(m => m.txnCount > 0)
+      .reduce((max, m) => m.expenses > max.expenses ? m : max, yearSummary.months[0]);
+
+    lines.push(
+      `Your best month was ${yearSummary.bestMonth.label} with ${yearSummary.bestMonth.savingsRate}% savings. Your highest spend month was ${highestSpendMonth.label} at ${sym}${fmt(highestSpendMonth.expenses)}.`
+    );
+  }
+
+  // Top category
+  if (yearlyCategories.length > 0) {
+    const top = yearlyCategories[0];
+    lines.push(
+      `${top.icon} ${top.name} was your top category at ${sym}${fmt(top.currSpent)} (${top.pctOfTotal}% of total spend).`
+    );
+    if (yearlyCategories.length >= 3) {
+      const top3 = yearlyCategories.slice(0, 3);
+      lines.push(
+        `Top 3 categories: ${top3.map(c => `${c.icon} ${c.name} (${c.pctOfTotal}%)`).join(', ')}.`
+      );
+    }
+  }
+
+  // Year-over-year comparison (if any category has prevSpent > 0)
+  const hasPrevData = yearlyCategories.some(c => c.prevSpent > 0);
+  if (hasPrevData) {
+    const totalPrev = yearlyCategories.reduce((s, c) => s + c.prevSpent, 0);
+    const totalCurr = yearlyCategories.reduce((s, c) => s + c.currSpent, 0);
+    const yoyChange = totalPrev > 0
+      ? Math.round(((totalCurr - totalPrev) / totalPrev) * 100)
+      : 0;
+    const direction = yoyChange > 0 ? 'increased' : yoyChange < 0 ? 'decreased' : 'stayed the same';
+    lines.push(
+      `Year-over-year spending ${direction} by ${Math.abs(yoyChange)}% (${sym}${fmt(totalPrev)} → ${sym}${fmt(totalCurr)}).`
+    );
+
+    // Biggest category changes
+    const biggestIncrease = yearlyCategories
+      .filter(c => c.prevSpent > 0 && c.changePct > 0)
+      .sort((a, b) => b.changePct - a.changePct)[0];
+    const biggestDecrease = yearlyCategories
+      .filter(c => c.prevSpent > 0 && c.changePct < 0)
+      .sort((a, b) => a.changePct - b.changePct)[0];
+
+    if (biggestIncrease) {
+      lines.push(
+        `Biggest increase: ${biggestIncrease.icon} ${biggestIncrease.name} (+${biggestIncrease.changePct}%).`
+      );
+    }
+    if (biggestDecrease) {
+      lines.push(
+        `Biggest decrease: ${biggestDecrease.icon} ${biggestDecrease.name} (${biggestDecrease.changePct}%).`
+      );
+    }
+  }
+
+  // Average monthly
+  lines.push(
+    `Average monthly spending: ${sym}${fmt(yearSummary.avgMonthlyExpenses)}. Average monthly savings rate: ${avgMonthlySavingsRate}%.`
+  );
+
+  return lines;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// generateYearlyInsightCards — AI insight cards for yearly scope
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function generateYearlyInsightCards(
+  yearSummary: YearSummary,
+  yearlyCategories: CategoryTrend[],
+  sym: string,
+): AIInsightCard[] {
+  const cards: AIInsightCard[] = [];
+  const fmt = (n: number) => Math.round(n).toLocaleString('en-IN');
+  const { year, totalExpenses, totalIncome, totalSavings, activeMonths, months } = yearSummary;
+  const overallSavingsRate = totalIncome > 0
+    ? Math.round((totalSavings / totalIncome) * 100)
+    : 0;
+
+  // ── 1. Overall yearly savings assessment ──────────────────────────────────
+  {
+    const severity: InsightSeverity =
+      overallSavingsRate >= 20 ? 'positive' :
+      overallSavingsRate >= 5 ? 'warning' : 'critical';
+    const title =
+      overallSavingsRate >= 20 ? `Strong ${year} Savings` :
+      overallSavingsRate >= 5 ? `Modest ${year} Savings` :
+      `${year} Savings Concern`;
+    cards.push({
+      id: `yearly-savings-${year}`,
+      severity,
+      category: 'savings',
+      title,
+      summary: `You saved ${sym}${fmt(totalSavings)} in ${year} (${overallSavingsRate}% savings rate).`,
+      detail: overallSavingsRate >= 20
+        ? `Excellent discipline — a ${overallSavingsRate}% annual savings rate puts you on track for strong financial growth. Total income: ${sym}${fmt(totalIncome)}, total spend: ${sym}${fmt(totalExpenses)}.`
+        : overallSavingsRate >= 5
+        ? `A ${overallSavingsRate}% savings rate covers basics but leaves little buffer. Consider trimming discretionary categories to push above 20%.`
+        : `A ${overallSavingsRate}% savings rate is dangerously low. Spending nearly equals or exceeds income. Urgent review recommended.`,
+      metric: `${overallSavingsRate}%`,
+      metricDirection: overallSavingsRate >= 20 ? 'up' : 'down',
+      confidence: 95,
+      actionLabel: overallSavingsRate < 20 ? 'Review Annual Budget' : undefined,
+      actionHint: overallSavingsRate < 20 ? 'Look at your top 3 categories for potential cuts.' : undefined,
+    });
+  }
+
+  // ── 2. Month-over-month spending consistency ──────────────────────────────
+  {
+    const activeExpenses = months.filter(m => m.txnCount > 0).map(m => m.expenses);
+    if (activeExpenses.length >= 3) {
+      const sd = stdDev(activeExpenses);
+      const avg = mean(activeExpenses);
+      const cv = avg > 0 ? Math.round((sd / avg) * 100) : 0; // coefficient of variation
+
+      const severity: InsightSeverity =
+        cv <= 20 ? 'positive' : cv <= 40 ? 'warning' : 'critical';
+      const label =
+        cv <= 20 ? 'Consistent' : cv <= 40 ? 'Moderate Swings' : 'Highly Volatile';
+
+      cards.push({
+        id: `yearly-volatility-${year}`,
+        severity,
+        category: 'trend',
+        title: `${year} Spending ${label}`,
+        summary: `Monthly spending varied by ${cv}% (std dev ${sym}${fmt(sd)} on avg ${sym}${fmt(avg)}).`,
+        detail: cv <= 20
+          ? `Your spending was remarkably steady through ${year}. Consistent budgets are a hallmark of good financial health.`
+          : cv <= 40
+          ? `Some months spiked or dipped notably. While occasional variation is normal, aim to smooth out large swings for better predictability.`
+          : `Spending swung dramatically month to month. This volatility makes budgeting and saving very difficult. Identify the spike months and investigate.`,
+        metric: `${cv}% CV`,
+        metricDirection: cv <= 20 ? 'neutral' : 'up',
+        confidence: 85,
+      });
+    }
+  }
+
+  // ── 3. Category concentration ─────────────────────────────────────────────
+  {
+    if (yearlyCategories.length > 0) {
+      const top = yearlyCategories[0];
+      const top3Total = yearlyCategories.slice(0, 3).reduce((s, c) => s + c.pctOfTotal, 0);
+
+      const severity: InsightSeverity =
+        top.pctOfTotal >= 50 ? 'warning' :
+        top3Total >= 80 ? 'info' : 'neutral';
+
+      cards.push({
+        id: `yearly-concentration-${year}`,
+        severity,
+        category: 'spending',
+        title: `${year} Category Concentration`,
+        summary: `${top.icon} ${top.name} dominated at ${top.pctOfTotal}% of total spend.`,
+        detail: top.pctOfTotal >= 50
+          ? `Over half your annual spending went to ${top.name}. Heavy concentration in one category creates risk — any price increase there impacts your whole budget.`
+          : top3Total >= 80
+          ? `Your top 3 categories (${yearlyCategories.slice(0, 3).map(c => c.name).join(', ')}) account for ${top3Total}% of spending. This is fairly concentrated.`
+          : `Spending is reasonably diversified across categories. Top category is ${top.name} at ${top.pctOfTotal}%.`,
+        metric: `${top.pctOfTotal}%`,
+        metricDirection: 'neutral',
+        confidence: 90,
+      });
+    }
+  }
+
+  // ── 4. Best and worst months ──────────────────────────────────────────────
+  {
+    if (yearSummary.bestMonth && yearSummary.worstMonth && yearSummary.bestMonth.month !== yearSummary.worstMonth.month) {
+      cards.push({
+        id: `yearly-best-worst-${year}`,
+        severity: 'info',
+        category: 'trend',
+        title: `${year} Monthly Extremes`,
+        summary: `Best: ${yearSummary.bestMonth.label} (${yearSummary.bestMonth.savingsRate}% saved). Worst: ${yearSummary.worstMonth.label} (${yearSummary.worstMonth.savingsRate}% saved).`,
+        detail: `In ${yearSummary.bestMonth.label}, you earned ${sym}${fmt(yearSummary.bestMonth.income)} and spent ${sym}${fmt(yearSummary.bestMonth.expenses)}, saving ${sym}${fmt(yearSummary.bestMonth.savings)}. In ${yearSummary.worstMonth.label}, income was ${sym}${fmt(yearSummary.worstMonth.income)} against ${sym}${fmt(yearSummary.worstMonth.expenses)} in expenses (${yearSummary.worstMonth.savingsRate}% savings rate). Understanding what drove each extreme can help you replicate successes and avoid pitfalls.`,
+        confidence: 90,
+        actionLabel: 'Analyse Worst Month',
+        actionHint: `Drill into ${yearSummary.worstMonth.label} to see which categories drove the overspend.`,
+      });
+    }
+  }
+
+  // ── 5. Spending trend through the year ────────────────────────────────────
+  {
+    const activeMonthData = months.filter(m => m.txnCount > 0);
+    if (activeMonthData.length >= 4) {
+      // Simple linear trend: compare first half avg vs second half avg
+      const half = Math.floor(activeMonthData.length / 2);
+      const firstHalf = activeMonthData.slice(0, half).map(m => m.expenses);
+      const secondHalf = activeMonthData.slice(half).map(m => m.expenses);
+      const firstAvg = mean(firstHalf);
+      const secondAvg = mean(secondHalf);
+      const trendPct = firstAvg > 0
+        ? Math.round(((secondAvg - firstAvg) / firstAvg) * 100)
+        : 0;
+
+      const direction = trendPct > 10 ? 'increasing' : trendPct < -10 ? 'decreasing' : 'stable';
+      const severity: InsightSeverity =
+        direction === 'decreasing' ? 'positive' :
+        direction === 'stable' ? 'info' : 'warning';
+
+      cards.push({
+        id: `yearly-trend-${year}`,
+        severity,
+        category: 'trend',
+        title: `${year} Spending Trend: ${direction.charAt(0).toUpperCase() + direction.slice(1)}`,
+        summary: `Second-half spending was ${Math.abs(trendPct)}% ${trendPct >= 0 ? 'higher' : 'lower'} than the first half.`,
+        detail: direction === 'decreasing'
+          ? `Great progress — you brought spending down as the year progressed (1st half avg: ${sym}${fmt(firstAvg)}, 2nd half avg: ${sym}${fmt(secondAvg)}).`
+          : direction === 'stable'
+          ? `Spending remained fairly flat through the year (1st half avg: ${sym}${fmt(firstAvg)}, 2nd half avg: ${sym}${fmt(secondAvg)}). Consistent, but check if it aligns with your goals.`
+          : `Spending crept upward through ${year} (1st half avg: ${sym}${fmt(firstAvg)} → 2nd half avg: ${sym}${fmt(secondAvg)}). If unplanned, consider setting tighter monthly budgets.`,
+        metric: `${trendPct >= 0 ? '+' : ''}${trendPct}%`,
+        metricDirection: trendPct > 0 ? 'up' : trendPct < 0 ? 'down' : 'neutral',
+        confidence: 75,
+      });
+    }
+  }
+
+  // ── 6. Partial year warning ───────────────────────────────────────────────
+  {
+    if (activeMonths < 12 && activeMonths > 0) {
+      cards.push({
+        id: `yearly-partial-${year}`,
+        severity: 'info',
+        category: 'trend',
+        title: `Partial ${year} Data`,
+        summary: `Only ${activeMonths} of 12 months have transaction data.`,
+        detail: `Yearly metrics are based on ${activeMonths} active month${activeMonths !== 1 ? 's' : ''}. Months with no data are excluded from averages but shown as zero in charts. Full-year comparisons may be skewed until all months have data.`,
+        metric: `${activeMonths}/12`,
+        metricDirection: 'neutral',
+        confidence: 100,
+      });
+    }
+  }
+
+  return cards;
+}

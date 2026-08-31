@@ -6,6 +6,7 @@ import {
   CheckCircle, Info, Zap, MessageCircle, Send, ChevronDown,
   ChevronUp, Target, Activity, BarChart2, RefreshCw,
   ArrowUpRight, ArrowDownRight, Minus, ShieldCheck, X, Clock,
+  CalendarRange, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { currencySymbol } from '@/utils/currency';
@@ -22,6 +23,10 @@ import {
   buildNarrativeSummary,
   generateInsightCards,
   processChat,
+  buildYearSummary,
+  buildYearlyCategoryBreakdown,
+  buildYearlyNarrativeSummary,
+  generateYearlyInsightCards,
   type AIInsightCard,
   type ChatMessage,
   type InsightSeverity,
@@ -245,6 +250,19 @@ export default function InsightsWorkspace() {
   const [activeTab,        setActiveTab]        = useState<'insights' | 'trends' | 'forecast' | 'behavior'>('insights');
   const [modalCard,        setModalCard]        = useState<AIInsightCard | null>(null);
 
+  // ── Scope toggle: Monthly vs Yearly ────────────────────────────────────────
+  const [scope, setScope] = useState<'monthly' | 'yearly'>('monthly');
+  const [yearlyYear, setYearlyYear] = useState(selectedYear);
+
+  // Available years from data
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    expenses.forEach(e => years.add(e.year));
+    income.forEach(i => years.add(i.year));
+    if (years.size === 0) years.add(selectedYear);
+    return [...years].sort((a, b) => b - a);
+  }, [expenses, income, selectedYear]);
+
   // ── Computed data ──────────────────────────────────────────────────────────
 
   const periodExpenses = useMemo(() =>
@@ -274,6 +292,29 @@ export default function InsightsWorkspace() {
   const healthScore   = useMemo(() => computeHealthScore(totalExpenses, totalIncome, monthHistory, catTrends, recurringItems), [totalExpenses, totalIncome, monthHistory, catTrends, recurringItems]);
   const insightCards  = useMemo(() => generateInsightCards(totalExpenses, totalIncome, savingsRate, catTrends, monthHistory, anomalies, prediction, recurringItems, sym), [totalExpenses, totalIncome, savingsRate, catTrends, monthHistory, anomalies, prediction, recurringItems, sym]);
   const narrativeLines = useMemo(() => buildNarrativeSummary(totalExpenses, totalIncome, catTrends, prediction, healthScore, sym), [totalExpenses, totalIncome, catTrends, prediction, healthScore, sym]);
+
+  // ── Yearly computed data ───────────────────────────────────────────────────
+  const yearSummary = useMemo(() =>
+    buildYearSummary(expenses, income, yearlyYear, financialCycleStart),
+    [expenses, income, yearlyYear, financialCycleStart]);
+
+  const yearlyCatTrends = useMemo(() =>
+    buildYearlyCategoryBreakdown(expenses, categories, yearlyYear, selectedCity, financialCycleStart, excludedCategoryIds, yearlyYear - 1),
+    [expenses, categories, yearlyYear, selectedCity, financialCycleStart, excludedCategoryIds]);
+
+  const yearlyNarrative = useMemo(() =>
+    buildYearlyNarrativeSummary(yearSummary, yearlyCatTrends, sym),
+    [yearSummary, yearlyCatTrends, sym]);
+
+  const yearlyInsightCards = useMemo(() =>
+    generateYearlyInsightCards(yearSummary, yearlyCatTrends, sym),
+    [yearSummary, yearlyCatTrends, sym]);
+
+  const yearlyVisibleInsights = showAllInsights ? yearlyInsightCards : yearlyInsightCards.slice(0, 4);
+
+  // Yearly savings rate
+  const yearlySavingsRate = yearSummary.totalIncome > 0
+    ? Math.round(((yearSummary.totalIncome - yearSummary.totalExpenses) / yearSummary.totalIncome) * 100) : 0;
 
   // ── Chat auto-scroll ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -308,25 +349,69 @@ export default function InsightsWorkspace() {
             <span className="ai-icon-glow" style={{ width: 36, height: 36, borderRadius: 'var(--r-md)' }}><Sparkles size={16} /></span>
             AI Insights
             <span style={{ fontSize: '0.6875rem', fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: 'var(--brand-50)', color: 'var(--brand-600)', border: '1px solid var(--brand-200)' }}>
-              {selectedMonthLabel}
+              {scope === 'monthly' ? selectedMonthLabel : String(yearlyYear)}
             </span>
           </h1>
           <p className="ws-subtitle">Intelligent analysis of your real financial data · Updated live</p>
         </div>
-        <button
-          onClick={() => setChatOpen(v => !v)}
-          className="ai-chat-trigger-btn"
-          style={{ background: chatOpen ? 'var(--brand-600)' : undefined, color: chatOpen ? '#fff' : undefined, borderColor: chatOpen ? 'var(--brand-600)' : undefined }}
-        >
-          <MessageCircle size={14} />
-          Ask AI
-          {chatOpen && <X size={12} style={{ marginLeft: 2 }} />}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Scope toggle */}
+          <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1.5px solid #e2e8f0' }}>
+            {(['monthly', 'yearly'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => { setScope(s); setShowAllInsights(false); }}
+                style={{
+                  padding: '7px 16px', fontSize: '0.75rem', fontWeight: 700,
+                  cursor: 'pointer', border: 'none', fontFamily: 'inherit',
+                  background: scope === s ? 'var(--brand-600)' : '#fff',
+                  color: scope === s ? '#fff' : '#64748b',
+                  transition: 'all 0.15s',
+                  textTransform: 'capitalize',
+                }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+          {/* Year selector (yearly scope) */}
+          {scope === 'yearly' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button
+                onClick={() => { const idx = availableYears.indexOf(yearlyYear); if (idx < availableYears.length - 1) setYearlyYear(availableYears[idx + 1]); }}
+                disabled={availableYears.indexOf(yearlyYear) >= availableYears.length - 1}
+                style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center' }}
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#1e293b', minWidth: 44, textAlign: 'center' }}>{yearlyYear}</span>
+              <button
+                onClick={() => { const idx = availableYears.indexOf(yearlyYear); if (idx > 0) setYearlyYear(availableYears[idx - 1]); }}
+                disabled={availableYears.indexOf(yearlyYear) <= 0}
+                style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center' }}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
+          <button
+            onClick={() => setChatOpen(v => !v)}
+            className="ai-chat-trigger-btn"
+            style={{ background: chatOpen ? 'var(--brand-600)' : undefined, color: chatOpen ? '#fff' : undefined, borderColor: chatOpen ? 'var(--brand-600)' : undefined }}
+          >
+            <MessageCircle size={14} />
+            Ask AI
+            {chatOpen && <X size={12} style={{ marginLeft: 2 }} />}
+          </button>
+        </div>
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          HERO KPI STRIP
+          MONTHLY VIEW
       ══════════════════════════════════════════════════════════════════════ */}
+      {scope === 'monthly' && (<>
+
+      {/* ── HERO KPI STRIP ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
         {/* Health Score — hero card */}
         <div
@@ -993,6 +1078,252 @@ export default function InsightsWorkspace() {
           </div>
         </div>
       )}
+
+      </>)}
+      {/* ══════════════════════════════════════════════════════════════════════
+          END MONTHLY VIEW
+      ══════════════════════════════════════════════════════════════════════ */}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          YEARLY VIEW
+      ══════════════════════════════════════════════════════════════════════ */}
+      {scope === 'yearly' && (<>
+
+      {/* ── YEARLY KPI STRIP ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
+        {[
+          { label: 'Total Spent', value: `${sym}${Math.round(yearSummary.totalExpenses).toLocaleString('en-IN')}`, sub: `${yearSummary.txnCount} txns · ${yearSummary.activeMonths} months`, color: '#ef4444', Icon: TrendingUp },
+          { label: 'Total Income', value: yearSummary.totalIncome > 0 ? `${sym}${Math.round(yearSummary.totalIncome).toLocaleString('en-IN')}` : '—', sub: `${yearlyYear} total`, color: '#16a34a', Icon: ArrowUpRight },
+          { label: 'Net Savings', value: yearSummary.totalIncome > 0 ? `${sym}${Math.round(yearSummary.totalSavings).toLocaleString('en-IN')}` : '—', sub: yearSummary.totalSavings >= 0 ? 'Surplus' : 'Deficit', color: yearSummary.totalSavings >= 0 ? '#16a34a' : '#ef4444', Icon: ShieldCheck },
+          { label: 'Savings Rate', value: yearSummary.totalIncome > 0 ? `${yearlySavingsRate}%` : '—', sub: yearlySavingsRate >= 20 ? 'Healthy' : yearlySavingsRate > 0 ? 'Below target' : '—', color: yearlySavingsRate >= 20 ? '#16a34a' : yearlySavingsRate > 0 ? '#d97706' : '#94a3b8', Icon: Target },
+          { label: 'Avg Monthly', value: `${sym}${yearSummary.avgMonthlyExpenses.toLocaleString('en-IN')}`, sub: 'per active month', color: '#6366f1', Icon: Activity },
+        ].map(kpi => (
+          <div key={kpi.label} style={{
+            padding: '16px 18px', borderRadius: 16,
+            background: '#fff', border: '1.5px solid #e8ecf0',
+            transition: 'all 0.2s ease',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{kpi.label}</span>
+              <div style={{ width: 26, height: 26, borderRadius: 7, background: `${kpi.color}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <kpi.Icon size={12} color={kpi.color} />
+              </div>
+            </div>
+            <div style={{ fontSize: '1.125rem', fontWeight: 800, color: kpi.color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{kpi.value}</div>
+            <div style={{ fontSize: '0.6875rem', color: '#94a3b8', marginTop: 4 }}>{kpi.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── YEARLY AI NARRATIVE ── */}
+      <div className="ai-narrative-card" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <div className="ai-icon-glow" style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0 }}><CalendarRange size={13} /></div>
+          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b' }}>{yearlyYear} Year in Review</span>
+          <span style={{ marginLeft: 'auto', fontSize: '0.625rem', color: '#16a34a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a', display: 'inline-block', animation: 'aiPulse 2s infinite' }} />
+            Live
+          </span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {yearlyNarrative.map((line, i) => (
+            <p key={i} style={{ fontSize: '0.875rem', color: i === 0 ? '#1e293b' : '#475569', lineHeight: 1.6, fontWeight: i === 0 ? 600 : 400 }}>
+              {line}
+            </p>
+          ))}
+        </div>
+      </div>
+
+      {/* ── YEARLY TAB NAV ── */}
+      <div className="ws-tab-bar" style={{ marginBottom: 16 }}>
+        {([
+          { key: 'insights',  label: 'Yearly Insights', Icon: Zap },
+          { key: 'trends',    label: 'Monthly Breakdown', Icon: BarChart2 },
+        ] as { key: typeof activeTab; label: string; Icon: React.ElementType }[]).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`ws-tab${activeTab === tab.key ? ' active' : ''}`}
+            style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+          >
+            <tab.Icon size={12} />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── TAB: YEARLY INSIGHTS ── */}
+      {activeTab === 'insights' && (
+        <div>
+          <div className="ai-insights-grid">
+            {yearlyVisibleInsights.map(card => (
+              <InsightCardFull key={card.id} card={card} onOpenModal={setModalCard} />
+            ))}
+          </div>
+          {yearlyInsightCards.length > 4 && (
+            <button
+              onClick={() => setShowAllInsights(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '8px auto 0', padding: '7px 18px', borderRadius: 99, fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', background: 'var(--brand-50)', color: 'var(--brand-600)', border: '1px solid var(--brand-200)', fontFamily: 'inherit' }}
+            >
+              {showAllInsights ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              {showAllInsights ? 'Show less' : `Show ${yearlyInsightCards.length - 4} more`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: MONTHLY BREAKDOWN (12-month chart + category table) ── */}
+      {activeTab === 'trends' && (
+        <div>
+          {/* 12-month bar chart */}
+          <div className="panel" style={{ marginBottom: 16 }}>
+            <div style={{ padding: '14px 18px 12px', borderBottom: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <BarChart2 size={14} style={{ color: '#6366f1' }} />
+              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>{yearlyYear} — Monthly Spending vs Income</span>
+            </div>
+            <div style={{ padding: '16px 18px 8px' }}>
+              <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+                {[{ label: 'Expenses', color: '#ef4444' }, { label: 'Income', color: '#16a34a' }].map(l => (
+                  <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.6875rem', fontWeight: 600, color: '#64748b' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: l.color, display: 'inline-block' }} />
+                    {l.label}
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 120 }}>
+                {yearSummary.months.map((m, i) => {
+                  const maxVal = Math.max(...yearSummary.months.map(h => Math.max(h.expenses, h.income)), 1);
+                  const expH = m.expenses > 0 ? Math.max(6, Math.round((m.expenses / maxVal) * 105)) : 3;
+                  const incH = m.income > 0 ? Math.max(6, Math.round((m.income / maxVal) * 105)) : 3;
+                  const hasData = m.txnCount > 0;
+                  return (
+                    <div key={m.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                      <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', width: '100%', justifyContent: 'center' }}>
+                        <div
+                          title={`Expenses: ${sym}${Math.round(m.expenses).toLocaleString('en-IN')}`}
+                          style={{ width: '42%', height: expH, background: hasData ? '#ef4444' : '#f1f5f9', borderRadius: '3px 3px 0 0', transition: 'height 0.4s ease', cursor: 'help' }}
+                        />
+                        <div
+                          title={`Income: ${sym}${Math.round(m.income).toLocaleString('en-IN')}`}
+                          style={{ width: '42%', height: incH, background: hasData ? '#16a34a' : '#f1f5f9', borderRadius: '3px 3px 0 0', transition: 'height 0.4s ease', cursor: 'help' }}
+                        />
+                      </div>
+                      <div style={{ fontSize: '0.5625rem', fontWeight: hasData ? 600 : 400, color: hasData ? '#1e293b' : '#cbd5e1', whiteSpace: 'nowrap' }}>{MONTH_NAMES[i]}</div>
+                      {m.savings !== 0 && hasData && (
+                        <div style={{ fontSize: '0.5rem', fontWeight: 700, color: m.savings >= 0 ? '#16a34a' : '#ef4444' }}>
+                          {m.savings >= 0 ? '+' : '−'}{sym}{(Math.abs(m.savings)/1000).toFixed(0)}k
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Savings rate across 12 months */}
+          <div className="panel" style={{ marginBottom: 16 }}>
+            <div style={{ padding: '14px 18px 12px', borderBottom: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ShieldCheck size={14} style={{ color: '#16a34a' }} />
+              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>{yearlyYear} Savings Rate by Month</span>
+            </div>
+            <div style={{ padding: '16px 18px' }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 80 }}>
+                {yearSummary.months.map((m, i) => {
+                  const rate = m.income > 0 ? Math.max(0, m.savingsRate) : 0;
+                  const h = rate > 0 ? Math.max(6, Math.round((rate / 100) * 68)) : 4;
+                  const color = rate >= 20 ? '#16a34a' : rate > 0 ? '#d97706' : '#e2e8f0';
+                  const hasData = m.txnCount > 0;
+                  return (
+                    <div key={m.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                      <div
+                        title={`${MONTH_NAMES[i]}: ${rate}% savings rate`}
+                        style={{ width: '70%', height: h, background: hasData ? color : '#f1f5f9', borderRadius: '3px 3px 0 0', transition: 'height 0.4s ease', cursor: 'help' }}
+                      />
+                      <div style={{ fontSize: '0.5625rem', fontWeight: hasData ? 600 : 400, color: hasData ? '#1e293b' : '#cbd5e1' }}>{MONTH_NAMES[i]}</div>
+                      {hasData && <div style={{ fontSize: '0.5rem', fontWeight: 700, color }}>{rate}%</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Yearly category breakdown */}
+          <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '14px 18px 12px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <TrendingUp size={14} style={{ color: '#6366f1' }} />
+              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>Category Breakdown — {yearlyYear} vs {yearlyYear - 1}</span>
+            </div>
+            {yearlyCatTrends.length === 0 ? (
+              <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem' }}>No category data for {yearlyYear}</div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px 80px 100px', padding: '8px 18px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                  {['Category', String(yearlyYear), String(yearlyYear - 1), 'Change', 'Share'].map(h => (
+                    <span key={h} style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: h === 'Change' || h === 'Share' ? 'right' : 'left' }}>{h}</span>
+                  ))}
+                </div>
+                {yearlyCatTrends.map(t => (
+                  <div key={t.catId} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px 80px 100px', padding: '10px 18px', borderBottom: '1px solid #f1f5f9', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 7, background: `${t.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>{t.icon}</div>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</span>
+                    </div>
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>{sym}{Math.round(t.currSpent).toLocaleString('en-IN')}</span>
+                    <span style={{ fontSize: '0.8125rem', color: '#64748b', fontVariantNumeric: 'tabular-nums' }}>{t.prevSpent > 0 ? `${sym}${Math.round(t.prevSpent).toLocaleString('en-IN')}` : '—'}</span>
+                    <div style={{ textAlign: 'right' }}>
+                      {t.prevSpent > 0 ? (
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: t.changePct > 0 ? '#ef4444' : t.changePct < 0 ? '#16a34a' : '#6366f1', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                          {t.changePct > 0 ? <ArrowUpRight size={11}/> : t.changePct < 0 ? <ArrowDownRight size={11}/> : <Minus size={11}/>}
+                          {t.changePct > 0 ? '+' : ''}{t.changePct}%
+                        </span>
+                      ) : <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>New</span>}
+                    </div>
+                    <div style={{ paddingLeft: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ flex: 1, height: 4, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${t.pctOfTotal}%`, background: t.color, borderRadius: 99 }} />
+                        </div>
+                        <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', minWidth: 28, textAlign: 'right' }}>{t.pctOfTotal}%</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+
+          {/* Best / worst month highlight */}
+          {(yearSummary.bestMonth || yearSummary.worstMonth) && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
+              {yearSummary.bestMonth && (
+                <div style={{ padding: '16px 18px', borderRadius: 14, background: '#f0fdf4', border: '1.5px solid #bbf7d0' }}>
+                  <div style={{ fontSize: '0.625rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Best Month</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#16a34a' }}>{yearSummary.bestMonth.label}</div>
+                  <div style={{ fontSize: '0.8125rem', color: '#475569', marginTop: 2 }}>
+                    {yearSummary.bestMonth.savingsRate}% savings · {sym}{Math.round(yearSummary.bestMonth.savings).toLocaleString('en-IN')} saved
+                  </div>
+                </div>
+              )}
+              {yearSummary.worstMonth && (
+                <div style={{ padding: '16px 18px', borderRadius: 14, background: '#fef2f2', border: '1.5px solid #fecaca' }}>
+                  <div style={{ fontSize: '0.625rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Highest Spend Month</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ef4444' }}>{yearSummary.worstMonth.label}</div>
+                  <div style={{ fontSize: '0.8125rem', color: '#475569', marginTop: 2 }}>
+                    {yearSummary.worstMonth.savingsRate}% savings · {sym}{Math.round(yearSummary.worstMonth.expenses).toLocaleString('en-IN')} spent
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      </>)}
+      {/* ══════════════════════════════════════════════════════════════════════
+          END YEARLY VIEW
+      ══════════════════════════════════════════════════════════════════════ */}
 
       {/* ══════════════════════════════════════════════════════════════════════
           INSIGHT DETAIL MODAL
