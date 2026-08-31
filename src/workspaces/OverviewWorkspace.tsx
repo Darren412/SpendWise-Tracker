@@ -89,18 +89,6 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
   const expChangePct = prevExpenses > 0 ? Math.round((globalTotalExpenses - prevExpenses) / prevExpenses * 100) : 0;
   const incChangePct = prevIncome   > 0 ? Math.round((totalIncome         - prevIncome)   / prevIncome   * 100) : 0;
 
-  // ── Health score (global) ─────────────────────────────────────────────────
-  const healthScore = useMemo(() => {
-    if (totalIncome === 0) return 0;
-    const targetCap = savingsTarget > 0 ? savingsTarget : 20;
-    const srScore = Math.min(targetCap, Math.max(0, savingsRate)) / targetCap * 40;
-    const cfScore = netBalance >= 0 ? 40 : Math.max(0, 40 + (netBalance / totalIncome) * 40);
-    return Math.round(Math.min(100, srScore + cfScore + 20));
-  }, [totalIncome, savingsRate, savingsTarget, netBalance]);
-
-  const healthLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 65 ? 'Good' : healthScore >= 45 ? 'Fair' : 'Needs work';
-  const healthColor = healthScore >= 80 ? 'var(--green-500)' : healthScore >= 65 ? 'var(--blue-500)' : healthScore >= 45 ? 'var(--amber-500)' : 'var(--red-500)';
-
   // ── Top categories (global — all cities combined) ─────────────────────────
   const topCats = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -116,6 +104,81 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
       .sort((a, b) => b.spent - a.spent)
       .slice(0, 5);
   }, [categories, globalExpensesThisPeriod, excludedCategoryIds]);
+
+  // ── Health score (global) ─────────────────────────────────────────────────
+  // Five components for a meaningful, differentiated score:
+  //   1. Savings rate vs target     (0-30)
+  //   2. Cash flow direction        (0-20)
+  //   3. Budget discipline          (0-20)  — uses monthly budget if set
+  //   4. Spending trend (MoM)       (0-15)
+  //   5. Expense diversity          (0-15)  — penalises if one category dominates
+  const healthScore = useMemo(() => {
+    if (totalIncome === 0 && globalTotalExpenses === 0) return 0;
+
+    // 1. Savings rate vs target (0-30)
+    const target = savingsTarget > 0 ? savingsTarget : 20;
+    let srPts = 0;
+    if (totalIncome > 0) {
+      const ratio = savingsRate / target; // 1.0 = exactly on target
+      srPts = Math.min(30, Math.round(ratio * 25)); // on-target = 25, above = up to 30
+    }
+
+    // 2. Cash flow (0-20)
+    let cfPts = 0;
+    if (totalIncome > 0) {
+      if (netBalance >= 0) {
+        // Positive: 15-20 based on how much surplus
+        const surplusPct = netBalance / totalIncome;
+        cfPts = 15 + Math.min(5, Math.round(surplusPct * 10));
+      } else {
+        // Negative: proportional penalty
+        cfPts = Math.max(0, Math.round(20 + (netBalance / totalIncome) * 20));
+      }
+    }
+
+    // 3. Budget discipline (0-20)
+    let budgetPts = 10; // neutral if no budget set
+    const budget = getMonthlyBudget(selectedMonth, selectedYear);
+    if (budget > 0) {
+      const budgetCats = budgetCategoryIds.length > 0 ? budgetCategoryIds : categories.filter(c => c.type !== 'income').map(c => c.id);
+      const trackedSpend = globalExpensesThisPeriod
+        .filter(e => budgetCats.includes(e.category))
+        .reduce((s, e) => s + e.amount, 0);
+      const budgetUsed = trackedSpend / budget;
+      if (budgetUsed <= 0.8)       budgetPts = 20; // well under budget
+      else if (budgetUsed <= 1.0)  budgetPts = 15; // within budget
+      else if (budgetUsed <= 1.2)  budgetPts = 8;  // slightly over
+      else                         budgetPts = 3;  // significantly over
+    }
+
+    // 4. Spending trend — MoM change (0-15)
+    let trendPts = 8; // neutral if no previous data
+    if (prevExpenses > 0) {
+      if (expChangePct <= -15)       trendPts = 15; // big decrease
+      else if (expChangePct <= -5)   trendPts = 13;
+      else if (expChangePct <= 5)    trendPts = 10; // stable
+      else if (expChangePct <= 15)   trendPts = 6;  // moderate increase
+      else                           trendPts = 2;  // big increase
+    }
+
+    // 5. Expense diversity (0-15) — penalise if one category dominates
+    let divPts = 12; // default good
+    if (topCats.length > 0 && globalTotalExpenses > 0) {
+      const topPct = topCats[0].spent / globalTotalExpenses;
+      if (topPct >= 0.7)       divPts = 5;   // heavily concentrated
+      else if (topPct >= 0.5)  divPts = 9;
+      else if (topPct >= 0.35) divPts = 12;
+      else                     divPts = 15;  // well diversified
+    }
+
+    return Math.min(100, srPts + cfPts + budgetPts + trendPts + divPts);
+  }, [totalIncome, globalTotalExpenses, savingsRate, savingsTarget, netBalance,
+      globalExpensesThisPeriod, budgetCategoryIds, categories,
+      selectedMonth, selectedYear, getMonthlyBudget,
+      prevExpenses, expChangePct, topCats]);
+
+  const healthLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 65 ? 'Good' : healthScore >= 45 ? 'Fair' : 'Needs work';
+  const healthColor = healthScore >= 80 ? 'var(--green-500)' : healthScore >= 65 ? 'var(--blue-500)' : healthScore >= 45 ? 'var(--amber-500)' : 'var(--red-500)';
 
   // ── Quick Insights (global) ────────────────────────────────────────────────
   const insights = useMemo(() => {
