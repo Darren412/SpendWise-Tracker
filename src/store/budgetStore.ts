@@ -49,6 +49,8 @@ interface BudgetStore {
   setMonthlyBudget: (month: string, year: number, amount: number) => void;
   getMonthlyBudget: (month: string, year: number) => number;
   setBudgetCategoryIds: (ids: string[]) => void;
+  savingsTarget: number;  // percentage (0-100)
+  setSavingsTarget: (pct: number) => void;
 }
 
 const defaultCategories: Category[] = [
@@ -143,6 +145,7 @@ interface UserSettings {
   budgetCategoryIds: string[];
   excludedCategoryIds: string[];
   selectedCity: string;
+  savingsTarget: number;
 }
 
 interface RemoteData {
@@ -216,10 +219,10 @@ let loadVersion = 0; // guards against concurrent loadFromSupabase calls
 
 /** Read the latest state from the store and return the sync payload. */
 function getLatestSyncPayload(): RemoteData {
-  const { expenses, income, categories, currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity } = useBudgetStore.getState();
+  const { expenses, income, categories, currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity, savingsTarget } = useBudgetStore.getState();
   return {
     expenses, income, categories,
-    settings: { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity },
+    settings: { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity, savingsTarget },
   };
 }
 
@@ -386,12 +389,12 @@ async function loadFromSupabase() {
     const { categories: migratedCats, changed } = migrateCategories(rawCategories);
 
     // Include current local settings in the initial upload
-    const { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity } = useBudgetStore.getState();
+    const { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity, savingsTarget } = useBudgetStore.getState();
     const migrated: RemoteData = {
       expenses:   parsedExpenses,
       income:     parsedIncome,
       categories: migratedCats,
-      settings:   { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity },
+      settings:   { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity, savingsTarget },
     };
 
     if (thisLoad !== loadVersion) return;
@@ -449,6 +452,9 @@ async function loadFromSupabase() {
     }
     if (remoteSettings.selectedCity && typeof remoteSettings.selectedCity === 'string') {
       settingsUpdate.selectedCity = remoteSettings.selectedCity;
+    }
+    if (typeof remoteSettings.savingsTarget === 'number' && remoteSettings.savingsTarget >= 0 && remoteSettings.savingsTarget <= 100) {
+      settingsUpdate.savingsTarget = remoteSettings.savingsTarget;
     }
     useBudgetStore.setState(settingsUpdate);
   }
@@ -514,6 +520,8 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   financialCycleStart: initCycleStart,
   monthlyBudgets: typeof window !== 'undefined' ? (() => { try { const raw = localStorage.getItem('spendwise_monthly_budgets'); if (raw) return JSON.parse(raw); const legacy = parseFloat(localStorage.getItem('spendwise_monthly_budget') ?? '0'); return legacy > 0 ? { _default: legacy } : {}; } catch { return {}; } })() : {},
   budgetCategoryIds: typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('spendwise_budget_categories') ?? '[]'); } catch { return []; } })() : [],
+  savingsTarget: 20,
+  setSavingsTarget: (pct: number) => { set({ savingsTarget: Math.max(0, Math.min(100, pct)) }); scheduleSyncToSupabase(); },
 
   setExcludedCategoryIds: (ids: string[]) => { set({ excludedCategoryIds: ids, selectedCategoryIds: ids }); scheduleSyncToSupabase(); },
   setSelectedCategoryIds: (ids: string[]) => { set({ excludedCategoryIds: ids, selectedCategoryIds: ids }); scheduleSyncToSupabase(); },

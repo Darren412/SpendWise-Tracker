@@ -6,7 +6,7 @@ import { currencies } from '@/utils/currency';
 import { formatFinancialPeriodRange, ordinalSuffix } from '@/utils/financialCycle';
 import CategoryFilterBar from '@/components/CategoryFilterBar';
 import FinancialCycleSettings from '@/components/FinancialCycleSettings';
-import { Settings, User, DollarSign, Calendar, MapPin, Tag, LogOut } from 'lucide-react';
+import { Settings, User, DollarSign, Calendar, MapPin, Tag, LogOut, PiggyBank } from 'lucide-react';
 
 export default function SettingsWorkspace() {
   const {
@@ -15,6 +15,7 @@ export default function SettingsWorkspace() {
     selectedMonth, selectedYear,
     selectedCity, setSelectedCity,
     setExcludedCategoryIds,
+    savingsTarget, setSavingsTarget,
   } = useBudgetStore();
   const { user, signOut } = useAuth();
 
@@ -151,6 +152,55 @@ export default function SettingsWorkspace() {
                 )}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* ── Savings Target ── */}
+        <div className="settings-card">
+          <div className="settings-card-title">
+            <div style={{
+              width: 28, height: 28, borderRadius: 'var(--r-sm)',
+              background: 'var(--green-50)', border: '1px solid var(--green-100)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <PiggyBank size={14} style={{ color: 'var(--green-600)' }} />
+            </div>
+            Savings Target
+          </div>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-400)', marginBottom: 12 }}>
+            Percentage of income you aim to save each month
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={savingsTarget}
+              onChange={e => setSavingsTarget(parseInt(e.target.value, 10))}
+              style={{ flex: 1, accentColor: 'var(--green-500)' }}
+            />
+            <span style={{
+              minWidth: 48,
+              textAlign: 'center',
+              fontSize: '1.1rem',
+              fontWeight: 800,
+              color: 'var(--green-600)',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              {savingsTarget}%
+            </span>
+          </div>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            marginTop: 8,
+            fontSize: '0.7rem',
+            color: 'var(--text-400)',
+          }}>
+            <span>0%</span>
+            <span>50%</span>
+            <span>100%</span>
           </div>
         </div>
 

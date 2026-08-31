@@ -24,6 +24,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
     excludedCategoryIds,
     monthlyBudgets, budgetCategoryIds,
     setMonthlyBudget, getMonthlyBudget, setBudgetCategoryIds,
+    savingsTarget,
   } = useBudgetStore();
 
   const sym = currencySymbol(currency);
@@ -91,10 +92,11 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
   // ── Health score (global) ─────────────────────────────────────────────────
   const healthScore = useMemo(() => {
     if (totalIncome === 0) return 0;
-    const srScore = Math.min(30, Math.max(0, savingsRate)) / 30 * 40;
+    const targetCap = savingsTarget > 0 ? savingsTarget : 20;
+    const srScore = Math.min(targetCap, Math.max(0, savingsRate)) / targetCap * 40;
     const cfScore = netBalance >= 0 ? 40 : Math.max(0, 40 + (netBalance / totalIncome) * 40);
     return Math.round(Math.min(100, srScore + cfScore + 20));
-  }, [totalIncome, savingsRate, netBalance]);
+  }, [totalIncome, savingsRate, savingsTarget, netBalance]);
 
   const healthLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 65 ? 'Good' : healthScore >= 45 ? 'Fair' : 'Needs work';
   const healthColor = healthScore >= 80 ? 'var(--green-500)' : healthScore >= 65 ? 'var(--blue-500)' : healthScore >= 45 ? 'var(--amber-500)' : 'var(--red-500)';
@@ -120,7 +122,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
     const items: { icon: string; text: string; color: string; bg: string }[] = [];
     if (totalIncome > 0 && globalTotalExpenses > totalIncome)
       items.push({ icon: '⚠️', text: `Overspending by ${sym}${Math.round(globalTotalExpenses - totalIncome).toLocaleString('en-IN')} this period`, color: 'var(--red-600)', bg: 'var(--red-50)' });
-    if (savingsRate >= 20)
+    if (savingsRate >= savingsTarget)
       items.push({ icon: '✅', text: `${savingsRate}% savings rate — healthy trajectory`, color: 'var(--green-700)', bg: 'var(--green-50)' });
     if (topCats[0])
       items.push({ icon: topCats[0].icon, text: `Top spend: ${topCats[0].name} at ${formatCurrencyShort(topCats[0].spent, currency)}`, color: 'var(--text-700)', bg: 'var(--bg-muted)' });
@@ -129,7 +131,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
     if (items.length === 0)
       items.push({ icon: '💡', text: 'Add transactions to unlock financial insights', color: 'var(--text-500)', bg: 'var(--bg-muted)' });
     return items.slice(0, 4);
-  }, [totalIncome, globalTotalExpenses, savingsRate, topCats, expChangePct, sym, currency]);
+  }, [totalIncome, globalTotalExpenses, savingsRate, savingsTarget, topCats, expChangePct, sym, currency]);
 
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const isCurrentPeriod = selectedMonth === currentPeriod.month && selectedYear === currentPeriod.year;
@@ -691,7 +693,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
             <div style={{
               fontSize: '2.5rem',
               fontWeight: 800,
-              color: savingsRate >= 20 ? 'var(--green-600)' : savingsRate >= 10 ? 'var(--amber-500)' : 'var(--red-500)',
+              color: savingsRate >= savingsTarget ? 'var(--green-600)' : savingsRate >= savingsTarget / 2 ? 'var(--amber-500)' : 'var(--red-500)',
               lineHeight: 1,
               letterSpacing: '-0.03em',
             }}>
@@ -699,25 +701,25 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
             </div>
             <div style={{
               fontSize: '0.75rem',
-              color: savingsRate >= 20 ? 'var(--green-600)' : 'var(--text-400)',
+              color: savingsRate >= savingsTarget ? 'var(--green-600)' : 'var(--text-400)',
               fontWeight: 500,
               marginTop: 8,
             }}>
-              {savingsRate >= 20 ? 'Above target' : savingsRate >= 10 ? 'Getting there' : totalIncome === 0 ? 'No income recorded' : 'Below target — aim for 20%'}
+              {savingsRate >= savingsTarget ? 'Above target' : savingsRate >= savingsTarget / 2 ? 'Getting there' : totalIncome === 0 ? 'No income recorded' : `Below target — aim for ${savingsTarget}%`}
             </div>
           </div>
           {totalIncome > 0 && (
             <div style={{ marginTop: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: '0.72rem', color: 'var(--text-400)' }}>
-                <span>Target: 20%</span>
-                <span>{sym}{Math.round(totalIncome * 0.2).toLocaleString('en-IN')}</span>
+                <span>Target: {savingsTarget}%</span>
+                <span>{sym}{Math.round(totalIncome * savingsTarget / 100).toLocaleString('en-IN')}</span>
               </div>
               <div className="progress-track">
                 <div
                   className="progress-fill"
                   style={{
-                    width: `${Math.min(100, savingsRate / 20 * 100)}%`,
-                    background: savingsRate >= 20 ? 'var(--green-500)' : savingsRate >= 10 ? 'var(--amber-500)' : 'var(--red-500)',
+                    width: `${Math.min(100, savingsRate / savingsTarget * 100)}%`,
+                    background: savingsRate >= savingsTarget ? 'var(--green-500)' : savingsRate >= savingsTarget / 2 ? 'var(--amber-500)' : 'var(--red-500)',
                   }}
                 />
               </div>
