@@ -64,6 +64,9 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
   const [mm, setMm] = useState(parts.mm);
   const [yyyy, setYyyy] = useState(parts.yyyy);
 
+  // Track whether the user has started typing since focus (to clear old value)
+  const freshRef = useRef<'dd' | 'mm' | 'yyyy' | null>(null);
+
   // Sync from parent value
   useEffect(() => {
     const p = parseParts(value);
@@ -78,7 +81,8 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
   }, [onChange]);
 
   // Select all text in the input on focus
-  const selectAll = (ref: React.RefObject<HTMLInputElement | null>) => {
+  const selectAll = (ref: React.RefObject<HTMLInputElement | null>, seg: 'dd' | 'mm' | 'yyyy') => {
+    freshRef.current = seg;
     setTimeout(() => ref.current?.select(), 0);
   };
 
@@ -90,12 +94,25 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
     return String(n).padStart(pad, '0');
   };
 
+  // Extract only new digits typed by the user, ignoring stale buffer
+  const extractDigits = (inputValue: string, maxLen: number): string => {
+    const digits = inputValue.replace(/\D/g, '');
+    // If the input has more digits than maxLen, the old value wasn't cleared;
+    // take only the last typed digits (the new ones)
+    return digits.length > maxLen ? digits.slice(-maxLen) : digits;
+  };
+
   const handleDdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, '').slice(-2);
-    setDd(raw);
+    let digits = extractDigits(e.target.value, 2);
+    // If fresh (first keystroke after focus), use only the last digit typed
+    if (freshRef.current === 'dd' && digits.length > 1) {
+      digits = digits.slice(-1);
+    }
+    freshRef.current = null;
+    setDd(digits);
     // Auto-advance to MM after typing 2 digits
-    if (raw.length === 2) {
-      const clamped = clamp(raw, 1, 31, 2);
+    if (digits.length === 2) {
+      const clamped = clamp(digits, 1, 31, 2);
       setDd(clamped);
       commit(clamped, mm, yyyy);
       mmRef.current?.focus();
@@ -103,10 +120,14 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
   };
 
   const handleMmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, '').slice(-2);
-    setMm(raw);
-    if (raw.length === 2) {
-      const clamped = clamp(raw, 1, 12, 2);
+    let digits = extractDigits(e.target.value, 2);
+    if (freshRef.current === 'mm' && digits.length > 1) {
+      digits = digits.slice(-1);
+    }
+    freshRef.current = null;
+    setMm(digits);
+    if (digits.length === 2) {
+      const clamped = clamp(digits, 1, 12, 2);
       setMm(clamped);
       commit(dd, clamped, yyyy);
       yyRef.current?.focus();
@@ -114,25 +135,32 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
   };
 
   const handleYyyyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, '').slice(-4);
-    setYyyy(raw);
-    if (raw.length === 4) {
-      commit(dd, mm, raw);
+    let digits = extractDigits(e.target.value, 4);
+    if (freshRef.current === 'yyyy' && digits.length > 1) {
+      digits = digits.slice(-1);
+    }
+    freshRef.current = null;
+    setYyyy(digits);
+    if (digits.length === 4) {
+      commit(dd, mm, digits);
     }
   };
 
   // On blur of each segment, clamp + pad + commit
   const handleDdBlur = () => {
+    freshRef.current = null;
     const clamped = clamp(dd, 1, 31, 2);
     setDd(clamped);
     commit(clamped, mm, yyyy);
   };
   const handleMmBlur = () => {
+    freshRef.current = null;
     const clamped = clamp(mm, 1, 12, 2);
     setMm(clamped);
     commit(dd, clamped, yyyy);
   };
   const handleYyyyBlur = () => {
+    freshRef.current = null;
     let y = parseInt(yyyy, 10);
     if (isNaN(y) || y < 1900) y = new Date().getFullYear();
     if (y > 2100) y = 2100;
@@ -197,10 +225,10 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
         inputMode="numeric"
         value={dd}
         onChange={handleDdChange}
-        onFocus={() => selectAll(ddRef)}
+        onFocus={() => selectAll(ddRef, 'dd')}
         onBlur={handleDdBlur}
         onKeyDown={e => handleKeyDown(e, 'dd')}
-        maxLength={2}
+        maxLength={4}
         style={{ ...segStyle, width: '2ch' }}
         aria-label="Day"
       />
@@ -212,10 +240,10 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
         inputMode="numeric"
         value={mm}
         onChange={handleMmChange}
-        onFocus={() => selectAll(mmRef)}
+        onFocus={() => selectAll(mmRef, 'mm')}
         onBlur={handleMmBlur}
         onKeyDown={e => handleKeyDown(e, 'mm')}
-        maxLength={2}
+        maxLength={4}
         style={{ ...segStyle, width: '2ch' }}
         aria-label="Month"
       />
@@ -227,10 +255,10 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
         inputMode="numeric"
         value={yyyy}
         onChange={handleYyyyChange}
-        onFocus={() => selectAll(yyRef)}
+        onFocus={() => selectAll(yyRef, 'yyyy')}
         onBlur={handleYyyyBlur}
         onKeyDown={e => handleKeyDown(e, 'yyyy')}
-        maxLength={4}
+        maxLength={8}
         style={{ ...segStyle, width: '4ch' }}
         aria-label="Year"
       />
