@@ -58,15 +58,7 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
     const raw = e.target.value;
     setTextValue(raw);
 
-    // Auto-insert slashes: 31 → 31/, 31/08 → 31/08/
-    // Only auto-insert if user is typing forward (not deleting)
-    if (raw.length === 2 && /^\d{2}$/.test(raw)) {
-      setTextValue(raw + '/');
-    } else if (raw.length === 5 && /^\d{2}\/\d{2}$/.test(raw)) {
-      setTextValue(raw + '/');
-    }
-
-    // Try to parse complete date
+    // Try to parse complete date — update value live as the user types/edits
     const iso = displayToIso(raw);
     if (iso) {
       onChange(iso);
