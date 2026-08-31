@@ -73,6 +73,8 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
 
   // Digit buffer: collects typed digits since last focus. Reset on focus/advance.
   const bufferRef = useRef('');
+  // Skip blur handler when keyDown already committed and advanced
+  const skipBlurRef = useRef(false);
 
   // Sync from parent value
   useEffect(() => {
@@ -121,6 +123,7 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
           setDd(clamped);
           commit(clamped, mm, yyyy);
           bufferRef.current = '';
+          skipBlurRef.current = true;
           mmRef.current?.focus();
         } else {
           // First digit — if > 3, it can't start a valid day, auto-pad and advance
@@ -130,6 +133,7 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
             setDd(clamped);
             commit(clamped, mm, yyyy);
             bufferRef.current = '';
+            skipBlurRef.current = true;
             mmRef.current?.focus();
           } else {
             setDd(buf);
@@ -141,6 +145,7 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
           setMm(clamped);
           commit(dd, clamped, yyyy);
           bufferRef.current = '';
+          skipBlurRef.current = true;
           yyRef.current?.focus();
         } else {
           const n = parseInt(buf, 10);
@@ -149,6 +154,7 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
             setMm(clamped);
             commit(dd, clamped, yyyy);
             bufferRef.current = '';
+            skipBlurRef.current = true;
             yyRef.current?.focus();
           } else {
             setMm(buf);
@@ -199,21 +205,24 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
     }
   };
 
-  // On blur: clamp + pad + commit
+  // On blur: clamp + pad + commit (skip if keyDown already handled it)
   const handleDdBlur = () => {
     bufferRef.current = '';
+    if (skipBlurRef.current) { skipBlurRef.current = false; return; }
     const clamped = clamp(parseInt(dd, 10) || 1, 1, 31, 2);
     setDd(clamped);
     commit(clamped, mm, yyyy);
   };
   const handleMmBlur = () => {
     bufferRef.current = '';
+    if (skipBlurRef.current) { skipBlurRef.current = false; return; }
     const clamped = clamp(parseInt(mm, 10) || 1, 1, 12, 2);
     setMm(clamped);
     commit(dd, clamped, yyyy);
   };
   const handleYyyyBlur = () => {
     bufferRef.current = '';
+    if (skipBlurRef.current) { skipBlurRef.current = false; return; }
     let y = parseInt(yyyy, 10);
     if (isNaN(y) || y < 1900) y = new Date().getFullYear();
     if (y > 2100) y = 2100;
