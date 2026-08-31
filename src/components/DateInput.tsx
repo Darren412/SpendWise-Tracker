@@ -34,6 +34,11 @@ function buildIso(dd: string, mm: string, yyyy: string): string {
   return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
+function clamp(val: number, min: number, max: number, pad: number): string {
+  const n = Math.max(min, Math.min(max, isNaN(val) ? min : val));
+  return String(n).padStart(pad, '0');
+}
+
 const segStyle: React.CSSProperties = {
   border: 'none',
   outline: 'none',
@@ -45,27 +50,29 @@ const segStyle: React.CSSProperties = {
   textAlign: 'center',
   caretColor: 'transparent',
   fontVariantNumeric: 'tabular-nums',
+  cursor: 'default',
 };
 
 /**
  * Segmented date input: DD / MM / YYYY
- * Tab moves between segments, then to the next form field.
- * Typing replaces the selected segment value.
+ *
+ * All digit input is handled via onKeyDown to avoid browser selection/timing
+ * issues. The inputs are read-only from React's perspective (value is set by
+ * state only), so there are no race conditions with select() or onChange.
  */
 export default function DateInput({ value, onChange, style, className, onFocus, onBlur }: DateInputProps) {
   const hiddenRef = useRef<HTMLInputElement>(null);
   const ddRef = useRef<HTMLInputElement>(null);
   const mmRef = useRef<HTMLInputElement>(null);
   const yyRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const parts = parseParts(value);
   const [dd, setDd] = useState(parts.dd);
   const [mm, setMm] = useState(parts.mm);
   const [yyyy, setYyyy] = useState(parts.yyyy);
 
-  // Track whether the user has started typing since focus (to clear old value)
-  const freshRef = useRef<'dd' | 'mm' | 'yyyy' | null>(null);
+  // Digit buffer: collects typed digits since last focus. Reset on focus/advance.
+  const bufferRef = useRef('');
 
   // Sync from parent value
   useEffect(() => {
@@ -80,102 +87,87 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
     if (iso) onChange(iso);
   }, [onChange]);
 
-  // Select all text in the input on focus
-  const selectAll = (ref: React.RefObject<HTMLInputElement | null>, seg: 'dd' | 'mm' | 'yyyy') => {
-    freshRef.current = seg;
+  // On focus: reset buffer, visually select text
+  const handleFocus = (ref: React.RefObject<HTMLInputElement | null>) => {
+    bufferRef.current = '';
     setTimeout(() => ref.current?.select(), 0);
   };
 
-  // Clamp and pad a segment value
-  const clamp = (val: string, min: number, max: number, pad: number): string => {
-    let n = parseInt(val, 10);
-    if (isNaN(n)) n = min;
-    n = Math.max(min, Math.min(max, n));
-    return String(n).padStart(pad, '0');
-  };
-
-  // Extract only new digits typed by the user, ignoring stale buffer
-  const extractDigits = (inputValue: string, maxLen: number): string => {
-    const digits = inputValue.replace(/\D/g, '');
-    // If the input has more digits than maxLen, the old value wasn't cleared;
-    // take only the last typed digits (the new ones)
-    return digits.length > maxLen ? digits.slice(-maxLen) : digits;
-  };
-
-  const handleDdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let digits = extractDigits(e.target.value, 2);
-    // If fresh (first keystroke after focus), use only the last digit typed
-    if (freshRef.current === 'dd' && digits.length > 1) {
-      digits = digits.slice(-1);
-    }
-    freshRef.current = null;
-    setDd(digits);
-    // Auto-advance to MM after typing 2 digits
-    if (digits.length === 2) {
-      const clamped = clamp(digits, 1, 31, 2);
-      setDd(clamped);
-      commit(clamped, mm, yyyy);
-      mmRef.current?.focus();
-    }
-  };
-
-  const handleMmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let digits = extractDigits(e.target.value, 2);
-    if (freshRef.current === 'mm' && digits.length > 1) {
-      digits = digits.slice(-1);
-    }
-    freshRef.current = null;
-    setMm(digits);
-    if (digits.length === 2) {
-      const clamped = clamp(digits, 1, 12, 2);
-      setMm(clamped);
-      commit(dd, clamped, yyyy);
-      yyRef.current?.focus();
-    }
-  };
-
-  const handleYyyyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let digits = extractDigits(e.target.value, 4);
-    if (freshRef.current === 'yyyy' && digits.length > 1) {
-      digits = digits.slice(-1);
-    }
-    freshRef.current = null;
-    setYyyy(digits);
-    if (digits.length === 4) {
-      commit(dd, mm, digits);
-    }
-  };
-
-  // On blur of each segment, clamp + pad + commit
-  const handleDdBlur = () => {
-    freshRef.current = null;
-    const clamped = clamp(dd, 1, 31, 2);
-    setDd(clamped);
-    commit(clamped, mm, yyyy);
-  };
-  const handleMmBlur = () => {
-    freshRef.current = null;
-    const clamped = clamp(mm, 1, 12, 2);
-    setMm(clamped);
-    commit(dd, clamped, yyyy);
-  };
-  const handleYyyyBlur = () => {
-    freshRef.current = null;
-    let y = parseInt(yyyy, 10);
-    if (isNaN(y) || y < 1900) y = new Date().getFullYear();
-    if (y > 2100) y = 2100;
-    const padded = String(y).padStart(4, '0');
-    setYyyy(padded);
-    commit(dd, mm, padded);
-  };
-
-  // Arrow up/down to increment/decrement
+  // All digit handling via keyDown — no onChange needed
   const handleKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
     segment: 'dd' | 'mm' | 'yyyy',
   ) => {
+    const isDigit = e.key >= '0' && e.key <= '9';
+
+    if (isDigit) {
+      e.preventDefault();
+      const digit = e.key;
+      const maxLen = segment === 'yyyy' ? 4 : 2;
+
+      // Build up the buffer from scratch since focus
+      bufferRef.current += digit;
+
+      // If buffer exceeds maxLen, keep only the latest digits
+      if (bufferRef.current.length > maxLen) {
+        bufferRef.current = bufferRef.current.slice(-maxLen);
+      }
+
+      const buf = bufferRef.current;
+
+      if (segment === 'dd') {
+        if (buf.length === 2) {
+          const clamped = clamp(parseInt(buf, 10), 1, 31, 2);
+          setDd(clamped);
+          commit(clamped, mm, yyyy);
+          bufferRef.current = '';
+          mmRef.current?.focus();
+        } else {
+          // First digit — if > 3, it can't start a valid day, auto-pad and advance
+          const n = parseInt(buf, 10);
+          if (n > 3) {
+            const clamped = clamp(n, 1, 31, 2);
+            setDd(clamped);
+            commit(clamped, mm, yyyy);
+            bufferRef.current = '';
+            mmRef.current?.focus();
+          } else {
+            setDd(buf);
+          }
+        }
+      } else if (segment === 'mm') {
+        if (buf.length === 2) {
+          const clamped = clamp(parseInt(buf, 10), 1, 12, 2);
+          setMm(clamped);
+          commit(dd, clamped, yyyy);
+          bufferRef.current = '';
+          yyRef.current?.focus();
+        } else {
+          const n = parseInt(buf, 10);
+          if (n > 1) {
+            const clamped = clamp(n, 1, 12, 2);
+            setMm(clamped);
+            commit(dd, clamped, yyyy);
+            bufferRef.current = '';
+            yyRef.current?.focus();
+          } else {
+            setMm(buf);
+          }
+        }
+      } else {
+        setYyyy(buf);
+        if (buf.length === 4) {
+          commit(dd, mm, buf);
+          bufferRef.current = '';
+        }
+      }
+      return;
+    }
+
+    // Arrow up/down
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
+      bufferRef.current = '';
       const delta = e.key === 'ArrowUp' ? 1 : -1;
       if (segment === 'dd') {
         let n = parseInt(dd, 10) + delta;
@@ -193,7 +185,41 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
         const v = String(n);
         setYyyy(v); commit(dd, mm, v);
       }
+      return;
     }
+
+    // Backspace — clear buffer and reset to "0" for the segment
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      bufferRef.current = '';
+      if (segment === 'dd') setDd('');
+      else if (segment === 'mm') setMm('');
+      else setYyyy('');
+      return;
+    }
+  };
+
+  // On blur: clamp + pad + commit
+  const handleDdBlur = () => {
+    bufferRef.current = '';
+    const clamped = clamp(parseInt(dd, 10) || 1, 1, 31, 2);
+    setDd(clamped);
+    commit(clamped, mm, yyyy);
+  };
+  const handleMmBlur = () => {
+    bufferRef.current = '';
+    const clamped = clamp(parseInt(mm, 10) || 1, 1, 12, 2);
+    setMm(clamped);
+    commit(dd, clamped, yyyy);
+  };
+  const handleYyyyBlur = () => {
+    bufferRef.current = '';
+    let y = parseInt(yyyy, 10);
+    if (isNaN(y) || y < 1900) y = new Date().getFullYear();
+    if (y > 2100) y = 2100;
+    const padded = String(y).padStart(4, '0');
+    setYyyy(padded);
+    commit(dd, mm, padded);
   };
 
   const separatorStyle: React.CSSProperties = {
@@ -204,9 +230,11 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
     lineHeight: 1,
   };
 
+  // Suppress onChange since we handle everything in onKeyDown
+  const noop = () => {};
+
   return (
     <div
-      ref={containerRef}
       style={{
         position: 'relative',
         display: 'flex',
@@ -224,13 +252,13 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
         type="text"
         inputMode="numeric"
         value={dd}
-        onChange={handleDdChange}
-        onFocus={() => selectAll(ddRef, 'dd')}
+        onChange={noop}
+        onFocus={() => handleFocus(ddRef)}
         onBlur={handleDdBlur}
         onKeyDown={e => handleKeyDown(e, 'dd')}
-        maxLength={4}
-        style={{ ...segStyle, width: '2ch' }}
+        style={{ ...segStyle, width: '2.2ch' }}
         aria-label="Day"
+        autoComplete="off"
       />
       <span style={separatorStyle}>/</span>
       {/* MM */}
@@ -239,13 +267,13 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
         type="text"
         inputMode="numeric"
         value={mm}
-        onChange={handleMmChange}
-        onFocus={() => selectAll(mmRef, 'mm')}
+        onChange={noop}
+        onFocus={() => handleFocus(mmRef)}
         onBlur={handleMmBlur}
         onKeyDown={e => handleKeyDown(e, 'mm')}
-        maxLength={4}
-        style={{ ...segStyle, width: '2ch' }}
+        style={{ ...segStyle, width: '2.2ch' }}
         aria-label="Month"
+        autoComplete="off"
       />
       <span style={separatorStyle}>/</span>
       {/* YYYY */}
@@ -254,13 +282,13 @@ export default function DateInput({ value, onChange, style, className, onFocus, 
         type="text"
         inputMode="numeric"
         value={yyyy}
-        onChange={handleYyyyChange}
-        onFocus={() => selectAll(yyRef, 'yyyy')}
+        onChange={noop}
+        onFocus={() => handleFocus(yyRef)}
         onBlur={handleYyyyBlur}
         onKeyDown={e => handleKeyDown(e, 'yyyy')}
-        maxLength={8}
-        style={{ ...segStyle, width: '4ch' }}
+        style={{ ...segStyle, width: '4.2ch' }}
         aria-label="Year"
+        autoComplete="off"
       />
 
       {/* Spacer */}
