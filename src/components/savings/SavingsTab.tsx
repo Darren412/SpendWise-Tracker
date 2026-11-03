@@ -71,9 +71,11 @@ function OpportunityCard({
               <P.Icon size={10} /> {P.label} opportunity
             </span>
           </div>
-          <p style={{ fontSize: '0.78rem', color: 'var(--text-500)', marginTop: 4, lineHeight: 1.45 }}>
-            {opp.reasons[0]}
-          </p>
+          {opp.reasons.slice(0, 2).map((r, i) => (
+            <p key={i} style={{ fontSize: '0.78rem', color: 'var(--text-500)', marginTop: 4, lineHeight: 1.45 }}>
+              {r}
+            </p>
+          ))}
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           <div style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--green-600)', fontVariantNumeric: 'tabular-nums' }}>
@@ -89,7 +91,7 @@ function OpportunityCard({
           <div style={statLabel}>{opp.kind === 'subscriptions' ? 'Monthly total' : 'Current'}</div>
           <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-900)' }}>
             {money(opp.currentToDate)}
-            {opp.kind === 'category' && opp.currentToDate !== opp.projectedMonthly && (
+            {opp.kind === 'category' && Math.abs(opp.currentToDate - opp.projectedMonthly) > 0.5 && (
               <span style={{ fontSize: '0.6875rem', fontWeight: 500, color: 'var(--text-400)' }}> → {money(opp.projectedMonthly)}</span>
             )}
           </div>
@@ -181,9 +183,10 @@ function OpportunityCard({
 
 export default function SavingsTab() {
   const {
-    currency,
+    currency, categories,
     dismissOpportunity, restoreOpportunity,
-    muteOpportunityCategory,
+    muteOpportunityCategory, unmuteOpportunityCategory,
+    mutedOpportunityCategories,
   } = useBudgetStore();
   const [window, setWindow] = useState<3 | 6 | 12>(3);
   const [showMethod, setShowMethod] = useState(false);
@@ -327,6 +330,37 @@ export default function SavingsTab() {
               onMute={o.catId ? () => muteOpportunityCategory(o.catId!) : undefined}
             />
           ))}
+        </div>
+      )}
+
+      {/* ── Muted (never-suggested) categories ── */}
+      {mutedOpportunityCategories.length > 0 && (
+        <div className="panel" style={{ padding: '12px 16px', marginTop: 14 }}>
+          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+            Never-suggested categories
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {mutedOpportunityCategories.map(catId => {
+              const cat = categories.find(c => c.id === catId);
+              return (
+                <span key={catId} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-600)',
+                  background: 'var(--bg-subtle)', border: '1px solid var(--border-default)',
+                  borderRadius: 99, padding: '4px 8px 4px 12px',
+                }}>
+                  {cat?.icon} {cat?.name ?? catId}
+                  <button
+                    onClick={() => unmuteOpportunityCategory(catId)}
+                    aria-label={`Unmute ${cat?.name ?? catId}`}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-text)', padding: '2px 6px' }}
+                  >
+                    Unmute
+                  </button>
+                </span>
+              );
+            })}
+          </div>
         </div>
       )}
 

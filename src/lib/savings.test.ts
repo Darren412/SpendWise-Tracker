@@ -115,8 +115,29 @@ describe('analysis period', () => {
     expect(o!.avgMonthly).toBe(1000);
     expect(o!.currentToDate).toBe(1000);
     expect(o!.pctVsAvg).toBe(100);
-    expect(o!.projectedMonthly).toBe(2000); // avgMonthly × (1000/500)
-    expect(o!.estMonthly).toBe(1100);       // 2000 − (1000 × 0.9)
+    expect(o!.habitualPctVsAvg).toBe(100);
+    // additive projection: habitual baseline 1000 + excess 500 = 1500
+    expect(o!.habitualProjected).toBe(1500);
+    expect(o!.projectedMonthly).toBe(1500);
+    expect(o!.estMonthly).toBe(600);        // 1500 − (1000 × 0.9)
+  });
+
+  it('below-pace months project the typical remainder, floored at spend to date', () => {
+    // baseline 500 early + 500 late; July only 200 so far → projected = 1000 − 300
+    const a = analyzeSavings(base({
+      expenses: [
+        ...monthSpend('dining', '2026-04', [[500, 3], [500, 20]]),
+        ...monthSpend('dining', '2026-05', [[500, 3], [500, 20]]),
+        ...monthSpend('dining', '2026-06', [[500, 3], [500, 20]]),
+        ...monthSpend('dining', '2026-07', [[200, 3]]),
+      ],
+      categoryBudgets: { dining: 150 }, // over budget → signal (c) keeps the opp
+    }));
+    const o = opp(a, 'cat:dining');
+    expect(o).toBeDefined();
+    expect(o!.habitualProjected).toBe(700);   // max(200, 1000 − 300)
+    expect(o!.projectedMonthly).toBe(700);
+    expect(o!.estMonthly).toBe(550);          // habitual 700 − budget target 150
   });
 });
 
@@ -174,7 +195,7 @@ describe('essential categories', () => {
 });
 
 describe('anomaly handling', () => {
-  it('one-off spike downgrades a level and is excluded from the estimate', () => {
+  it('one-off spike is excluded from the habitual % and the estimate', () => {
     // baseline dining: 10 txns of ~200/mo → mean 200, small sd; June: 10×200 + one ₹3,000 spike
     const pattern: [number, number][] = [[180, 2], [190, 4], [200, 6], [210, 8], [220, 10], [180, 12], [190, 14], [200, 16], [210, 18], [220, 20]];
     const a = analyzeSavings(base({
@@ -189,10 +210,58 @@ describe('anomaly handling', () => {
     }));
     const o = opp(a, 'cat:dining');
     expect(o).toBeDefined();
-    expect(o!.priority).toBe('Medium');           // +150% would be High, downgraded one level
+    // overall spend is +150% vs avg, but habitual spend is flat → Low tier
+    expect(o!.pctVsAvg).toBe(150);
+    expect(o!.habitualPctVsAvg).toBe(0);
+    expect(o!.priority).toBe('Low');
     expect(o!.anomalyTxnIds).toHaveLength(1);
+    const reasons = o!.reasons.join(' ');
+    expect(reasons).toContain('unusual expense');
+    expect(reasons).toContain('vs usual');         // "Excluding one unusual expense … +0% vs usual"
+    expect(reasons).toContain('may not repeat');   // anomaly ≥50% of overall above-avg
+    expect(o!.estMonthly).toBe(500);               // 10 small txns → 2000 − 25% of 2000
+    expect(o!.habitualToDate).toBe(2000);          // spike removed
+  });
+
+  it('uniform-ish grocery spend never trips the anomaly rule (median check)', () => {
+    // baseline 2000/2400/3200 → mean+2σ ≈ 3531, median 2400 → 4400 is >2σ but <2×median
+    const pattern: [number, number][] = [[2000, 3], [2400, 12], [3200, 22]];
+    const a = analyzeSavings(base({
+      expenses: [
+        ...monthSpend('groc', '2026-03', pattern),
+        ...monthSpend('groc', '2026-04', pattern),
+        ...monthSpend('groc', '2026-05', pattern),
+        ...monthSpend('groc', '2026-06', [[2000, 3], [2400, 12], [4400, 20]]),
+      ],
+      ...JUNE,
+    }));
+    const o = opp(a, 'cat:groc');
+    expect(o).toBeDefined(); // +15.8% habitual → Medium via signal (a)
+    expect(o!.anomalyTxnIds).toHaveLength(0);
+    expect(o!.reasons.join(' ')).not.toContain('unusual');
+    expect(o!.habitualPctVsAvg).toBeCloseTo(15.8, 1);
+  });
+
+  it('a large one-off against small typical txns IS an anomaly', () => {
+    // June = habitual 2590 (+30% → signal a) + a ₹5,000 one-off
+    const pattern: [number, number][] = [[380, 3], [400, 8], [420, 13], [400, 19], [390, 25]];
+    const a = analyzeSavings(base({
+      expenses: [
+        ...monthSpend('dining', '2026-03', pattern),
+        ...monthSpend('dining', '2026-04', pattern),
+        ...monthSpend('dining', '2026-05', pattern),
+        ...monthSpend('dining', '2026-06', pattern),
+        exp('dining', 600, '2026-06-16'),
+        exp('dining', 5000, '2026-06-15', 'anniversary'),
+      ],
+      ...JUNE,
+    }));
+    const o = opp(a, 'cat:dining');
+    expect(o).toBeDefined();
+    expect(o!.anomalyTxnIds).toHaveLength(1);
+    expect(o!.habitualToDate).toBe(2590); // spike excluded from habitual
+    expect(o!.habitualPctVsAvg).toBeCloseTo(30.2, 0);
     expect(o!.reasons.join(' ')).toContain('unusual expense');
-    expect(o!.estMonthly).toBe(200);              // habitual 2000 − (2000 × 0.9); spike excluded
   });
 });
 
@@ -352,11 +421,34 @@ describe('worked example (6-month realistic dataset)', () => {
       // eslint-disable-next-line no-console
       console.log(JSON.stringify(a.opportunities.map(o => ({
         id: o.id, name: o.name, priority: o.priority, pctVsAvg: o.pctVsAvg,
+        habitualPctVsAvg: o.habitualPctVsAvg ?? null,
+        projectedMonthly: o.projectedMonthly,
         estMonthly: o.estMonthly, estAnnual: o.estAnnual, score: o.score,
         suggestedReductionPct: o.suggestedReductionPct, reasons: o.reasons,
       })), null, 1));
       expect(a.opportunities.length).toBeGreaterThan(0);
       expect(a.opportunities.every(o => o.estMonthly % 10 === 0)).toBe(true);
+
+      // Sanity bound: no estimate can exceed the spend it applies to, and the
+      // total can't exceed habitual projections + non-essential recurring
+      const nonEssRecurring = opp(a, 'subscriptions')?.subscriptionItems
+        ?.filter(i => !i.isEssential).reduce((s, i) => s + i.monthly, 0) ?? 0;
+      for (const o of a.opportunities) {
+        const base = o.kind === 'subscriptions' ? nonEssRecurring : (o.habitualProjected ?? Infinity);
+        expect(o.estMonthly).toBeLessThanOrEqual(Math.floor(base));
+      }
+      const catBase = a.opportunities.reduce((s, o) =>
+        s + (o.kind === 'subscriptions' ? nonEssRecurring : (o.habitualProjected ?? 0)), 0);
+      expect(a.potentialMonthly).toBeLessThanOrEqual(Math.floor(catBase));
+
+      // Expected headline numbers for this fixture
+      expect(opp(a, 'cat:fun')!.estMonthly).toBe(1770);       // habitual 2850 − target 1080
+      expect(opp(a, 'cat:fun')!.priority).toBe('High');
+      expect(opp(a, 'cat:dining')!.estMonthly).toBe(2300);    // habitual 5900 − target 3600
+      expect(opp(a, 'cat:dining')!.habitualPctVsAvg).toBeCloseTo(126.7, 1);
+      expect(opp(a, 'cat:groc')!.estMonthly).toBe(1500);      // habitual 9100 − target 7600
+      expect(opp(a, 'subscriptions')!.priority).toBe('Low');  // only ₹999 non-essential
+      expect(a.potentialMonthly).toBe(1770 + 2300 + 1500 + 250);
     }
   });
 });

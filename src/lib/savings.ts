@@ -54,6 +54,10 @@ export interface Opportunity {
   avg12: number | null;
   diffAmount: number;
   pctVsAvg: number | null;
+  habitualToDate?: number;         // excluding recurring + one-offs
+  habitualBaselineToDate?: number;
+  habitualProjected?: number;      // additive month-end projection on habitual spend
+  habitualPctVsAvg?: number | null;  // tiers/score use this (1 decimal)
   txnCount: number;
   suggestedReductionPct: number;
   suggestedTarget: number;
@@ -71,6 +75,7 @@ export interface Opportunity {
   recurringRuleIds: string[];
   /** subscriptions kind only: monthly-equivalent line items */
   subscriptionItems?: { key: string; name: string; catId?: string; monthly: number; isEssential: boolean; fromRule: boolean }[];
+  essentialRecurringTotal?: number;  // subs opp: essential monthly total (excluded from estimate)
   history: { key: string; label: string; amount: number }[];
   includedInTotal: boolean;
 }
@@ -151,9 +156,6 @@ function enumeratePeriods(month: string, year: number, count: number, cycleStart
   return out;
 }
 
-function prevPriority(p: OpportunityPriority): OpportunityPriority {
-  return p === 'High' ? 'Medium' : 'Low';
-}
 const PRIORITY_RANK: Record<OpportunityPriority, number> = { High: 3, Medium: 2, Low: 1 };
 
 const CLASS_WEIGHT: Record<SpendClass, number> = { discretionary: 1, flexible: 0.75, essential: 0.4 };
@@ -297,28 +299,32 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
   interface CatMetrics {
     cat: Category;
     cls: SpendClass;
-    monthly: number[];             // baseline monthly spend
-    recurringMonthly: number[];    // baseline recurring spend per month
+    monthly: number[];                // baseline monthly spend
+    recurringMonthly: number[];       // baseline recurring spend per month
     avgMonthly: number;
     avgToDate: number;
     currentToDate: number;
     txnCount: number;
-    recurringSpend: number;
+    recurringSpend: number;           // recurring spend so far this period
     recurringTxns: Expense[];
     anomalySpend: number;
     anomalyTxns: Expense[];
     smallTxns: Expense[];
-    pctVsAvg: number | null;
-    amountAboveAvg: number;
-    projectedMonthly: number;
-    projectionFactor: number;
+    pctVsAvg: number | null;          // overall vs baseline to-date (display)
+    amountAboveAvg: number;           // overall (display)
+    habitualToDate: number;
+    habitualBaselineToDate: number;
+    habitualBaselineMonthly: number;
+    habitualPctVsAvg: number | null;  // tiers, score and signal (a) use this
+    habitualAboveAvg: number;
+    habitualProjected: number;
+    recurringMonthlyExpected: number; // recurring part of the projected month-end
+    projectedMonthly: number;         // display: habitual + recurring + anomalies
     budget: number;
     budgetUsedPct: number | null;
     consistentlyOverBudget: boolean;
     frequentSmall: boolean;
     smallProjectedSum: number;
-    habitualProjected: number;
-    habitualBaseline: number;
   }
 
   const metrics: CatMetrics[] = expenseCats.map(cat => {
@@ -332,26 +338,83 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
     const recurringTxns = catTxns.filter(isRecurringTxn);
     const recurringSpend = recurringTxns.reduce((s, e) => s + e.amount, 0);
 
-    const baselineCatTxns = baseline.flatMap(p => (byPeriod.get(p.key) ?? []).filter(e => e.category === cat.id));
-    let anomalyTxns: Expense[] = [];
-    if (baselineCatTxns.length >= 5) {
-      const mu = mean(baselineCatTxns.map(e => e.amount));
-      const sigma = sd(baselineCatTxns.map(e => e.amount), mu);
-      if (sigma > 0) anomalyTxns = catTxns.filter(e => e.amount > mu + 2 * sigma);
-    }
+    // Baseline txns of this category (with their period for to-date math)
+    const baselineCatTxns = baseline.flatMap(p =>
+      (byPeriod.get(p.key) ?? [])
+        .filter(e => e.category === cat.id)
+        .map(e => ({ e, p })));
+
+    // Anomaly rule: ALL of > mean + 2·sd, ≥ 2× baseline median, ≥5 txns, sd > 0
+    const baseAmounts = baselineCatTxns.map(t => t.e.amount);
+    const mu = mean(baseAmounts);
+    const sigma = sd(baseAmounts, mu);
+    const med = median(baseAmounts);
+    const anomalyRuleOn = baselineCatTxns.length >= 5 && sigma > 0;
+    const isAnomalyAmt = (amt: number) => anomalyRuleOn && amt > mu + 2 * sigma && amt >= 2 * med;
+    // A txn counts in exactly one bucket — recurring wins over anomaly
+    const anomalyTxns = catTxns.filter(e => !isRecurringTxn(e) && isAnomalyAmt(e.amount));
     const anomalySpend = anomalyTxns.reduce((s, e) => s + e.amount, 0);
 
-    const smallTxns = catTxns.filter(e => e.amount <= smallThreshold);
+    const smallTxns = catTxns.filter(e => e.amount <= smallThreshold && !isRecurringTxn(e));
     const smallSum = smallTxns.reduce((s, e) => s + e.amount, 0);
+
+    // Baseline recurring detection (same rule applied inside the baseline window)
+    const isRecurringBase = (e: Expense) => !!e.recurringId || (() => {
+      const nd = normDesc(e.description);
+      const per = baselineSeries.get(nd);
+      if (!per || per.size < 2) return false;
+      const amounts = [...per.values()];
+      if (!amountsWithin15(amounts)) return false;
+      const avg = mean(amounts);
+      return Math.abs(e.amount - avg) <= 0.15 * avg;
+    })();
+
+    const recurringMonthly = baseline.map(p =>
+      baselineCatTxns.filter(t => t.p.key === p.key && isRecurringBase(t.e))
+        .reduce((s, t) => s + t.e.amount, 0));
+    const anomalyMonthly = baseline.map(p =>
+      baselineCatTxns.filter(t => t.p.key === p.key && !isRecurringBase(t.e) && isAnomalyAmt(t.e.amount))
+        .reduce((s, t) => s + t.e.amount, 0));
+
+    const recurringBaselineAvg = mean(recurringMonthly);
+    const anomalyBaselineAvg = mean(anomalyMonthly);
+    const habitualBaselineMonthly = Math.max(0, avgMonthly - recurringBaselineAvg - anomalyBaselineAvg);
+
+    // Baseline habitual spend within the first elapsedDays of each baseline month
+    const nDays = (p: PeriodMeta) => Math.min(elapsedDays, p.totalDays);
+    const habitualBaselineToDate = inProgress
+      ? Math.max(0, mean(baseline.map(p => {
+          const inWindow = baselineCatTxns.filter(t => t.p.key === p.key && dayOfPeriod(p, t.e.date) <= nDays(p));
+          const tot = inWindow.reduce((s, t) => s + t.e.amount, 0);
+          const rec = inWindow.filter(t => isRecurringBase(t.e)).reduce((s, t) => s + t.e.amount, 0);
+          const ano = inWindow.filter(t => !isRecurringBase(t.e) && isAnomalyAmt(t.e.amount)).reduce((s, t) => s + t.e.amount, 0);
+          return tot - rec - ano;
+        })))
+      : habitualBaselineMonthly;
+
+    // ── Habitual decomposition of the analysed period ───────────────────────
+    const habitualToDate = Math.max(0, currentToDate - recurringSpend - anomalySpend);
+    const habitualAboveAvg = habitualToDate - habitualBaselineToDate;
+    const habitualPctVsAvg = habitualBaselineToDate > 0
+      ? (habitualAboveAvg / habitualBaselineToDate) * 100 : null;
+
+    // Additive projection — "if the rest of the month is typical"
+    const habitualProjected = !inProgress
+      ? habitualToDate
+      : habitualAboveAvg >= 0
+        ? habitualBaselineMonthly + habitualAboveAvg
+        : Math.max(habitualToDate, habitualBaselineMonthly - Math.abs(habitualAboveAvg));
+
+    // Displayed month-end projection = habitual + expected recurring + one-offs
+    const recurringMonthlyExpected = inProgress
+      ? Math.max(recurringBaselineAvg, recurringSpend)
+      : recurringSpend;
+    const projectedMonthly = !inProgress
+      ? currentToDate
+      : habitualProjected + recurringMonthlyExpected + anomalySpend;
 
     const pctVsAvg = avgToDate > 0 ? ((currentToDate - avgToDate) / avgToDate) * 100 : null;
     const amountAboveAvg = currentToDate - avgToDate;
-    const projectedMonthly = !inProgress
-      ? currentToDate
-      : avgToDate > 0
-        ? avgMonthly * (currentToDate / avgToDate)
-        : currentToDate / elapsedFraction;
-    const projectionFactor = currentToDate > 0 ? projectedMonthly / currentToDate : 1;
 
     const budget = input.spendingTargets[cat.id]?.target ?? input.categoryBudgets[cat.id] ?? 0;
     const budgetUsedPct = budget > 0 ? (currentToDate / budget) * 100 : null;
@@ -360,33 +423,18 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
       last3Complete.filter(p => spend(p, cat.id) > budget).length >= 2;
 
     const frequentSmall = smallTxns.length >= 8 && smallSum >= 0.05 * avgTotalMonthly;
-    const smallProjectedSum = smallSum * projectionFactor;
-
-    // baseline recurring spend per month (same detection, baseline context)
-    const recurringMonthly = baseline.map(p =>
-      (byPeriod.get(p.key) ?? [])
-        .filter(e => e.category === cat.id)
-        .filter(e => !!e.recurringId || (() => {
-          const nd = normDesc(e.description);
-          const per = baselineSeries.get(nd);
-          if (!per || per.size < 2) return false;
-          const amounts = [...per.values()];
-          if (!amountsWithin15(amounts)) return false;
-          const avg = mean(amounts);
-          return Math.abs(e.amount - avg) <= 0.15 * avg;
-        })())
-        .reduce((s, e) => s + e.amount, 0));
-
-    const recurringProjected = recurringSpend * projectionFactor;
-    const habitualProjected = Math.max(0, projectedMonthly - recurringProjected - anomalySpend);
-    const habitualBaseline = Math.max(0, avgMonthly - mean(recurringMonthly));
+    // small-purchase sum projected the same way habitual spend projects
+    const smallFactor = habitualToDate > 0 ? habitualProjected / habitualToDate : (inProgress ? 1 / elapsedFraction : 1);
+    const smallProjectedSum = smallSum * smallFactor;
 
     return {
       cat, cls: getSpendClass(cat), monthly, recurringMonthly, avgMonthly, avgToDate,
       currentToDate, txnCount: catTxns.length, recurringSpend, recurringTxns,
       anomalySpend, anomalyTxns, smallTxns, pctVsAvg, amountAboveAvg,
-      projectedMonthly, projectionFactor, budget, budgetUsedPct, consistentlyOverBudget,
-      frequentSmall, smallProjectedSum, habitualProjected, habitualBaseline,
+      habitualToDate, habitualBaselineToDate, habitualBaselineMonthly,
+      habitualPctVsAvg, habitualAboveAvg, habitualProjected, recurringMonthlyExpected,
+      projectedMonthly, budget, budgetUsedPct, consistentlyOverBudget,
+      frequentSmall, smallProjectedSum,
     };
   });
 
@@ -400,7 +448,9 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
 
     const isNewCategory = m.pctVsAvg === null;
     const materiality = Math.max(0.01 * avgTotalMonthly, 200);
-    const signalA = !isNewCategory && m.pctVsAvg! >= 10 && m.amountAboveAvg >= materiality;
+    // Signal (a) runs on habitual spend — recurring and one-offs excluded
+    const signalA = !isNewCategory && m.habitualPctVsAvg !== null
+      && m.habitualPctVsAvg >= 10 && m.habitualAboveAvg >= materiality;
     const signalANew = isNewCategory && m.currentToDate >= 0.05 * avgTotalMonthly;
     const signalB = m.frequentSmall && m.cls !== 'essential';
     const signalC = m.consistentlyOverBudget || (m.budgetUsedPct !== null && m.budgetUsedPct >= 100);
@@ -408,23 +458,25 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
 
     let fires = false;
     if (m.cls === 'essential') {
-      fires = !isNewCategory && m.pctVsAvg! >= 30 && !anomalyDriven && signalA;
+      fires = !isNewCategory && m.habitualPctVsAvg !== null
+        && m.habitualPctVsAvg >= 30 && !anomalyDriven && signalA;
     } else {
       fires = signalA || signalB || signalC;
     }
     if (signalANew) fires = m.cls !== 'essential'; // new-category path
     if (!fires) continue;
 
-    // ── Tier ──
+    // ── Tier from habitual change (one-offs don't lift the tier) ────────────
     let priority: OpportunityPriority =
-      m.pctVsAvg === null ? 'Low' : m.pctVsAvg > 20 ? 'High' : m.pctVsAvg >= 10 ? 'Medium' : 'Low';
-    if (m.cls === 'essential' && priority === 'High' && !(m.pctVsAvg! > 50)) priority = 'Medium';
-    if (anomalyDriven) priority = prevPriority(priority);
+      m.habitualPctVsAvg === null ? 'Low'
+      : m.habitualPctVsAvg > 20 ? 'High'
+      : m.habitualPctVsAvg >= 10 ? 'Medium' : 'Low';
+    if (m.cls === 'essential' && priority === 'High' && !(m.habitualPctVsAvg! > 50)) priority = 'Medium';
 
     // ── Score ──
     const sb = {
-      pct: Math.min(35, Math.max(0, m.pctVsAvg ?? 0) * 0.7),
-      materiality: Math.min(20, (Math.max(0, m.amountAboveAvg) / (avgTotalMonthly || 1)) * 100 * 2),
+      pct: Math.min(35, Math.max(0, m.habitualPctVsAvg ?? 0) * 0.7),
+      materiality: Math.min(20, (Math.max(0, m.habitualAboveAvg) / (avgTotalMonthly || 1)) * 100 * 2),
       frequency: m.frequentSmall ? 10 : 0,
       budget: m.consistentlyOverBudget ? 15 : (m.budgetUsedPct !== null && m.budgetUsedPct >= 100 ? 8 : 0),
       recurring: 0,
@@ -438,7 +490,7 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
     // ── Suggested target & savings (habitual, non-recurring spend only) ──────
     let target: number;
     if (signalA) {
-      target = m.habitualBaseline * (1 - CLASS_REDUCTION[m.cls]);
+      target = m.habitualBaselineMonthly * (1 - CLASS_REDUCTION[m.cls]);
     } else if (signalANew) {
       // no credible baseline — suggest trimming projected habitual spend by the class %
       target = m.habitualProjected * (1 - CLASS_REDUCTION[m.cls]);
@@ -449,7 +501,10 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
       target = m.budget;
     }
     target = Math.max(0, Math.min(target, m.habitualProjected));
-    const estMonthly = Math.max(0, round10(m.habitualProjected - target));
+    const estMonthly = Math.min(
+      Math.max(0, round10(m.habitualProjected - target)),
+      Math.max(0, Math.floor(m.habitualProjected)),
+    );
     const estAnnual = estMonthly * 12;
     const suggestedReductionPct = m.habitualProjected > 0
       ? round1((estMonthly / m.habitualProjected) * 100) : 0;
@@ -458,11 +513,25 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
 
     // ── Reasons & method ──
     const reasons: string[] = [];
+    const fmtDay = (iso: string) =>
+      new Date(iso + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
     if (isNewCategory) {
       reasons.push(`${m.cat.name} is a new spending category — ${money(m.currentToDate)} so far this month with no prior history.`);
     } else if (m.pctVsAvg !== null) {
       const dir = m.pctVsAvg >= 0 ? 'higher' : 'lower';
       reasons.push(`${m.cat.name} spending is ${money(m.currentToDate)} so far this month, ${Math.abs(round1(m.pctVsAvg))}% ${dir} than the ${windowText} for this point in the month (${money(m.avgToDate)}).`);
+    }
+    if (m.habitualPctVsAvg !== null && (m.anomalySpend > 0 || m.recurringSpend > 0)) {
+      const parts: string[] = [];
+      if (m.anomalyTxns.length > 0) {
+        const a = m.anomalyTxns.reduce((x, y) => (y.amount > x.amount ? y : x));
+        parts.push(`one unusual expense (${money(a.amount)} on ${fmtDay(a.date)})`);
+      }
+      if (m.recurringSpend > 0) parts.push('recurring payments');
+      reasons.push(`Excluding ${parts.join(' and ')}, you're ${m.habitualPctVsAvg >= 0 ? '+' : ''}${round1(m.habitualPctVsAvg)}% vs usual.`);
+    }
+    if (inProgress) {
+      reasons.push(`If the rest of the month is typical, you'll spend about ${money(m.projectedMonthly)}.`);
     }
     if (m.frequentSmall) {
       reasons.push(`You spent ${money(m.smallTxns.reduce((s, e) => s + e.amount, 0))} on ${m.smallTxns.length} small purchases (≤ ${money(smallThreshold)} each).`);
@@ -476,8 +545,10 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
 
     const method = `Baseline: ${windowText} (${baselineLabels.join(', ')}). ` +
       (inProgress
-        ? `Same-point comparison: average of baseline spend in the first ${elapsedDays} days of each period. Projected month-end = ${money(m.projectedMonthly)} at current pace. ` : '') +
-      `Suggested target = ${signalA ? `baseline habitual spend (${money(m.habitualBaseline)}) minus ${Math.round(CLASS_REDUCTION[m.cls] * 100)}%` :
+        ? `Same-point comparison: average of baseline spend in the first ${elapsedDays} days of each period. ` +
+          `If the rest of the month is typical, projected month-end = ${money(m.projectedMonthly)} ` +
+          `(habitual ${money(m.habitualProjected)} + recurring ${money(m.recurringMonthlyExpected)} + one-offs ${money(m.anomalySpend)}). ` : '') +
+      `Suggested target = ${signalA ? `baseline habitual spend (${money(m.habitualBaselineMonthly)}) minus ${Math.round(CLASS_REDUCTION[m.cls] * 100)}%` :
         signalANew ? `projected habitual spend minus ${Math.round(CLASS_REDUCTION[m.cls] * 100)}%` :
         signalB ? 'projected habitual spend minus a quarter of small-purchase spend' : `your budget (${money(m.budget)})`}. ` +
       `Estimates exclude recurring payments and one-off spikes.`;
@@ -499,6 +570,10 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
       avg12: avgN(12, m.cat.id),
       diffAmount: m.amountAboveAvg,
       pctVsAvg: m.pctVsAvg === null ? null : round1(m.pctVsAvg),
+      habitualToDate: m.habitualToDate,
+      habitualBaselineToDate: m.habitualBaselineToDate,
+      habitualProjected: m.habitualProjected,
+      habitualPctVsAvg: m.habitualPctVsAvg === null ? null : round1(m.habitualPctVsAvg),
       txnCount: m.txnCount,
       suggestedReductionPct,
       suggestedTarget: target,
@@ -565,12 +640,22 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
       fromRule: false,
     });
   }
-  const subsTotal = subItems.reduce((s, i) => s + i.monthly, 0);
+  const subsEssential = subItems.filter(i => i.isEssential).reduce((s, i) => s + i.monthly, 0);
   const subsNonEssential = subItems.filter(i => !i.isEssential).reduce((s, i) => s + i.monthly, 0);
-  if (subsTotal > 0) {
-    const subPriority: OpportunityPriority = subsTotal >= 0.05 * avgTotalMonthly ? 'Medium' : 'Low';
-    const estMonthly = Math.max(0, round10(0.25 * subsNonEssential));
+  if (subsNonEssential > 0) {
+    const subPriority: OpportunityPriority = subsNonEssential >= 0.05 * avgTotalMonthly ? 'Medium' : 'Low';
+    const estMonthly = Math.min(Math.max(0, round10(0.25 * subsNonEssential)), Math.floor(subsNonEssential));
     if (!(estMonthly < 50 && PRIORITY_RANK[subPriority] < PRIORITY_RANK.Medium)) {
+      const biggestEssential = subItems.filter(i => i.isEssential).sort((a, b) => b.monthly - a.monthly)[0];
+      const reasons = [
+        `Non-essential subscriptions & recurring payments total ${money(subsNonEssential)}/month. Review them for potential savings.`,
+        ...(subsEssential > 0
+          ? [`${money(subsEssential)}/month of essential recurring payments${biggestEssential ? ` (e.g. ${biggestEssential.name})` : ''} are listed but not counted.`]
+          : []),
+        `Savings estimate assumes cancelling or downgrading about a quarter of them.`,
+      ];
+      // capped at 60 — subscriptions never outrank a strong behavioural signal
+      const subScore = clamp(Math.round((subsNonEssential / (avgTotalMonthly || 1)) * 100 * 2) * 1.0, 0, 60);
       const subOpp: Opportunity = {
         id: 'subscriptions',
         kind: 'subscriptions',
@@ -578,26 +663,24 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
         icon: '🔁',
         color: 'var(--purple-500)',
         spendClass: null,
-        currentToDate: subItems.reduce((s, i) => s + i.monthly, 0),
-        projectedMonthly: subsTotal,
-        avgMonthly: subsTotal,
-        avgToDate: subsTotal,
+        currentToDate: subsNonEssential,
+        projectedMonthly: subsNonEssential,
+        avgMonthly: subsNonEssential,
+        avgToDate: subsNonEssential,
         avg3: null, avg6: null, avg12: null,
         diffAmount: 0,
         pctVsAvg: null,
         txnCount: subItems.length,
         suggestedReductionPct: 25,
-        suggestedTarget: subsTotal - 0.25 * subsNonEssential,
+        suggestedTarget: subsNonEssential * 0.75,
         estMonthly,
         estAnnual: estMonthly * 12,
-        score: clamp(Math.round((subsTotal / (avgTotalMonthly || 1)) * 100 * 2 + 10), 0, 100),
-        scoreBreakdown: { pct: 0, materiality: Math.min(20, (subsTotal / (avgTotalMonthly || 1)) * 100 * 2), frequency: 0, budget: 0, recurring: 0, anomalyPenalty: 0, classWeight: 1 },
+        score: subScore,
+        scoreBreakdown: { pct: 0, materiality: Math.min(60, (subsNonEssential / (avgTotalMonthly || 1)) * 100 * 2), frequency: 0, budget: 0, recurring: 0, anomalyPenalty: 0, classWeight: 1 },
         priority: subPriority,
-        reasons: [
-          `Subscriptions & recurring payments total ${money(subsTotal)}/month. Review them for potential savings.`,
-          `Savings estimate assumes cancelling or downgrading about a quarter of them.`,
-        ],
-        method: `Monthly-equivalent of ${activeRules.length} active recurring rule${activeRules.length === 1 ? '' : 's'} plus detected subscription-like spending (same amount in ≥2 of the last 3 months). Essential subscriptions are listed but excluded from the estimate.`,
+        reasons,
+        method: `Monthly-equivalent of ${activeRules.length} active recurring rule${activeRules.length === 1 ? '' : 's'} plus detected subscription-like spending (same amount in ≥2 of the last 3 months). Essential subscriptions are listed but excluded from the estimate. Score = 2× the non-essential share of your average monthly spend, capped at 60.`,
+        essentialRecurringTotal: subsEssential,
         relatedTxnIds: periodTxns.filter(e => !!e.recurringId).map(e => e.id),
         anomalyTxnIds: [],
         smallTxnIds: [],

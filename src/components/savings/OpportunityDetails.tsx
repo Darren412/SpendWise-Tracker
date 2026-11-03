@@ -112,6 +112,11 @@ export default function OpportunityDetails({
                   </div>
                 ))}
               </div>
+              {(opp.essentialRecurringTotal ?? 0) > 0 && (
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-400)', marginTop: 6 }}>
+                  {money(opp.essentialRecurringTotal!)}/month of essential recurring payments is excluded from the savings estimate.
+                </div>
+              )}
             </div>
           )}
 
