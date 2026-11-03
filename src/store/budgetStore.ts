@@ -1,12 +1,13 @@
 'use client';
 
 import { create } from 'zustand';
-import { Expense, Income, Category, RecurringRule, RecurrenceFrequency, SavingsGoal, BudgetAlertThresholds, SpendingTarget } from '@/types';
+import { Expense, Income, Category, RecurringRule, RecurrenceFrequency, SavingsGoal, BudgetAlertThresholds, SpendingTarget, OpeningBalanceBaseline } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { getFinancialPeriod, getCurrentFinancialPeriod, todayLocalISO } from '@/utils/financialCycle';
 import { generateDue, resumeRule, mergeRecurringRules } from '@/lib/recurring';
 import { moveById } from '@/lib/categoryOrder';
 import { validateThresholds, pruneKeys } from '@/lib/budgetAlerts';
+import { validateBaseline } from '@/lib/balance';
 import {
   getStoredTheme, setStoredTheme, applyTheme, resolveTheme, ThemePreference,
 } from '@/lib/theme';
@@ -82,6 +83,10 @@ interface BudgetStore {
   unmuteOpportunityCategory: (catId: string) => void;
   setSpendingTarget: (catId: string, target: { target: number; baselineMonthly: number }) => void;
   removeSpendingTarget: (catId: string, alsoRemoveBudget: boolean) => void;
+  // Annual opening balance — derived ledger lives in useBalanceLedger
+  openingBalance: OpeningBalanceBaseline | null;
+  setOpeningBalance: (input: { startYear: number; amount: number; effectiveDate: string }) => void;
+  clearOpeningBalance: () => void;
   themePreference: ThemePreference;
   setThemePreference: (p: ThemePreference) => void;
   selectedCategoryIds: string[];
@@ -209,6 +214,7 @@ interface UserSettings {
   dismissedOpportunities?: string[];
   mutedOpportunityCategories?: string[];
   spendingTargets?: Record<string, SpendingTarget>;
+  openingBalance?: OpeningBalanceBaseline | null;
   themePreference?: ThemePreference;
 }
 
@@ -372,7 +378,7 @@ function getLatestSyncPayload(): RemoteData {
     currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
     selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
     acknowledgedAlerts, notifiedAlerts, dismissedOpportunities, mutedOpportunityCategories,
-    spendingTargets, themePreference,
+    spendingTargets, openingBalance, themePreference,
   } = useBudgetStore.getState();
   return {
     expenses, income, categories, recurring, goals,
@@ -380,7 +386,7 @@ function getLatestSyncPayload(): RemoteData {
       currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
       selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
       acknowledgedAlerts, notifiedAlerts, dismissedOpportunities, mutedOpportunityCategories,
-      spendingTargets, themePreference,
+      spendingTargets, openingBalance, themePreference,
     },
   };
 }
@@ -635,7 +641,7 @@ async function loadFromSupabase() {
       currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
       selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
       acknowledgedAlerts, notifiedAlerts, dismissedOpportunities, mutedOpportunityCategories,
-      spendingTargets, themePreference,
+      spendingTargets, openingBalance, themePreference,
     } = useBudgetStore.getState();
     const migrated: RemoteData = {
       expenses:   cycled.expenses,
@@ -647,7 +653,7 @@ async function loadFromSupabase() {
         currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
         selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
         acknowledgedAlerts, notifiedAlerts, dismissedOpportunities, mutedOpportunityCategories,
-        spendingTargets, themePreference,
+        spendingTargets, openingBalance, themePreference,
       },
     };
 
@@ -758,6 +764,20 @@ async function loadFromSupabase() {
         }
       }
       settingsUpdate.spendingTargets = cleanTargets;
+    }
+    if ('openingBalance' in remoteSettings) {
+      const ob = remoteSettings.openingBalance;
+      if (ob === null) {
+        settingsUpdate.openingBalance = null;
+      } else if (ob && typeof ob === 'object'
+          && typeof ob.createdAt === 'string' && typeof ob.updatedAt === 'string'
+          && Object.keys(validateBaseline(
+            { startYear: ob.startYear, amount: ob.amount, effectiveDate: ob.effectiveDate },
+            remoteSettings.financialCycleStart ?? useBudgetStore.getState().financialCycleStart,
+          )).length === 0) {
+        settingsUpdate.openingBalance = ob;
+      }
+      // invalid shape → keep current value (don't trust the remote blob)
     }
     if (isValidTheme(remoteSettings.themePreference)
         && remoteSettings.themePreference !== useBudgetStore.getState().themePreference) {
@@ -879,6 +899,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   dismissedOpportunities: [],
   mutedOpportunityCategories: [],
   spendingTargets: {},
+  openingBalance: null,
   themePreference: getStoredTheme(),
   financialCycleStart: initCycleStart,
   monthlyBudgets: typeof window !== 'undefined' ? (() => { try { const raw = localStorage.getItem('spendwise_monthly_budgets'); if (raw) return JSON.parse(raw); const legacy = parseFloat(localStorage.getItem('spendwise_monthly_budget') ?? '0'); return legacy > 0 ? { _default: legacy } : {}; } catch { return {}; } })() : {},
@@ -1326,6 +1347,28 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
       if (alsoRemoveBudget) delete categoryBudgets[catId];
       return { spendingTargets, categoryBudgets };
     });
+    scheduleSyncToSupabase();
+  },
+
+  // ── Annual opening balance ────────────────────────────────────────────────
+  setOpeningBalance: (input: { startYear: number; amount: number; effectiveDate: string }) => {
+    // second line of defence — the modal already runs the same validation
+    if (Object.keys(validateBaseline(input, get().financialCycleStart)).length > 0) return;
+    const now = new Date().toISOString();
+    set(state => ({
+      openingBalance: {
+        startYear: input.startYear,
+        amount: input.amount,
+        effectiveDate: input.effectiveDate,
+        createdAt: state.openingBalance?.createdAt ?? now,
+        updatedAt: now,
+      },
+    }));
+    scheduleSyncToSupabase();
+  },
+
+  clearOpeningBalance: () => {
+    set({ openingBalance: null });
     scheduleSyncToSupabase();
   },
 

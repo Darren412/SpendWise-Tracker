@@ -3,6 +3,7 @@ import { getEffectiveTax } from '@/lib/tax';
 import { TxnRow } from '@/lib/transactionFilters';
 import { MonthPointMoM } from '@/lib/trends';
 import { TaxSummary } from '@/lib/tax';
+import { YearBalance, getYearBalance } from '@/lib/balance';
 import { CsvColumn } from '@/lib/export/csv';
 
 export interface Dataset {
@@ -66,7 +67,12 @@ export function transactionsDataset(rows: TxnRow[], categories: Category[]): Dat
 
 // ── Monthly summary ───────────────────────────────────────────────────────
 
-export function monthlySummaryDataset(series: MonthPointMoM[]): Dataset {
+export function monthlySummaryDataset(series: MonthPointMoM[], ledger?: YearBalance[]): Dataset {
+  const hasBalance = (ledger?.length ?? 0) > 0;
+  const balAt = (p: MonthPointMoM) => {
+    const mb = ledger ? getYearBalance(ledger, p.year)?.months[+p.month - 1] : undefined;
+    return mb && !mb.beforeBaseline ? mb : undefined;
+  };
   const rows = series.map(p => ({
     month: `${p.label} (${p.start} – ${p.end})`,
     income: p.income,
@@ -80,6 +86,10 @@ export function monthlySummaryDataset(series: MonthPointMoM[]): Dataset {
     budgetSpent: p.budgetSpent,
     budgetUsedPct: p.budgetUsedPct ?? '',
     txnCount: p.txnCount,
+    ...(hasBalance ? {
+      openingBalance: balAt(p)?.opening ?? '',
+      closingBalance: balAt(p)?.closing ?? '',
+    } : {}),
   }));
   return {
     columns: [
@@ -95,6 +105,10 @@ export function monthlySummaryDataset(series: MonthPointMoM[]): Dataset {
       { key: 'budgetSpent', header: 'Tracked Spend' },
       { key: 'budgetUsedPct', header: 'Budget Used %' },
       { key: 'txnCount', header: 'Transactions' },
+      ...(hasBalance ? [
+        { key: 'openingBalance', header: 'Opening Balance' },
+        { key: 'closingBalance', header: 'Closing Balance' },
+      ] : []),
     ],
     rows,
     totals: {

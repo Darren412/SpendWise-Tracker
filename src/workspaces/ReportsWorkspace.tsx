@@ -7,6 +7,7 @@ import { formatCurrency } from '@/utils/currency';
 import { formatFinancialPeriodRange, getFinancialMonthRange } from '@/utils/financialCycle';
 import { applyTransactionFilters, EMPTY_FILTERS, TxnRow } from '@/lib/transactionFilters';
 import { buildMonthlySeries, withMoM } from '@/lib/trends';
+import { useBalanceLedger } from '@/hooks/useBalanceLedger';
 import { summarizeTax } from '@/lib/tax';
 import { toCSV } from '@/lib/export/csv';
 import {
@@ -43,6 +44,7 @@ export default function ReportsWorkspace() {
     budgetCategoryIds, getMonthlyBudget, financialCycleStart, currency,
     categoryBudgets,
   } = useBudgetStore();
+  const ledger = useBalanceLedger();
 
   const [showExport, setShowExport] = useState(false);
 
@@ -110,7 +112,7 @@ export default function ReportsWorkspace() {
       case 'transactions':
         return { title, rangeText, dataset: transactionsDataset(rangeRows(), categories) };
       case 'monthly':
-        return { title, rangeText, dataset: monthlySummaryDataset(withMoM(rangeSeries())) };
+        return { title, rangeText, dataset: monthlySummaryDataset(withMoM(rangeSeries()), ledger) };
       case 'category':
         return { title, rangeText, dataset: categorySpendingDataset(rangeRows(), categories) };
       case 'budget':
