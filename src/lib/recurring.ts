@@ -143,7 +143,13 @@ export function generateDue(
       }
     }
 
-    return { ...rule, generatedThrough: upper };
+    // A full-cap result means the interval was truncated — advance only to
+    // the LAST emitted date so the next run continues where we stopped
+    // instead of silently skipping the remainder.
+    const newThrough = dates.length === MAX_OCCURRENCES_PER_CALL
+      ? dates[dates.length - 1]
+      : upper;
+    return { ...rule, generatedThrough: newThrough };
   });
 
   return { expenses, income, rules: nextRules };
@@ -155,13 +161,34 @@ export function nextOccurrence(rule: RecurringRule, today: string): string | nul
 }
 
 /**
- * Resume a paused rule without backfilling the skipped period: generation
- * resumes from `today` onward.
+ * Resume a paused rule without backfilling the skipped period. The floor is
+ * yesterday (not today) so an occurrence falling ON the resume day is still
+ * generated; occurrences missed while paused are skipped.
  */
 export function resumeRule(rule: RecurringRule, today: string): RecurringRule {
+  const floor = addDays(today, -1);
   return {
     ...rule,
     paused: false,
-    generatedThrough: rule.generatedThrough ? maxDate(rule.generatedThrough, today) : today,
+    generatedThrough: rule.generatedThrough ? maxDate(rule.generatedThrough, floor) : floor,
   };
+}
+
+/**
+ * Union-by-id merge for two devices' rule sets: remote order preserved,
+ * local-only rules appended. For ids on both, LOCAL fields win — EXCEPT
+ * generatedThrough, which takes the max. Local-wins on generatedThrough
+ * could regress it below a bound another device already reached,
+ * resurrecting occurrences that device deleted.
+ */
+export function mergeRecurringRules(remote: RecurringRule[], local: RecurringRule[]): RecurringRule[] {
+  const localById = new Map(local.map(r => [r.id, r]));
+  const remoteIds = new Set(remote.map(r => r.id));
+  const merged = remote.map(r => {
+    const l = localById.get(r.id);
+    if (!l) return r;
+    const gt = maxDate(l.generatedThrough ?? '', r.generatedThrough ?? '');
+    return { ...l, generatedThrough: gt || undefined };
+  });
+  return [...merged, ...local.filter(r => !remoteIds.has(r.id))];
 }

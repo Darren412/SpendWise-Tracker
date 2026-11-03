@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { occurrenceDates, occurrenceId, generateDue, nextOccurrence, resumeRule } from '@/lib/recurring';
+import { occurrenceDates, occurrenceId, generateDue, nextOccurrence, resumeRule, mergeRecurringRules } from '@/lib/recurring';
 import { RecurringRule } from '@/types';
 
 const base: RecurringRule = {
@@ -135,15 +135,47 @@ describe('generateDue', () => {
     expect(due.rules[0].generatedThrough).toBe('2026-10-15');
   });
 
-  it('resuming skips the paused gap (no backfill)', () => {
+  it('truncated runs continue next time instead of skipping the remainder', () => {
+    // Weekly rule started ~11 years ago → >500 due dates at once
+    const rules = [rule({ frequency: 'weekly', startDate: '2015-01-01' })];
+    const first = generateDue(rules, new Set(), '2026-06-01');
+    expect(first.expenses).toHaveLength(500);
+    // Bound advanced to the last emitted date, NOT today's upper bound
+    expect(first.rules[0].generatedThrough).toBe(first.expenses[499].date);
+    expect(first.rules[0].generatedThrough! < '2026-06-01').toBe(true);
+
+    const second = generateDue(first.rules, new Set(first.expenses.map(e => e.id)), '2026-06-01');
+    expect(second.expenses.length).toBeGreaterThan(0);
+    expect(second.expenses.length).toBeLessThan(200); // ~96 remaining weeks
+    expect(second.rules[0].generatedThrough).toBe('2026-06-01');
+    // No overlap between the two batches
+    const firstIds = new Set(first.expenses.map(e => e.id));
+    expect(second.expenses.every(e => !firstIds.has(e.id))).toBe(true);
+    expect(second.expenses.every(e => e.date > first.expenses[499].date)).toBe(true);
+
+    // Third run is a no-op
+    const third = generateDue(second.rules, new Set([...firstIds, ...second.expenses.map(e => e.id)]), '2026-06-01');
+    expect(third.expenses).toHaveLength(0);
+  });
+
+  it('resuming skips the paused gap but still generates an occurrence due today', () => {
     const resumed = resumeRule(
       rule({ startDate: '2026-01-01', paused: true, generatedThrough: '2026-02-01' }),
       '2026-06-01'
     );
     expect(resumed.paused).toBe(false);
-    expect(resumed.generatedThrough).toBe('2026-06-01');
+    expect(resumed.generatedThrough).toBe('2026-05-31'); // floor = yesterday
     const due = generateDue([resumed], new Set(), '2026-06-01');
-    expect(due.expenses).toHaveLength(0); // nothing new — already generated through today
+    // Feb–May occurrences skipped, but the June 1 occurrence IS generated
+    expect(due.expenses.map(e => e.date)).toEqual(['2026-06-01']);
+  });
+
+  it('resume keeps a generatedThrough already ahead of the floor', () => {
+    const resumed = resumeRule(
+      rule({ paused: true, generatedThrough: '2026-07-15' }),
+      '2026-06-01'
+    );
+    expect(resumed.generatedThrough).toBe('2026-07-15');
   });
 });
 
@@ -158,5 +190,42 @@ describe('nextOccurrence', () => {
     const r = rule({ startDate: '2026-01-15', endDate: '2026-03-15' });
     expect(nextOccurrence(r, '2026-03-15')).toBeNull();
     expect(nextOccurrence(r, '2026-04-01')).toBeNull();
+  });
+});
+
+describe('mergeRecurringRules', () => {
+  it('keeps remote order, appends local-only rules', () => {
+    const remote = [rule({ id: 'a' }), rule({ id: 'b' })];
+    const local = [rule({ id: 'b' }), rule({ id: 'c' })];
+    const merged = mergeRecurringRules(remote, local);
+    expect(merged.map(r => r.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('local fields win for shared ids', () => {
+    const remote = [rule({ id: 'a', description: 'old', amount: 100 })];
+    const local = [rule({ id: 'a', description: 'new', amount: 250 })];
+    const merged = mergeRecurringRules(remote, local);
+    expect(merged[0].description).toBe('new');
+    expect(merged[0].amount).toBe(250);
+  });
+
+  it('generatedThrough takes the max — stale local bound cannot regress it', () => {
+    const remote = [rule({ id: 'a', generatedThrough: '2026-06-01' })];
+    const local = [rule({ id: 'a', generatedThrough: '2026-03-01', paused: true })];
+    const merged = mergeRecurringRules(remote, local);
+    expect(merged[0].generatedThrough).toBe('2026-06-01');
+    expect(merged[0].paused).toBe(true); // local fields still win otherwise
+  });
+
+  it('generatedThrough survives when only one side has it', () => {
+    expect(mergeRecurringRules(
+      [rule({ id: 'a' })],
+      [rule({ id: 'a', generatedThrough: '2026-01-01' })]
+    )[0].generatedThrough).toBe('2026-01-01');
+    expect(mergeRecurringRules(
+      [rule({ id: 'a', generatedThrough: '2026-01-01' })],
+      [rule({ id: 'a' })]
+    )[0].generatedThrough).toBe('2026-01-01');
+    expect(mergeRecurringRules([rule({ id: 'a' })], [rule({ id: 'a' })])[0].generatedThrough).toBeUndefined();
   });
 });

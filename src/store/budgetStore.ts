@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import { Expense, Income, Category, RecurringRule, RecurrenceFrequency } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { getFinancialPeriod, getCurrentFinancialPeriod, todayLocalISO } from '@/utils/financialCycle';
-import { generateDue, resumeRule } from '@/lib/recurring';
+import { generateDue, resumeRule, mergeRecurringRules } from '@/lib/recurring';
 import { moveById } from '@/lib/categoryOrder';
 
 interface BudgetStore {
@@ -662,7 +662,9 @@ async function loadFromSupabase() {
     remote.expenses   = mergeById(remote.expenses,   localExpenses);
     remote.income     = mergeById(remote.income,     localIncome);
     remote.categories = mergeById(remote.categories, localCategories);
-    remote.recurring  = mergeById(remote.recurring ?? [], localRecurring);
+    // Rules use the dedicated merge — generatedThrough takes the max so a
+    // stale local bound can't resurrect occurrences deleted elsewhere
+    remote.recurring  = mergeRecurringRules(remote.recurring ?? [], localRecurring);
   }
 
   // Apply the financial-cycle mapping directly — migrateToFinancialCycle()
