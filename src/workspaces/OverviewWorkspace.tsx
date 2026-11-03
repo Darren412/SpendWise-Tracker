@@ -12,6 +12,7 @@ import { getFinancialMonthRange, formatFinancialPeriodRange, getCurrentFinancial
 import { budgetTrackedSpend } from '@/lib/trends';
 import BudgetAlertsBanner from '@/components/BudgetAlertsBanner';
 import GoalsSummaryCard from '@/components/GoalsSummaryCard';
+import PotentialSavingsCard from '@/components/PotentialSavingsCard';
 
 interface OverviewWorkspaceProps {
   onNavigate: (workspace: string) => void;
@@ -703,6 +704,9 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
           </div>
         )}
       </div>
+
+      {/* ── Potential savings ── */}
+      <PotentialSavingsCard onNavigate={onNavigate} />
 
       {/* ── Savings goals summary ── */}
       <GoalsSummaryCard onNavigate={onNavigate} />

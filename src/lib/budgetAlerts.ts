@@ -13,6 +13,8 @@ export interface BudgetAlert {
   pct: number;                  // 1 decimal
   spent: number;
   budget: number;
+  /** true when the budget comes from a savings target — UI says "target" */
+  isTarget?: boolean;
 }
 
 export interface BudgetAlertInput {

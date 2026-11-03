@@ -6,6 +6,7 @@ import { useBudgetStore } from '@/store/budgetStore';
 import { Category, TaxInfo } from '@/types';
 import TaxFields from '@/components/TaxFields';
 import { todayLocalISO } from '@/utils/financialCycle';
+import { defaultSpendClass, SpendClass } from '@/lib/spendClass';
 
 // Visually-hidden helper (for the aria-live announcements)
 const srOnly: React.CSSProperties = {
@@ -20,6 +21,7 @@ function Section({
   taxEditId,
   setTaxEditId,
   onTaxChange,
+  showSpendClass,
 }: {
   title: string;
   cats: Category[];
@@ -27,9 +29,17 @@ function Section({
   taxEditId: string | null;
   setTaxEditId: (id: string | null) => void;
   onTaxChange: (id: string, tax: TaxInfo | undefined) => void;
+  showSpendClass?: boolean;
 }) {
   const [dragId, setDragId] = useState<string | null>(null);
-  const { moveCategory } = useBudgetStore();
+  const { moveCategory, updateCategory } = useBudgetStore();
+
+  const CLASS_OPTIONS: { value: string; label: string }[] = [
+    { value: 'auto', label: 'Auto' },
+    { value: 'essential', label: 'Essential' },
+    { value: 'flexible', label: 'Flexible' },
+    { value: 'discretionary', label: 'Discretionary' },
+  ];
 
   if (cats.length === 0) return null;
 
@@ -98,6 +108,30 @@ function Section({
               >
                 Tax
               </button>
+              {showSpendClass && (
+                <select
+                  value={cat.spendClass ?? 'auto'}
+                  onChange={e => {
+                    const v = e.target.value;
+                    updateCategory(cat.id, { spendClass: v === 'auto' ? undefined : v as SpendClass });
+                  }}
+                  aria-label={`Spending class for ${cat.name}`}
+                  title={`Classification: ${cat.spendClass ?? `${defaultSpendClass(cat)} (auto)`}`}
+                  style={{
+                    padding: '4px 6px', borderRadius: 'var(--r-sm)', fontFamily: 'inherit',
+                    fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer',
+                    border: '1px solid var(--border-default)', background: 'var(--bg-subtle)',
+                    color: cat.spendClass ? 'var(--brand-text)' : 'var(--text-500)',
+                    maxWidth: 108,
+                  }}
+                >
+                  {CLASS_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>
+                      {o.value === 'auto' ? `${defaultSpendClass(cat)} (auto)` : o.label}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button
                 type="button"
                 onClick={() => onMove(cat, cats, -1)}
@@ -180,7 +214,7 @@ export default function CategoryOrderList() {
   return (
     <div>
       <div aria-live="polite" style={srOnly}>{announcement}</div>
-      <Section title="Expense categories" cats={expenseCats} onMove={move} taxEditId={taxEditId} setTaxEditId={setTaxEditId} onTaxChange={onTaxChange} />
+      <Section title="Expense categories" cats={expenseCats} onMove={move} taxEditId={taxEditId} setTaxEditId={setTaxEditId} onTaxChange={onTaxChange} showSpendClass />
       <Section title="Income categories" cats={incomeCats} onMove={move} taxEditId={taxEditId} setTaxEditId={setTaxEditId} onTaxChange={onTaxChange} />
       <p style={{ fontSize: '0.72rem', color: 'var(--text-400)', marginTop: 8 }}>
         Drag to reorder, or use the arrow buttons. Keyboard: focus a row and press Alt + ↑ / Alt + ↓.
