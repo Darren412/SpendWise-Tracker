@@ -59,6 +59,7 @@ export interface Category {
   icon: string;
   type?: 'expense' | 'income' | 'both';   // undefined treated as 'expense' for backward compat
   tax?: TaxInfo; // category-level default; a transaction's own tax overrides it
+  spendClass?: 'essential' | 'flexible' | 'discretionary'; // user override; undefined = auto
 }
 
 export interface SavingsGoal {
@@ -73,3 +74,10 @@ export interface SavingsGoal {
 }
 
 export interface BudgetAlertThresholds { warning: number; exceeded: number; }  // percents, defaults 80 / 100
+
+export interface SpendingTarget {
+  target: number;               // monthly amount
+  baselineMonthly: number;      // category avg when the target was set
+  createdAt: string;            // ISO timestamp
+  createdForPeriod: string;     // 'YYYY-MM' financial period it was created in
+}

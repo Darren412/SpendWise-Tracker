@@ -23,7 +23,7 @@ export function useBudgetAlerts(): BudgetAlerts {
   const {
     expenses, categories, selectedMonth, selectedYear,
     budgetCategoryIds, categoryBudgets, alertThresholds, alertsEnabled,
-    acknowledgedAlerts, notifiedAlerts, getMonthlyBudget,
+    acknowledgedAlerts, notifiedAlerts, getMonthlyBudget, spendingTargets,
   } = useBudgetStore();
 
   return useMemo(() => {
@@ -50,13 +50,17 @@ export function useBudgetAlerts(): BudgetAlerts {
       thresholds: alertThresholds,
     });
 
-    const visible = visibleAlerts(alerts, acknowledgedAlerts);
+    // Categories backed by a savings target read as "target" in the UI
+    const tagged = alerts.map(a =>
+      a.scope === 'category' && spendingTargets[a.scopeId] ? { ...a, isTarget: true } : a);
+
+    const visible = visibleAlerts(tagged, acknowledgedAlerts);
     // Toast only for alerts the user would actually see
     const newOnes = newlyTriggered(visible, notifiedAlerts);
-    return { alerts, visible, newOnes };
+    return { alerts: tagged, visible, newOnes };
   }, [
     expenses, categories, selectedMonth, selectedYear,
     budgetCategoryIds, categoryBudgets, alertThresholds, alertsEnabled,
-    acknowledgedAlerts, notifiedAlerts, getMonthlyBudget,
+    acknowledgedAlerts, notifiedAlerts, getMonthlyBudget, spendingTargets,
   ]);
 }

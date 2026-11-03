@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import { Expense, Income, Category, RecurringRule, RecurrenceFrequency, SavingsGoal, BudgetAlertThresholds } from '@/types';
+import { Expense, Income, Category, RecurringRule, RecurrenceFrequency, SavingsGoal, BudgetAlertThresholds, SpendingTarget } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { getFinancialPeriod, getCurrentFinancialPeriod, todayLocalISO } from '@/utils/financialCycle';
 import { generateDue, resumeRule, mergeRecurringRules } from '@/lib/recurring';
@@ -72,6 +72,16 @@ interface BudgetStore {
   setAlertsEnabled: (enabled: boolean) => void;
   acknowledgeAlert: (key: string) => void;
   markAlertsNotified: (keys: string[]) => void;
+  // Savings opportunities — remote settings only
+  dismissedOpportunities: string[];            // '{periodKey}:{opportunityId}'
+  mutedOpportunityCategories: string[];
+  spendingTargets: Record<string, SpendingTarget>;
+  dismissOpportunity: (key: string) => void;
+  restoreOpportunity: (key: string) => void;
+  muteOpportunityCategory: (catId: string) => void;
+  unmuteOpportunityCategory: (catId: string) => void;
+  setSpendingTarget: (catId: string, target: { target: number; baselineMonthly: number }) => void;
+  removeSpendingTarget: (catId: string, alsoRemoveBudget: boolean) => void;
   themePreference: ThemePreference;
   setThemePreference: (p: ThemePreference) => void;
   selectedCategoryIds: string[];
@@ -196,6 +206,9 @@ interface UserSettings {
   alertsEnabled?: boolean;
   acknowledgedAlerts?: string[];
   notifiedAlerts?: string[];
+  dismissedOpportunities?: string[];
+  mutedOpportunityCategories?: string[];
+  spendingTargets?: Record<string, SpendingTarget>;
   themePreference?: ThemePreference;
 }
 
@@ -358,14 +371,16 @@ function getLatestSyncPayload(): RemoteData {
     expenses, income, categories, recurring, goals,
     currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
     selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
-    acknowledgedAlerts, notifiedAlerts, themePreference,
+    acknowledgedAlerts, notifiedAlerts, dismissedOpportunities, mutedOpportunityCategories,
+    spendingTargets, themePreference,
   } = useBudgetStore.getState();
   return {
     expenses, income, categories, recurring, goals,
     settings: {
       currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
       selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
-      acknowledgedAlerts, notifiedAlerts, themePreference,
+      acknowledgedAlerts, notifiedAlerts, dismissedOpportunities, mutedOpportunityCategories,
+      spendingTargets, themePreference,
     },
   };
 }
@@ -619,7 +634,8 @@ async function loadFromSupabase() {
     const {
       currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
       selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
-      acknowledgedAlerts, notifiedAlerts, themePreference,
+      acknowledgedAlerts, notifiedAlerts, dismissedOpportunities, mutedOpportunityCategories,
+      spendingTargets, themePreference,
     } = useBudgetStore.getState();
     const migrated: RemoteData = {
       expenses:   cycled.expenses,
@@ -630,7 +646,8 @@ async function loadFromSupabase() {
       settings:   {
         currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
         selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
-        acknowledgedAlerts, notifiedAlerts, themePreference,
+        acknowledgedAlerts, notifiedAlerts, dismissedOpportunities, mutedOpportunityCategories,
+        spendingTargets, themePreference,
       },
     };
 
@@ -722,6 +739,25 @@ async function loadFromSupabase() {
     }
     if (Array.isArray(remoteSettings.notifiedAlerts)) {
       settingsUpdate.notifiedAlerts = remoteSettings.notifiedAlerts.filter(k => typeof k === 'string');
+    }
+    if (Array.isArray(remoteSettings.dismissedOpportunities)) {
+      settingsUpdate.dismissedOpportunities = remoteSettings.dismissedOpportunities.filter(k => typeof k === 'string');
+    }
+    if (Array.isArray(remoteSettings.mutedOpportunityCategories)) {
+      settingsUpdate.mutedOpportunityCategories = remoteSettings.mutedOpportunityCategories.filter(k => typeof k === 'string');
+    }
+    if (remoteSettings.spendingTargets && typeof remoteSettings.spendingTargets === 'object') {
+      const cleanTargets: Record<string, SpendingTarget> = {};
+      for (const [k, v] of Object.entries(remoteSettings.spendingTargets)) {
+        if (v && typeof v === 'object'
+            && typeof (v as SpendingTarget).target === 'number' && Number.isFinite((v as SpendingTarget).target) && (v as SpendingTarget).target > 0
+            && typeof (v as SpendingTarget).baselineMonthly === 'number' && Number.isFinite((v as SpendingTarget).baselineMonthly)
+            && typeof (v as SpendingTarget).createdAt === 'string'
+            && typeof (v as SpendingTarget).createdForPeriod === 'string') {
+          cleanTargets[k] = v as SpendingTarget;
+        }
+      }
+      settingsUpdate.spendingTargets = cleanTargets;
     }
     if (isValidTheme(remoteSettings.themePreference)
         && remoteSettings.themePreference !== useBudgetStore.getState().themePreference) {
@@ -840,6 +876,9 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   alertsEnabled: true,
   acknowledgedAlerts: [],
   notifiedAlerts: [],
+  dismissedOpportunities: [],
+  mutedOpportunityCategories: [],
+  spendingTargets: {},
   themePreference: getStoredTheme(),
   financialCycleStart: initCycleStart,
   monthlyBudgets: typeof window !== 'undefined' ? (() => { try { const raw = localStorage.getItem('spendwise_monthly_budgets'); if (raw) return JSON.parse(raw); const legacy = parseFloat(localStorage.getItem('spendwise_monthly_budget') ?? '0'); return legacy > 0 ? { _default: legacy } : {}; } catch { return {}; } })() : {},
@@ -1225,6 +1264,68 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
     set((state) => ({
       notifiedAlerts: pruneKeys([...state.notifiedAlerts, ...keys], alertKeepPeriods(state)),
     }));
+    scheduleSyncToSupabase();
+  },
+
+  // ── Savings opportunities ────────────────────────────────────────────────
+  dismissOpportunity: (key: string) => {
+    set((state) => ({
+      dismissedOpportunities: state.dismissedOpportunities.includes(key)
+        ? state.dismissedOpportunities
+        : pruneKeys([...state.dismissedOpportunities, key], alertKeepPeriods(state)),
+    }));
+    scheduleSyncToSupabase();
+  },
+
+  restoreOpportunity: (key: string) => {
+    set((state) => ({ dismissedOpportunities: state.dismissedOpportunities.filter(k => k !== key) }));
+    scheduleSyncToSupabase();
+  },
+
+  muteOpportunityCategory: (catId: string) => {
+    set((state) => ({
+      mutedOpportunityCategories: state.mutedOpportunityCategories.includes(catId)
+        ? state.mutedOpportunityCategories
+        : [...state.mutedOpportunityCategories, catId],
+    }));
+    scheduleSyncToSupabase();
+  },
+
+  unmuteOpportunityCategory: (catId: string) => {
+    set((state) => ({
+      mutedOpportunityCategories: state.mutedOpportunityCategories.filter(c => c !== catId),
+    }));
+    scheduleSyncToSupabase();
+  },
+
+  setSpendingTarget: (catId: string, input: { target: number; baselineMonthly: number }) => {
+    const safe = Math.max(0, input.target);
+    if (safe === 0) return;
+    const period = `${get().selectedYear}-${get().selectedMonth}`;
+    set((state) => ({
+      spendingTargets: {
+        ...state.spendingTargets,
+        [catId]: {
+          target: safe,
+          baselineMonthly: Math.max(0, input.baselineMonthly),
+          createdAt: new Date().toISOString(),
+          createdForPeriod: period,
+        },
+      },
+      // Mirror into category budgets so existing alerts warn on approach/exceed
+      categoryBudgets: { ...state.categoryBudgets, [catId]: safe },
+    }));
+    scheduleSyncToSupabase();
+  },
+
+  removeSpendingTarget: (catId: string, alsoRemoveBudget: boolean) => {
+    set((state) => {
+      const spendingTargets = { ...state.spendingTargets };
+      delete spendingTargets[catId];
+      const categoryBudgets = { ...state.categoryBudgets };
+      if (alsoRemoveBudget) delete categoryBudgets[catId];
+      return { spendingTargets, categoryBudgets };
+    });
     scheduleSyncToSupabase();
   },
 

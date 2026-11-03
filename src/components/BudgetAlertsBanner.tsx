@@ -34,7 +34,7 @@ export default function BudgetAlertsBanner({ onNavigate }: BudgetAlertsBannerPro
           ? exceeded
             ? `Overall budget exceeded — ${a.pct}% used`
             : `Overall budget at ${a.pct}% — ${formatCurrency(a.spent, currency)} of ${formatCurrency(a.budget, currency)} used`
-          : `${a.name}: ${a.pct}% of ${formatCurrency(a.budget, currency)} budget used`;
+          : `${a.name}: ${a.pct}% of ${formatCurrency(a.budget, currency)} ${a.isTarget ? 'target' : 'budget'} used`;
         return (
           <div key={a.key} style={{
             display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
