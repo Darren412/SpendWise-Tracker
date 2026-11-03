@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { Expense, Income, Category } from '@/types';
 import { safeCell } from '@/lib/export/sanitize';
+import { fundingSource, fundingParts } from '@/lib/reserve';
 import { currencySymbol } from '@/utils/currency';
 
 export type ExportFilter =
@@ -34,31 +35,36 @@ type AnyRow = Record<string, string | number>;
 
 function buildExpenseSheet(filtered: Expense[], categories: Category[], label: string, sym: string) {
   const resolveName = (id: string) => categories.find((c) => c.id === id)?.name ?? id;
+  const FUNDING_LABEL = { budget: 'Monthly Budget', reserve: 'Reserve', split: 'Split' } as const;
 
   const rows: AnyRow[] = [
     { '': `Expenses — ${label}` },
     { '': '' },
-    { 'No.': 'No.', Date: 'Date', Category: 'Category', Description: 'Description', [`Amount (${sym})`]: `Amount (${sym})` },
+    { 'No.': 'No.', Date: 'Date', Category: 'Category', Description: 'Description', [`Amount (${sym})`]: `Amount (${sym})`, 'Pay From': 'Pay From', 'Budget Portion': 'Budget Portion', 'Reserve Portion': 'Reserve Portion' },
   ];
 
   if (filtered.length === 0) {
-    rows.push({ 'No.': '', Date: '', Category: '', Description: 'No expenses recorded', [`Amount (${sym})`]: '' });
+    rows.push({ 'No.': '', Date: '', Category: '', Description: 'No expenses recorded', [`Amount (${sym})`]: '', 'Pay From': '', 'Budget Portion': '', 'Reserve Portion': '' });
   } else {
     filtered.forEach((e, i) => {
+      const parts = fundingParts(e);
       rows.push({
         'No.': i + 1,
         Date: fmtDate(e.date),
         Category: safeCell(`${categories.find(c => c.id === e.category)?.icon ?? ''} ${resolveName(e.category)}`),
         Description: safeCell(e.description),
         [`Amount (${sym})`]: e.amount,
+        'Pay From': FUNDING_LABEL[fundingSource(e)],
+        'Budget Portion': parts.budget,
+        'Reserve Portion': parts.reserve,
       });
     });
     const total = filtered.reduce((s, e) => s + e.amount, 0);
-    rows.push({ 'No.': '', Date: '', Category: '', Description: 'TOTAL', [`Amount (${sym})`]: total });
+    rows.push({ 'No.': '', Date: '', Category: '', Description: 'TOTAL', [`Amount (${sym})`]: total, 'Pay From': '', 'Budget Portion': '', 'Reserve Portion': '' });
   }
 
   const ws = XLSX.utils.json_to_sheet(rows, { skipHeader: true });
-  ws['!cols'] = [{ wch: 6 }, { wch: 16 }, { wch: 26 }, { wch: 36 }, { wch: 14 }];
+  ws['!cols'] = [{ wch: 6 }, { wch: 16 }, { wch: 26 }, { wch: 36 }, { wch: 14 }, { wch: 16 }, { wch: 15 }, { wch: 16 }];
   return ws;
 }
 

@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { toCSV } from '@/lib/export/csv';
-import { transactionsDataset, monthlySummaryDataset, categorySpendingDataset, budgetReportDataset, taxDataset } from '@/lib/export/datasets';
+import { transactionsDataset, monthlySummaryDataset, categorySpendingDataset, budgetReportDataset, taxDataset, reserveLedgerDataset } from '@/lib/export/datasets';
 import { buildReportHTML } from '@/lib/export/pdfReport';
 import { describeFilters, EMPTY_FILTERS } from '@/lib/transactionFilters';
 import { summarizeTax } from '@/lib/tax';
 import { withMoM, MonthPointMoM } from '@/lib/trends';
-import { Category } from '@/types';
+import { buildReserveLedger, ReserveTransfer } from '@/lib/reserve';
+import { Category, Expense } from '@/types';
 import { TxnRow } from '@/lib/transactionFilters';
 
 const cats: Category[] = [
@@ -88,10 +89,12 @@ describe('monthlySummaryDataset', () => {
   it('maps series rows incl. MoM blanks and totals', () => {
     const series: MonthPointMoM[] = withMoM([
       { key: '2026-02', month: '02', year: 2026, label: "Feb '26", start: '2026-01-25', end: '2026-02-24',
-        income: 1000, expenses: 400, savings: 600, savingsRate: 60, budget: 500, budgetSpent: 250,
+        income: 1000, expenses: 400, reserveExpenses: 0, reserveTxnTotal: 0, splitTxnTotal: 0,
+        actualExpenses: 400, netCashFlow: 600, savings: 600, savingsRate: 60, budget: 500, budgetSpent: 250,
         budgetUsedPct: 50, txnCount: 7, byCategory: {}, isComplete: true, isCurrent: false },
       { key: '2026-03', month: '03', year: 2026, label: "Mar '26", start: '2026-02-25', end: '2026-03-24',
-        income: 0, expenses: 100, savings: -100, savingsRate: null, budget: null, budgetSpent: 0,
+        income: 0, expenses: 100, reserveExpenses: 0, reserveTxnTotal: 0, splitTxnTotal: 0,
+        actualExpenses: 100, netCashFlow: -100, savings: -100, savingsRate: null, budget: null, budgetSpent: 0,
         budgetUsedPct: null, txnCount: 2, byCategory: {}, isComplete: true, isCurrent: false },
     ]);
     const ds = monthlySummaryDataset(series);
@@ -227,5 +230,49 @@ describe('describeFilters', () => {
 
   it('empty filters → empty list', () => {
     expect(describeFilters(F(), cats, '₹')).toEqual([]);
+  });
+});
+
+describe('reserve funding in the transactions dataset', () => {
+  const fundedRows: TxnRow[] = [
+    { id: 's1', _type: 'expense', category: 'food', description: 'split', amount: 100, date: '2026-03-05', month: '03', year: 2026, funding: { source: 'split', reserveAmount: 30 } },
+    { id: 'r1', _type: 'expense', category: 'food', description: 'res txn', amount: 200, date: '2026-03-06', month: '03', year: 2026, funding: { source: 'reserve' } },
+  ];
+  it('columns carry funding source + portions; totals split regular/reserve', () => {
+    const d = transactionsDataset(fundedRows, cats);
+    const headers = d.columns.map(c => c.header);
+    expect(headers).toContain('Funding Source');
+    expect(headers).toContain('Budget Portion');
+    expect(headers).toContain('Reserve Portion');
+    expect(d.rows[0].fundingSource).toBe('Split');
+    expect(d.rows[0].budgetPortion).toBe(70);
+    expect(d.rows[0].reservePortion).toBe(30);
+    expect(d.rows[1].fundingSource).toBe('Reserve');
+    expect(d.rows[1].budgetPortion).toBe(0);
+    expect(d.rows[1].reservePortion).toBe(200);
+    expect(d.totals?.budgetPortion).toBe(70);
+    expect(d.totals?.reservePortion).toBe(230);
+    // regular + reserve = actual
+    expect((d.totals!.budgetPortion as number) + (d.totals!.reservePortion as number)).toBe(300);
+  });
+});
+
+describe('reserve ledger dataset', () => {
+  it('lists entries with signed amounts and a range summary', () => {
+    const transfers: ReserveTransfer[] = [
+      { id: 't1', date: '2026-01-01', amount: 600000, direction: 'in', createdAt: '2026-01-01T00:00:00Z' },
+      { id: 't2', date: '2026-02-15', amount: 50000, direction: 'out', createdAt: '2026-02-15T00:00:00Z' },
+    ];
+    const expenses: Expense[] = [
+      { id: 'e1', category: 'food', description: 'Car', amount: 300000, date: '2026-03-01', month: '03', year: 2026, funding: { source: 'reserve' } },
+    ];
+    const ledger = buildReserveLedger(transfers, expenses);
+    const d = reserveLedgerDataset(ledger, { from: '2026-02-01', to: '2026-03-31' });
+    expect(d.rows).toHaveLength(2); // Feb release + Mar spend (Jan contribution outside range)
+    expect(d.reserveSummary.opening).toBe(600000);
+    expect(d.reserveSummary.releases).toBe(50000);
+    expect(d.reserveSummary.spend).toBe(300000);
+    expect(d.reserveSummary.closing).toBe(250000);
+    expect(d.rows[1].amount).toBe(-300000);
   });
 });
