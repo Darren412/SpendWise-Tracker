@@ -70,13 +70,17 @@ export default function Home() {
     }
   }, [authLoading, userId]);
 
-  const [planningTab, setPlanningTab] = useState<'save' | 'reserve' | 'goals' | 'budgets' | undefined>(undefined);
-  const [txnFunding, setTxnFunding] = useState<'budget' | 'reserve' | 'split' | undefined>(undefined);
+  const [planningTab, setPlanningTab] = useState<'save' | 'major' | 'goals' | 'budgets' | undefined>(undefined);
+  const [txnFunding, setTxnFunding] = useState<'budget' | 'balance' | 'split' | undefined>(undefined);
 
   const handleWorkspaceChange = (id: string, subTab?: string) => {
-    setPlanningTab(id === 'planning' ? (subTab as 'save' | 'reserve' | 'goals' | 'budgets' | undefined) : undefined);
+    // 'reserve' kept as a legacy deep-link alias for the Major Expenses tab /
+    // existing-balance funding filter.
+    const planTab = subTab === 'reserve' ? 'major' : subTab;
+    const fund = subTab === 'reserve' ? 'balance' : subTab;
+    setPlanningTab(id === 'planning' ? (planTab as 'save' | 'major' | 'goals' | 'budgets' | undefined) : undefined);
     setTxnFunding(id === 'transactions'
-      ? (['budget', 'reserve', 'split'].includes(subTab ?? '') ? (subTab as 'budget' | 'reserve' | 'split') : undefined)
+      ? (['budget', 'balance', 'split'].includes(fund ?? '') ? (fund as 'budget' | 'balance' | 'split') : undefined)
       : undefined);
     setActiveWorkspace(id as Workspace);
   };
@@ -87,17 +91,17 @@ export default function Home() {
   const [alertToast, setAlertToast] = useState('');
   const toastedRef = useRef<Set<string>>(new Set());
 
-  // Reserve shortfall notices from recurring generation — surfaced once via
-  // toast, then cleared from the store.
-  const reserveNotices = useBudgetStore(s => s.reserveNotices);
-  const clearReserveNotices = useBudgetStore(s => s.clearReserveNotices);
-  const [reserveToast, setReserveToast] = useState('');
+  // Available-balance shortfall notices from recurring generation — surfaced
+  // once via toast, then cleared from the store.
+  const fundingNotices = useBudgetStore(s => s.fundingNotices);
+  const clearFundingNotices = useBudgetStore(s => s.clearFundingNotices);
+  const [fundingToast, setFundingToast] = useState('');
   useEffect(() => {
-    if (reserveNotices.length === 0) return;
-    setReserveToast(reserveNotices.slice(0, 2).join(' ')
-      + (reserveNotices.length > 2 ? ` …and ${reserveNotices.length - 2} more.` : ''));
-    clearReserveNotices();
-  }, [reserveNotices, clearReserveNotices]);
+    if (fundingNotices.length === 0) return;
+    setFundingToast(fundingNotices.slice(0, 2).join(' ')
+      + (fundingNotices.length > 2 ? ` …and ${fundingNotices.length - 2} more.` : ''));
+    clearFundingNotices();
+  }, [fundingNotices, clearFundingNotices]);
   useEffect(() => {
     const fresh = newOnes.filter(a => !toastedRef.current.has(a.key));
     if (fresh.length === 0) return;
@@ -211,12 +215,12 @@ export default function Home() {
         onClose={() => setAlertToast('')}
       />
 
-      {/* Reserve shortfall toast (recurring occurrences capped to fit) */}
+      {/* Available-balance shortfall toast (recurring occurrences capped to fit) */}
       <Toast
-        open={!!reserveToast}
-        message={reserveToast}
+        open={!!fundingToast}
+        message={fundingToast}
         accent="var(--amber-500)"
-        onClose={() => setReserveToast('')}
+        onClose={() => setFundingToast('')}
       />
     </>
   );

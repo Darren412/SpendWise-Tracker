@@ -18,16 +18,16 @@ import { buildReportHTML } from '@/lib/export/pdfReport';
 import { printHTML } from '@/lib/export/print';
 import { getEffectiveTax } from '@/lib/tax';
 import { RecurrenceFrequency, FundingSource, Expense } from '@/types';
-import { fundingSource, fundingParts, validateFunding } from '@/lib/reserve';
-import { useReserve } from '@/hooks/useReserve';
+import { fundingSource, fundingParts, validateFunding } from '@/lib/funding';
+import { useMajorExpenses } from '@/hooks/useMajorExpenses';
 import RecurringManager from '@/components/RecurringManager';
 import DateInput from '@/components/DateInput';
-import FundingPicker, { ReserveShortfallDialog } from '@/components/balance/FundingPicker';
+import FundingPicker, { BalanceShortfallDialog } from '@/components/balance/FundingPicker';
 
 interface TransactionsWorkspaceProps {
   onAddExpense: () => void;
   onAddIncome: () => void;
-  initialFunding?: TransactionFilters['funding']; // deep-link e.g. from the Reserve tab
+  initialFunding?: TransactionFilters['funding']; // deep-link e.g. from the Major Expenses tab
 }
 
 type Tab = 'all' | 'expenses' | 'income' | 'recurring';
@@ -53,7 +53,7 @@ interface EditState {
   payee: string;
   notes: string;
   fundingSource: FundingSource;
-  reserveAmount: string;
+  balanceAmount: string;
 }
 
 export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initialFunding }: TransactionsWorkspaceProps) {
@@ -68,7 +68,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
 
   const sym = currencySymbol(currency);
   const { start, end } = getFinancialMonthRange(selectedMonth, selectedYear, financialCycleStart);
-  const { availableOn } = useReserve();
+  const { availableOn } = useMajorExpenses();
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [tab, setTab]           = useState<Tab>('all');
@@ -106,7 +106,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
   const [expandedId, setExpandedId]   = useState<string | null>(null);
   const [editState, setEditState]     = useState<EditState | null>(null);
   const [editError, setEditError]     = useState('');
-  const [editShortfall, setEditShortfall] = useState<{ requested: number; available: number } | null>(null);
+  const [editShortfall, setEditShortfall] = useState<{ requested: number; available: number; date: string } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
     [allFilteredRows, filters.type]);
 
   const totalExpAmt = filteredExpenses.reduce((s, e) => s + e.amount, 0);
-  const reserveExpAmt = filteredExpenses.reduce((s, e) => s + fundingParts(e).reserve, 0);
+  const majorExpAmt = filteredExpenses.reduce((s, e) => s + fundingParts(e).balance, 0);
   const totalIncAmt = filteredIncome.reduce((s, i) => s + i.amount, 0);
   const netAmt      = totalIncAmt - totalExpAmt;
 
@@ -210,26 +210,26 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
     if (row._type === 'expense') {
       const r = row as ExpRow;
       setEditState({ id: r.id, type: 'expense', description: r.description, amount: String(r.amount), date: r.date, category: r.category, payee: r.payee ?? '', notes: r.notes ?? '',
-        fundingSource: r.funding?.source ?? 'budget',
-        reserveAmount: r.funding?.reserveAmount !== undefined ? String(r.funding.reserveAmount) : '' });
+        fundingSource: r.funding?.source === 'reserve' ? 'balance' : (r.funding?.source ?? 'budget'),
+        balanceAmount: (r.funding?.balanceAmount ?? r.funding?.reserveAmount) !== undefined ? String(r.funding!.balanceAmount ?? r.funding!.reserveAmount) : '' });
     } else {
       const r = row as IncRow;
-      setEditState({ id: r.id, type: 'income', description: r.source ?? '', amount: String(r.amount), date: r.date, category: r.category ?? '', payee: '', notes: r.notes ?? '', fundingSource: 'budget', reserveAmount: '' });
+      setEditState({ id: r.id, type: 'income', description: r.source ?? '', amount: String(r.amount), date: r.date, category: r.category ?? '', payee: '', notes: r.notes ?? '', fundingSource: 'budget', balanceAmount: '' });
     }
     setExpandedId(row.id);
   };
 
-  const buildFundingPatch = (reservePart: number | null): Expense['funding'] => {
+  const buildFundingPatch = (balancePart: number | null): Expense['funding'] => {
     if (!editState || editState.type !== 'expense') return undefined;
-    if (reservePart !== null) {
-      return reservePart > 0 ? { source: 'split', reserveAmount: reservePart } : undefined;
+    if (balancePart !== null) {
+      return balancePart > 0 ? { source: 'split', balanceAmount: balancePart } : undefined;
     }
     if (editState.fundingSource === 'budget') return undefined;
-    if (editState.fundingSource === 'reserve') return { source: 'reserve' };
-    return { source: 'split', reserveAmount: parseFloat(editState.reserveAmount) };
+    if (editState.fundingSource === 'balance') return { source: 'balance' };
+    return { source: 'split', balanceAmount: parseFloat(editState.balanceAmount) };
   };
 
-  const doSaveEdit = (reservePart: number | null) => {
+  const doSaveEdit = (balancePart: number | null) => {
     if (!editState) return;
     const amt = parseFloat(editState.amount);
     const period = getFinancialPeriod(editState.date, financialCycleStart);
@@ -241,7 +241,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
         category: editState.category,
         payee: editState.payee.trim() || undefined,
         notes: editState.notes.trim() || undefined,
-        funding: buildFundingPatch(reservePart),
+        funding: buildFundingPatch(balancePart),
         ...period,
       });
     } else {
@@ -263,15 +263,15 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
     if (editState.type === 'expense') {
       const fErr = validateFunding({
         amount: amt, source: editState.fundingSource,
-        reserveAmount: editState.fundingSource === 'split' ? parseFloat(editState.reserveAmount) : undefined,
+        balanceAmount: editState.fundingSource === 'split' ? parseFloat(editState.balanceAmount) : undefined,
       });
       if (fErr) { setEditError(fErr); return; }
       setEditError('');
-      const requested = editState.fundingSource === 'reserve' ? amt
-        : editState.fundingSource === 'split' ? parseFloat(editState.reserveAmount) : 0;
+      const requested = editState.fundingSource === 'balance' ? amt
+        : editState.fundingSource === 'split' ? parseFloat(editState.balanceAmount) : 0;
       const avail = availableOn(editState.date, { excludeExpenseId: editState.id });
-      if (requested > 0 && requested > avail) {
-        setEditShortfall({ requested, available: avail });
+      if (avail !== null && requested > 0 && requested > avail) {
+        setEditShortfall({ requested, available: avail, date: editState.date });
         return;
       }
     }
@@ -290,7 +290,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
     'non-deductible': 'Tax non-deductible', exclude: 'Not tax-related',
   };
   const FUNDING_FILTER_LABELS: Record<TransactionFilters['funding'], string> = {
-    all: 'All', budget: 'Monthly budget', reserve: 'Reserve', split: 'Split',
+    all: 'All', budget: 'Monthly budget', balance: 'Existing balance', split: 'Split',
   };
   const activeFilters: { label: string; onRemove: () => void }[] = [];
   if (filters.search.trim()) activeFilters.push({ label: `“${filters.search.trim()}”`, onRemove: () => updateFilter({ search: '' }) });
@@ -445,7 +445,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
         {[
           {
             label: 'Money Out', value: `${sym}${Math.round(totalExpAmt).toLocaleString('en-IN')}`,
-            sub: `${filteredExpenses.length} expense${filteredExpenses.length !== 1 ? 's' : ''}${reserveExpAmt > 0 ? ` · of which ${sym}${Math.round(reserveExpAmt).toLocaleString('en-IN')} from reserve` : ''}`,
+            sub: `${filteredExpenses.length} expense${filteredExpenses.length !== 1 ? 's' : ''}${majorExpAmt > 0 ? ` · of which ${sym}${Math.round(majorExpAmt).toLocaleString('en-IN')} from existing balance` : ''}`,
             color: 'var(--red-500)', bg: 'var(--red-50)', border: 'var(--red-100)',
             Icon: ArrowUpRight,
           },
@@ -806,7 +806,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
               >
                 <option value="all">All</option>
                 <option value="budget">Monthly budget</option>
-                <option value="reserve">Reserve</option>
+                <option value="balance">Existing Balance</option>
                 <option value="split">Split</option>
               </select>
             </div>
@@ -1077,8 +1077,8 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
                                     border: '1px solid var(--amber-200)', borderRadius: 99, padding: '0 6px',
                                   }}>
                                     <PiggyBank size={9} />
-                                    <span className="sw-txn-hide-sm">{src === 'reserve' ? 'Reserve' : `Split ${formatCurrency(parts.budget, currency)} + ${formatCurrency(parts.reserve, currency)}`}</span>
-                                    <span className="sw-mobile-only">{src === 'reserve' ? 'Reserve' : 'Split'}</span>
+                                    <span className="sw-txn-hide-sm">{src === 'balance' ? 'Existing Balance' : `Split ${formatCurrency(parts.budget, currency)} + ${formatCurrency(parts.balance, currency)}`}</span>
+                                    <span className="sw-mobile-only">{src === 'balance' ? 'Existing Balance' : 'Split'}</span>
                                   </span>
                                 );
                               })()}
@@ -1232,9 +1232,9 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
                                         const src = fundingSource(row as ExpRow);
                                         if (src === 'budget') return 'Monthly Budget';
                                         const parts = fundingParts(row as ExpRow);
-                                        return src === 'reserve'
-                                          ? 'Reserve'
-                                          : `Split: ${formatCurrency(parts.budget, currency)} Budget + ${formatCurrency(parts.reserve, currency)} Reserve`;
+                                        return src === 'balance'
+                                          ? 'Existing Balance'
+                                          : `Split: ${formatCurrency(parts.budget, currency)} Budget + ${formatCurrency(parts.balance, currency)} Existing Balance`;
                                       })()}
                                     </div>
                                   </div>
@@ -1415,8 +1415,8 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
                                   amount={parseFloat(editState!.amount)}
                                   date={editState!.date}
                                   source={editState!.fundingSource}
-                                  reserveAmount={editState!.reserveAmount}
-                                  onChange={v => setEditState(s => s && ({ ...s, fundingSource: v.source, reserveAmount: v.reserveAmount }))}
+                                  balanceAmount={editState!.balanceAmount}
+                                  onChange={v => setEditState(s => s && ({ ...s, fundingSource: v.source, balanceAmount: v.balanceAmount }))}
                                   excludeExpenseId={editState!.id}
                                   compact
                                 />
@@ -1482,7 +1482,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
       </>)}
 
       {editShortfall && (
-        <ReserveShortfallDialog
+        <BalanceShortfallDialog
           shortfall={editShortfall}
           currency={currency}
           onUseAvailable={() => { setEditShortfall(null); doSaveEdit(editShortfall.available); }}

@@ -8,7 +8,7 @@
 
 import { Expense, Income, Category } from '@/types';
 import { getFinancialMonthRange } from './financialCycle';
-import { fundingParts } from '@/lib/reserve';
+import { fundingParts } from '@/lib/funding';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -803,27 +803,29 @@ interface ChatContext {
   behaviorProfile: BehaviorProfile;
   healthScore: HealthScore;
   sym: string;
-  /** Optional reserve context — answers "reserve"/"savings fund" questions */
-  reserveBalance?: number;
-  reserveUsed?: { total: number; count: number };
+  /** Optional existing-balance context — answers balance/major-expense questions */
+  availableBalance?: number | null;
+  majorExpenseUsage?: { total: number; count: number };
 }
 
 export function processChat(input: string, ctx: ChatContext): string {
   const q = input.toLowerCase().trim();
   const sym = ctx.sym;
 
-  // ── Reserve / savings fund ────────────────────────────────────────────────
-  if (q.includes('reserve') || q.includes('savings fund') || q.includes('major expense')) {
-    const bal = ctx.reserveBalance ?? 0;
-    const used = ctx.reserveUsed;
-    if (bal === 0 && (!used || used.total === 0)) {
-      return 'You haven\'t set aside a reserve yet. Use "Add to Reserve" in Planning → Reserve to allocate money for big expenses — reserve spend is then kept out of your monthly budget.';
+  // ── Existing balance / major expenses ('reserve' kept as a legacy keyword) ─
+  if (q.includes('existing balance') || q.includes('accumulated balance')
+    || q.includes('available balance') || q.includes('major expense')
+    || q.includes('reserve') || q.includes('savings fund')) {
+    const bal = ctx.availableBalance;
+    const used = ctx.majorExpenseUsage;
+    if (bal == null) {
+      return 'Your existing balance is tracked once you set an opening balance (Settings → Opening Balance or Trends → Yearly Overview). You can still mark a big expense as "Existing Balance" when adding it — it just won\'t show an available amount yet.';
     }
-    const lines = [`Your reserve balance is ${sym}${Math.round(bal).toLocaleString('en-IN')}.`];
+    const lines = [`Your available balance is ${sym}${Math.round(bal).toLocaleString('en-IN')}.`];
     if (used && used.total > 0) {
-      lines.push(`You used ${sym}${Math.round(used.total).toLocaleString('en-IN')} from it this period across ${used.count} major expense${used.count === 1 ? '' : 's'} — that spend doesn't count against your monthly budget.`);
+      lines.push(`You paid ${sym}${Math.round(used.total).toLocaleString('en-IN')} for ${used.count} major expense${used.count === 1 ? '' : 's'} from it this period — that spend doesn't count against your monthly budget.`);
     } else {
-      lines.push('No reserve-funded expenses this period.');
+      lines.push('No major expenses were paid from it this period.');
     }
     return lines.join(' ');
   }
@@ -1115,7 +1117,7 @@ export function buildYearlyNarrativeSummary(
   yearSummary: YearSummary,
   yearlyCategories: CategoryTrend[],
   sym: string,
-  reserve?: { total: number; count: number },
+  major?: { total: number; count: number },
 ): string[] {
   const lines: string[] = [];
   const fmt = (n: number) => Math.round(n).toLocaleString('en-IN');
@@ -1192,10 +1194,10 @@ export function buildYearlyNarrativeSummary(
     `Average monthly spending: ${sym}${fmt(yearSummary.avgMonthlyExpenses)}. Average monthly savings rate: ${avgMonthlySavingsRate}%.`
   );
 
-  // Reserve outflows (informational — kept out of behaviour metrics)
-  if (reserve && reserve.total > 0) {
+  // Balance-funded major expenses (informational — kept out of behaviour metrics)
+  if (major && major.total > 0) {
     lines.push(
-      `${sym}${fmt(reserve.total)} was paid from your reserve this year across ${reserve.count} major expense${reserve.count === 1 ? '' : 's'}.`
+      `${sym}${fmt(major.total)} of major expenses were paid from your existing balance this year across ${major.count} transaction${major.count === 1 ? '' : 's'}.`
     );
   }
 
@@ -1380,22 +1382,22 @@ export function generateYearlyInsightCards(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Reserve-funded spending (informational — not overspending)
+// Balance-funded spending (informational — not overspending)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Insight card describing reserve outflows inside a period expense list.
- * `periodExpenses` must be the ACTUAL expense records (full amounts with
- * funding fields) for the analysed period; the card reports reserve portions.
- * Returns null when the period has no reserve outflows.
+ * Insight card describing balance-funded major expenses inside a period
+ * expense list. `periodExpenses` must be the ACTUAL expense records (full
+ * amounts with funding fields); the card reports existing-balance portions.
+ * Returns null when the period has no balance-funded outflows.
  */
-export function buildReserveInsight(
+export function buildMajorExpenseInsight(
   periodExpenses: Expense[],
   categories: Category[],
   sym: string,
 ): AIInsightCard | null {
   const funded = periodExpenses
-    .map(e => ({ e, part: fundingParts(e).reserve }))
+    .map(e => ({ e, part: fundingParts(e).balance }))
     .filter(x => x.part > 0);
   if (funded.length === 0) return null;
 
@@ -1406,16 +1408,16 @@ export function buildReserveInsight(
   const fmt = (v: number) => `${sym}${Math.round(v).toLocaleString('en-IN')}`;
 
   return {
-    id: 'reserve_outflow',
+    id: 'major_expense',
     severity: 'info',
     category: 'spending',
-    title: 'Paid from Reserve',
-    summary: `${fmt(total)} was used from your Reserve this month for ${largest.e.description} (${catName})${others > 0 ? ` and ${others} other major expense${others === 1 ? '' : 's'}` : ''}.`,
-    detail: `Major expenses paid from your reserve are not counted as overspending — they draw on money you set aside. ${funded.length} transaction${funded.length === 1 ? '' : 's'} used the reserve this period for a total of ${fmt(total)}.`,
+    title: 'Paid from Existing Balance',
+    summary: `${fmt(total)} was paid from your existing balance this month for ${largest.e.description} (${catName})${others > 0 ? ` and ${others} other major expense${others === 1 ? '' : 's'}` : ''}.`,
+    detail: `Major expenses paid from your existing balance are not counted as overspending — they draw on money accumulated over time. ${funded.length} transaction${funded.length === 1 ? '' : 's'} used the existing balance this period for a total of ${fmt(total)}.`,
     metric: fmt(total),
     metricDirection: 'neutral',
     confidence: 100,
-    actionLabel: 'View reserve',
-    actionHint: 'planning:reserve',
+    actionLabel: 'View major expenses',
+    actionHint: 'planning:major',
   };
 }

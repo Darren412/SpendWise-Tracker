@@ -160,7 +160,7 @@ export default function WeeklySpendTracker() {
     categories, excludedCategoryIds,
     selectedMonth, selectedYear, selectedCity, currency, financialCycleStart,
   } = useBudgetStore();
-  // Weekly spend tracks REGULAR spend — reserve outflows aren't behaviour
+  // Weekly spend tracks REGULAR spend — balance-funded outflows aren't't behaviour
   const expenses = useRegularExpenses();
   const [expandedWeek, setExpandedWeek] = useState<number | null>(null);
 

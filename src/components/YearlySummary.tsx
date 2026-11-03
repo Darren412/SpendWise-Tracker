@@ -8,7 +8,7 @@ import {
 import { useBudgetStore } from '@/store/budgetStore';
 import { useBalanceLedger } from '@/hooks/useBalanceLedger';
 import { getYearBalance } from '@/lib/balance';
-import { fundingParts } from '@/lib/reserve';
+import { fundingParts } from '@/lib/funding';
 import { useChartTheme } from '@/components/charts/chartTheme';
 import OpeningBalanceModal from '@/components/balance/OpeningBalanceModal';
 import { formatCurrency } from '@/utils/currency';
@@ -66,7 +66,7 @@ interface CategoryRow {
   color: string;
   total: number;
   lastTotal: number;
-  reserve: number;   // reserve-funded portion inside `total`
+  major: number;     // balance-funded portion inside `total`
   share: number;
   monthlyAvg: number;
   txns: number;
@@ -133,8 +133,8 @@ export default function YearlySummary() {
     const totalIncome = yearIncome.reduce((s, i) => s + i.amount, 0);
     // Behaviour: regular (budget) portions only; money: actual totals.
     const regularSpent = yearExpenses.reduce((s, e) => s + fundingParts(e).budget, 0);
-    const reserveSpent = yearExpenses.reduce((s, e) => s + fundingParts(e).reserve, 0);
-    const reserveCount = yearExpenses.filter((e) => fundingParts(e).reserve > 0).length;
+    const majorSpent = yearExpenses.reduce((s, e) => s + fundingParts(e).balance, 0);
+    const majorCount = yearExpenses.filter((e) => fundingParts(e).balance > 0).length;
     const totalSavings = totalIncome - regularSpent; // operating surplus
     const savingsRate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
 
@@ -166,7 +166,7 @@ export default function YearlySummary() {
       color: string;
       total: number;
       lastTotal: number;
-      reserveTotal: number;
+      majorTotal: number;
       txns: number;
       monthly: number[];
       exps: Expense[];
@@ -183,7 +183,7 @@ export default function YearlySummary() {
           color: meta?.color ?? UNCATEGORIZED.color,
           total: 0,
           lastTotal: 0,
-          reserveTotal: 0,
+          majorTotal: 0,
           txns: 0,
           monthly: Array(12).fill(0),
           exps: [],
@@ -196,7 +196,7 @@ export default function YearlySummary() {
       const a = bucketFor(e.category);
       const mi = parseInt(e.month, 10) - 1;
       a.total += e.amount;
-      a.reserveTotal += fundingParts(e).reserve;
+      a.majorTotal += fundingParts(e).balance;
       a.txns += 1;
       if (mi >= 0 && mi <= 11) a.monthly[mi] += e.amount;
       a.exps.push(e);
@@ -212,7 +212,7 @@ export default function YearlySummary() {
       color: a.color,
       total: a.total,
       lastTotal: a.lastTotal,
-      reserve: a.reserveTotal,
+      major: a.majorTotal,
       share: totalSpent > 0 ? (a.total / totalSpent) * 100 : 0,
       monthlyAvg: a.total / avgDivisor,
       txns: a.txns,
@@ -248,7 +248,7 @@ export default function YearlySummary() {
     const avgMonthlySpend = activeExpenseMonths > 0 ? totalSpent / activeExpenseMonths : 0;
     const avgMonthlyIncome = activeIncomeMonths > 0 ? totalIncome / activeIncomeMonths : 0;
     const txnsPerMonth = activeExpenseMonths > 0 ? yearExpenses.length / activeExpenseMonths : 0;
-    // Pace projection uses regular spend — a one-off reserve draw shouldn't
+    // Pace projection uses regular spend — a one-off major draw shouldn't
     // project forward as behaviour.
     const projectedSpend = elapsed > 0 ? (regularSpent / elapsed) * 12 : 0;
 
@@ -329,13 +329,13 @@ export default function YearlySummary() {
       });
     }
 
-    if (reserveSpent > 0) {
+    if (majorSpent > 0) {
       insights.push({
         Icon: PiggyBank,
         bg: 'var(--amber-50)',
         border: 'var(--amber-200)',
         color: 'var(--warning-text)',
-        text: `${formatCurrency(reserveSpent, currency)} was paid from your reserve this year across ${reserveCount} major expense${reserveCount === 1 ? '' : 's'}.`,
+        text: `${formatCurrency(majorSpent, currency)} of major expenses were paid from your existing balance this year across ${majorCount} transaction${majorCount === 1 ? '' : 's'}.`,
       });
     }
 
@@ -411,8 +411,8 @@ export default function YearlySummary() {
       yearIncome,
       totalSpent,
       regularSpent,
-      reserveSpent,
-      reserveCount,
+      majorSpent,
+      majorCount,
       totalIncome,
       totalSavings,
       savingsRate,
@@ -465,7 +465,7 @@ export default function YearlySummary() {
     yearExpenses,
     totalSpent,
     regularSpent,
-    reserveSpent,
+    majorSpent,
     totalIncome,
     totalSavings,
     savingsRate,
@@ -614,11 +614,11 @@ export default function YearlySummary() {
             {[
               { l: 'Opening balance', v: yearBalance.opening, sub: year > openingBalance.startYear ? `Carried forward from ${year - 1}` : 'Baseline' },
               { l: '+ Total income', v: yearBalance.income },
-              yearBalance.reserveExpenses > 0
+              yearBalance.majorExpenses > 0
                 ? { l: '− Regular expenses', v: -yearBalance.regularExpenses, sub: 'monthly budget' }
                 : { l: '− Total expenses', v: -yearBalance.expenses },
-              ...(yearBalance.reserveExpenses > 0
-                ? [{ l: '− Reserve expenses', v: -yearBalance.reserveExpenses, sub: 'paid from reserve' }]
+              ...(yearBalance.majorExpenses > 0
+                ? [{ l: '− Major expenses', v: -yearBalance.majorExpenses, sub: 'from existing balance' }]
                 : []),
             ].map((r, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '5px 0', color: 'var(--text-700)' }}>
@@ -629,15 +629,10 @@ export default function YearlySummary() {
                 <span style={{ fontWeight: 700 }}>{formatCurrency(r.v, currency)}</span>
               </div>
             ))}
-            {yearBalance.reserveExpenses > 0 && (
+            {yearBalance.majorExpenses > 0 && (
               <div style={{ textAlign: 'right', fontSize: '0.68rem', color: 'var(--text-400)', marginTop: 2 }}>
                 Total actual expenses: {formatCurrency(yearBalance.expenses, currency)}
               </div>
-            )}
-            {(yearBalance.reserveIn > 0 || yearBalance.reserveOut > 0) && (
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-400)', marginTop: 8, fontFamily: 'inherit' }}>
-                Allocations (not income/expense): +{formatCurrency(yearBalance.reserveIn, currency)} to reserve, −{formatCurrency(yearBalance.reserveOut, currency)} released.
-              </p>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '7px 0 2px', borderTop: '2px solid var(--border-strong)', color: 'var(--text-900)' }}>
               <span style={{ fontWeight: 800 }}>
@@ -822,9 +817,9 @@ export default function YearlySummary() {
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--danger-text)' }}>Total Spent</span>
           </div>
           <p className="text-xl font-bold num-mono" style={{ color: 'var(--danger-text)' }}>{formatCurrency(totalSpent, currency)}</p>
-          {reserveSpent > 0 && (
+          {majorSpent > 0 && (
             <p className="num-mono" style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-500)' }}>
-              Regular {formatCurrency(regularSpent, currency)} · Reserve {formatCurrency(reserveSpent, currency)}
+              Regular {formatCurrency(regularSpent, currency)} · Existing balance {formatCurrency(majorSpent, currency)}
             </p>
           )}
           {renderYoY(spentYoY, false)}
@@ -1047,12 +1042,12 @@ export default function YearlySummary() {
                         <span className="text-xs font-bold truncate" style={{ color: 'var(--text-700)' }}>
                           {row.name}
                         </span>
-                        {row.reserve > 0 && (
+                        {row.major > 0 && (
                           <span
-                            title={`Includes ${formatCurrency(row.reserve, currency)} paid from reserve`}
+                            title={`Includes ${formatCurrency(row.major, currency)} paid from existing balance`}
                             style={{ fontSize: '0.5625rem', fontWeight: 800, color: 'var(--amber-600)', background: 'var(--amber-50)', border: '1px solid var(--amber-200)', borderRadius: 99, padding: '1px 6px', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}
                           >
-                            Reserve
+                            Major
                           </span>
                         )}
                         <ChevronDown
@@ -1150,9 +1145,9 @@ export default function YearlySummary() {
                           </div>
                         </div>
                         <div>
-                          {row.reserve > 0 && (
+                          {row.major > 0 && (
                             <p className="num-mono" style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--amber-600)', marginBottom: 8 }}>
-                              of which {formatCurrency(row.reserve, currency)} paid from reserve
+                              of which {formatCurrency(row.major, currency)} paid from existing balance
                             </p>
                           )}
                           <p
@@ -1497,9 +1492,9 @@ export default function YearlySummary() {
                       )}
                     </div>
                   </div>
-                  {hasBalance && mb!.reserveExpenses > 0 && (
+                  {hasBalance && mb!.majorExpenses > 0 && (
                     <div className="num-mono" style={{ fontSize: '0.6875rem', color: 'var(--text-400)', marginBottom: 6 }}>
-                      Regular {formatCurrency(mb!.regularExpenses, currency)} · Reserve {formatCurrency(mb!.reserveExpenses, currency)}
+                      Regular {formatCurrency(mb!.regularExpenses, currency)} · Major {formatCurrency(mb!.majorExpenses, currency)}
                     </div>
                   )}
                   <div className="space-y-1">

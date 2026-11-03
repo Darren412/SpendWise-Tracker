@@ -14,7 +14,7 @@ import { useRegularExpenses } from '@/hooks/useRegularExpenses';
 import BudgetAlertsBanner from '@/components/BudgetAlertsBanner';
 import GoalsSummaryCard from '@/components/GoalsSummaryCard';
 import PotentialSavingsCard from '@/components/PotentialSavingsCard';
-import ReserveSummaryCard from '@/components/ReserveSummaryCard';
+import MajorExpensesCard from '@/components/MajorExpensesCard';
 
 interface OverviewWorkspaceProps {
   onNavigate: (workspace: string) => void;
@@ -36,9 +36,9 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
   const sym = currencySymbol(currency);
 
   // Budget performance & behaviour use REGULAR spend (budget portions) —
-  // reserve-funded amounts are shown separately via the figures below.
+  // balance-funded amounts are shown separately via the figures below.
   const regularAll = useRegularExpenses();
-  const reserveThisPeriod = useMemo(() => {
+  const balanceThisPeriod = useMemo(() => {
     const regular = regularAll
       .filter(e => e.month === selectedMonth && e.year === selectedYear)
       .reduce((s, e) => s + e.amount, 0);
@@ -357,9 +357,9 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
               )}
             </div>
             <div className="ws-kpi-value">{formatCurrencyShort(cityTotalExpenses, currency)}</div>
-            {reserveThisPeriod > 0 && (
+            {balanceThisPeriod > 0 && (
               <div className="ws-kpi-delta" style={{ color: 'var(--warning-text)' }}>
-                + {formatCurrencyShort(reserveThisPeriod, currency)} paid from reserve
+                + {formatCurrencyShort(balanceThisPeriod, currency)} paid from existing balance
               </div>
             )}
             {prevExpenses > 0 && (
@@ -728,8 +728,8 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
       {/* ── Potential savings ── */}
       <PotentialSavingsCard onNavigate={onNavigate} />
 
-      {/* ── Reserve / major expenses ── */}
-      <ReserveSummaryCard onNavigate={onNavigate} />
+      {/* ── Major expenses from existing balance ── */}
+      <MajorExpensesCard onNavigate={onNavigate} />
 
       {/* ── Savings goals summary ── */}
       <GoalsSummaryCard onNavigate={onNavigate} />

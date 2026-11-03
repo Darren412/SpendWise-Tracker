@@ -13,11 +13,11 @@ import { formatCurrency } from '@/utils/currency';
 import GoalCard from '@/components/goals/GoalCard';
 import GoalForm from '@/components/goals/GoalForm';
 import SavingsTab from '@/components/savings/SavingsTab';
-import ReserveTab from '@/components/reserve/ReserveTab';
+import MajorExpensesTab from '@/components/major/MajorExpensesTab';
 import { useRegularExpenses } from '@/hooks/useRegularExpenses';
 import { Landmark } from 'lucide-react';
 
-type Tab = 'save' | 'reserve' | 'goals' | 'budgets';
+type Tab = 'save' | 'major' | 'goals' | 'budgets';
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '8px 11px', borderRadius: 'var(--r-sm)',
@@ -62,7 +62,7 @@ export default function PlanningWorkspace({ initialTab, onNavigate }: { initialT
   const activeCount = goals.filter(g => !g.archived).length;
 
   // ── Budget status data (same period set as Overview / useBudgetAlerts) ────
-  // Budget performance measures REGULAR spend only — reserve portions don't
+  // Budget performance measures REGULAR spend only — balance-funded portions don't
   // count against the monthly budget.
   const periodExpenses = useRegularExpenses().filter(e => e.month === selectedMonth && e.year === selectedYear);
   const overallBudget = getMonthlyBudget(selectedMonth, selectedYear);
@@ -129,7 +129,7 @@ export default function PlanningWorkspace({ initialTab, onNavigate }: { initialT
         <div className="ws-tab-bar" role="group" aria-label="Planning sections">
           {([
             { id: 'save', label: 'Where Can I Save?', Icon: Sparkles },
-            { id: 'reserve', label: 'Reserve', Icon: Landmark },
+            { id: 'major', label: 'Major Expenses', Icon: Landmark },
             { id: 'goals', label: 'Savings Goals', Icon: PiggyBank },
             { id: 'budgets', label: 'Budgets & Alerts', Icon: Bell },
           ] as const).map(({ id, label, Icon }) => (
@@ -143,8 +143,8 @@ export default function PlanningWorkspace({ initialTab, onNavigate }: { initialT
       {/* ══════════ TAB: WHERE CAN I SAVE? ══════════ */}
       {tab === 'save' && <SavingsTab />}
 
-      {/* ══════════ TAB: RESERVE ══════════ */}
-      {tab === 'reserve' && <ReserveTab onNavigate={onNavigate} />}
+      {/* ══════════ TAB: MAJOR EXPENSES ══════════ */}
+      {tab === 'major' && <MajorExpensesTab onNavigate={onNavigate} />}
 
       {/* ══════════ TAB: SAVINGS GOALS ══════════ */}
       {tab === 'goals' && (
