@@ -107,3 +107,16 @@ export function ordinalSuffix(n: number): string {
 export function cycleDayLabel(day: number): string {
   return `${day}${ordinalSuffix(day)} of each month`;
 }
+
+/**
+ * Today's date as a "YYYY-MM-DD" string in the LOCAL timezone.
+ * `new Date().toISOString().split('T')[0]` is UTC and returns yesterday's
+ * date for timezones ahead of UTC during early-morning hours.
+ */
+export function todayLocalISO(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}

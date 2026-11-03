@@ -16,6 +16,7 @@ interface BudgetStore {
   userId: string | null;
   currency: string;
   setUserId: (userId: string | null) => void;
+  resetForLogout: () => void;
   setCurrency: (currency: string) => void;
   setSelectedMonth: (month: string) => void;
   setSelectedYear: (year: number) => void;
@@ -182,6 +183,59 @@ function getLocalBackup(userId: string | null): { expenses: string | null; incom
   };
 }
 
+// ── Dirty flag: per-user localStorage marker for "has unsynced changes" ─────
+// Set on every mutation, cleared only when a push succeeds with nothing newer
+// queued. On the next load, a set flag means the local backup must be merged
+// INTO remote data — otherwise remote is authoritative and deletions made on
+// other devices are allowed to propagate.
+function dirtyKey(userId: string): string {
+  return `budget_${userId}_dirty`;
+}
+function markDirty(userId: string) {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(dirtyKey(userId), '1'); } catch { /* quota — non-critical */ }
+}
+function clearDirty(userId: string) {
+  if (typeof window === 'undefined') return;
+  try { localStorage.removeItem(dirtyKey(userId)); } catch { /* non-critical */ }
+}
+function isDirty(userId: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try { return localStorage.getItem(dirtyKey(userId)) === '1'; } catch { return false; }
+}
+
+/**
+ * Pure financial-cycle remap used on the load paths. Same mapping as
+ * migrateToFinancialCycle but returns the relabelled arrays and whether
+ * anything changed — no state write, no scheduled sync.
+ */
+function applyCycle(
+  expenses: Expense[],
+  income: Income[],
+  startDay: number,
+): { expenses: Expense[]; income: Income[]; changed: boolean } {
+  let changed = false;
+  const newExpenses = expenses.map((e) => {
+    if (!e.date) return e;
+    const period = getFinancialPeriod(e.date, startDay);
+    if (period.month !== e.month || period.year !== e.year) {
+      changed = true;
+      return { ...e, ...period };
+    }
+    return e;
+  });
+  const newIncome = income.map((i) => {
+    if (!i.date) return i;
+    const period = getFinancialPeriod(i.date, startDay);
+    if (period.month !== i.month || period.year !== i.year) {
+      changed = true;
+      return { ...i, ...period };
+    }
+    return i;
+  });
+  return { expenses: newExpenses, income: newIncome, changed };
+}
+
 
 // ── Financial cycle init (reads localStorage before store creation) ─────────
 function getSavedCycleStart(): number {
@@ -217,6 +271,21 @@ let syncInFlight = false;
 let syncPendingAfterFlight = false;
 let loadVersion = 0; // guards against concurrent loadFromSupabase calls
 
+// Hydration & dirty-tracking:
+//  - remoteHydrated gates every remote write so pre-hydration mutations
+//    (e.g. a city toggle while data is still loading) can't wipe remote data.
+//  - localHydrated means the in-memory store holds this user's loaded data —
+//    before it's true, backing up would overwrite the good localStorage copy
+//    with empty/default arrays.
+//  - mutationSeq bumps on each mutation so a resolved push can tell whether
+//    it flushed the latest state or something newer is still pending.
+//  - loadRetry* backs off and retries failed loads — remote stays the truth.
+let remoteHydrated = false;
+let localHydrated = false;
+let mutationSeq = 0;
+let loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let loadRetryCount = 0;
+
 /** Read the latest state from the store and return the sync payload. */
 function getLatestSyncPayload(): RemoteData {
   const { expenses, income, categories, currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity, savingsTarget } = useBudgetStore.getState();
@@ -229,7 +298,10 @@ function getLatestSyncPayload(): RemoteData {
 /** Actually push data to Supabase (called by the debounce / retry). */
 async function executeSyncToSupabase() {
   const userId = useBudgetStore.getState().userId;
-  if (!userId) return;
+  if (!userId || !remoteHydrated) return;
+
+  const uid = userId;
+  const seq = mutationSeq;
 
   // Set in-flight flag BEFORE reading payload to close the TOCTOU window
   syncInFlight = true;
@@ -244,6 +316,10 @@ async function executeSyncToSupabase() {
     if (error) throw error;
     syncRetryCount = 0;
     if (syncRetryTimeout) clearTimeout(syncRetryTimeout);
+    // Clear the dirty flag only if nothing newer was queued while we pushed
+    if (seq === mutationSeq && !syncPendingAfterFlight && useBudgetStore.getState().userId === uid) {
+      clearDirty(uid);
+    }
     useBudgetStore.setState({ syncing: false, networkError: false });
   } catch {
     useBudgetStore.setState({ syncing: false, networkError: true });
@@ -269,8 +345,24 @@ async function executeSyncToSupabase() {
  * - If a sync is already in-flight, we flag a re-sync for after it completes.
  */
 function scheduleSyncToSupabase() {
+  const uid = useBudgetStore.getState().userId;
+
+  // Pre-hydration for a signed-in user: the store still holds empty/default
+  // data — backing it up would clobber the good local backup, and marking
+  // dirty would make the next load's merge treat those defaults as truth.
+  if (uid && !localHydrated) return;
+
   // Immediate localStorage backup with latest state
   backupToLocalStorage(getLatestSyncPayload());
+
+  if (uid) {
+    markDirty(uid);
+    mutationSeq++;
+  }
+
+  // Not hydrated — skip the remote write entirely. The dirty local backup is
+  // merged into remote data by the next successful loadFromSupabase.
+  if (!remoteHydrated) return;
 
   if (syncInFlight) {
     // A sync is currently awaiting Supabase — mark that we need to re-sync
@@ -279,29 +371,50 @@ function scheduleSyncToSupabase() {
   }
 
   if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
-  syncDebounceTimer = setTimeout(() => executeSyncToSupabase(), 350);
+  syncDebounceTimer = setTimeout(() => {
+    syncDebounceTimer = null;
+    executeSyncToSupabase();
+  }, 350);
 }
 
 /**
  * Flush any pending debounced sync immediately.
- * Called on beforeunload to prevent data loss when closing the tab.
+ * Called on beforeunload and before signOut so pending changes aren't lost.
  */
-export function flushPendingSync() {
+export async function flushPendingSync(): Promise<void> {
   if (syncDebounceTimer) {
     clearTimeout(syncDebounceTimer);
     syncDebounceTimer = null;
-    // Fire the sync immediately (best-effort, browser may cut it short)
-    executeSyncToSupabase();
+    await executeSyncToSupabase();
+    return;
+  }
+  if (syncInFlight) {
+    // Wait for the in-flight sync to finish (poll every 100ms, max 5s)
+    const deadline = Date.now() + 5000;
+    while (syncInFlight && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    if (syncPendingAfterFlight) {
+      syncPendingAfterFlight = false;
+      await executeSyncToSupabase();
+    }
+    // The finished sync may have scheduled a debounced follow-up
+    if (syncDebounceTimer) {
+      clearTimeout(syncDebounceTimer);
+      syncDebounceTimer = null;
+      await executeSyncToSupabase();
+    }
   }
 }
 
 // Auto-register beforeunload handler (client-side only)
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
-    // Flush localStorage immediately (synchronous, guaranteed)
-    backupToLocalStorage(getLatestSyncPayload());
+    // Flush localStorage immediately (synchronous, guaranteed) — but not
+    // pre-hydration, which would overwrite the good backup with defaults
+    if (localHydrated) backupToLocalStorage(getLatestSyncPayload());
     // Attempt Supabase sync (may not complete, but localStorage is safe)
-    flushPendingSync();
+    void flushPendingSync();
   });
 
   // Network status awareness — retry sync when coming back online
@@ -311,6 +424,10 @@ if (typeof window !== 'undefined') {
       if (syncRetryTimeout) { clearTimeout(syncRetryTimeout); syncRetryTimeout = null; }
       scheduleSyncToSupabase();
     }
+    // A failed load retries on reconnect too — remote is the source of truth
+    if (useBudgetStore.getState().userId && !remoteHydrated) {
+      loadFromSupabase();
+    }
   });
 }
 
@@ -318,7 +435,9 @@ if (typeof window !== 'undefined') {
 async function syncToSupabase(data: RemoteData) {
   backupToLocalStorage(data);
   const userId = useBudgetStore.getState().userId;
-  if (!userId) return;
+  if (!userId || !remoteHydrated) return;
+  const uid = userId;
+  const seq = mutationSeq;
   useBudgetStore.setState({ syncing: true, networkError: false });
   try {
     const { error } = await supabase
@@ -326,6 +445,10 @@ async function syncToSupabase(data: RemoteData) {
       .upsert({ user_id: userId, ...data }, { onConflict: 'user_id' });
     if (error) throw error;
     syncRetryCount = 0;
+    // Clear the dirty flag only if nothing newer was queued while we pushed
+    if (seq === mutationSeq && !syncPendingAfterFlight && useBudgetStore.getState().userId === uid) {
+      clearDirty(uid);
+    }
     useBudgetStore.setState({ syncing: false, networkError: false });
   } catch {
     useBudgetStore.setState({ syncing: false, networkError: true });
@@ -336,6 +459,12 @@ async function loadFromSupabase() {
   const userId = useBudgetStore.getState().userId;
   if (!userId) return;
 
+  // Block remote writes until this load completes. Mutations that happen in
+  // the meantime are backed up + marked dirty and get merged below instead of
+  // pushing the still-empty store over remote data.
+  remoteHydrated = false;
+  const uid = userId;
+
   // Version guard: if another load starts while we're awaiting, discard our stale result
   const thisLoad = ++loadVersion;
 
@@ -345,8 +474,8 @@ async function loadFromSupabase() {
     .eq('user_id', userId)
     .single();
 
-  // Stale guard — a newer load started while we were awaiting
-  if (thisLoad !== loadVersion) return;
+  // Stale guard — a newer load started (or the user changed) while we were awaiting
+  if (thisLoad !== loadVersion || useBudgetStore.getState().userId !== uid) return;
 
   // Distinguish "no rows" (PGRST116) from real network/server errors
   const isNoRows = error?.code === 'PGRST116';
@@ -366,11 +495,16 @@ async function loadFromSupabase() {
     if (!Array.isArray(parsedIncome))   parsedIncome   = [];
     if (!Array.isArray(rawCategories))  rawCategories  = defaultCategories;
     const { categories: migratedCats } = migrateCategories(rawCategories);
-    useBudgetStore.setState({ expenses: parsedExpenses, income: parsedIncome, categories: migratedCats });
+    // Apply the cycle mapping directly — migrateToFinancialCycle() would
+    // schedule a sync and push this stale backup over fresher remote data.
+    const cycled = applyCycle(parsedExpenses, parsedIncome, useBudgetStore.getState().financialCycleStart);
+    useBudgetStore.setState({ expenses: cycled.expenses, income: cycled.income, categories: migratedCats });
+    localHydrated = true;
     useBudgetStore.setState({ networkError: true });
-    if (useBudgetStore.getState().financialCycleStart > 1) {
-      useBudgetStore.getState().migrateToFinancialCycle();
-    }
+    // Retry the load with backoff — remote remains the source of truth
+    loadRetryCount++;
+    if (loadRetryTimer) clearTimeout(loadRetryTimer);
+    loadRetryTimer = setTimeout(loadFromSupabase, Math.min(60000, 2000 * Math.pow(2, loadRetryCount)));
     return;
   }
 
@@ -387,27 +521,32 @@ async function loadFromSupabase() {
     if (!Array.isArray(parsedIncome))   parsedIncome   = [];
     if (!Array.isArray(rawCategories))  rawCategories  = defaultCategories;
     const { categories: migratedCats, changed } = migrateCategories(rawCategories);
+    // Apply the cycle mapping before setState/push (pure — no sync scheduled)
+    const cycled = applyCycle(parsedExpenses, parsedIncome, useBudgetStore.getState().financialCycleStart);
 
     // Include current local settings in the initial upload
     const { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity, savingsTarget } = useBudgetStore.getState();
     const migrated: RemoteData = {
-      expenses:   parsedExpenses,
-      income:     parsedIncome,
+      expenses:   cycled.expenses,
+      income:     cycled.income,
       categories: migratedCats,
       settings:   { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity, savingsTarget },
     };
 
-    if (thisLoad !== loadVersion) return;
+    if (thisLoad !== loadVersion || useBudgetStore.getState().userId !== uid) return;
     const { settings: _ms, ...migratedData } = migrated;
     useBudgetStore.setState(migratedData);
+    localHydrated = true;
+
+    // Mark hydrated BEFORE the push — syncToSupabase is gated on it
+    remoteHydrated = true;
+    loadRetryCount = 0;
+    if (loadRetryTimer) { clearTimeout(loadRetryTimer); loadRetryTimer = null; }
+    useBudgetStore.setState({ networkError: false });
 
     // Push existing localStorage data up to Supabase (and if migration ran, persist it)
     if (local.expenses || local.income || local.categories || changed) {
       await syncToSupabase(migrated);
-    }
-
-    if (useBudgetStore.getState().financialCycleStart > 1) {
-      useBudgetStore.getState().migrateToFinancialCycle();
     }
     return;
   }
@@ -459,49 +598,76 @@ async function loadFromSupabase() {
     useBudgetStore.setState(settingsUpdate);
   }
 
-  // Merge localStorage backup with Supabase data to prevent data loss
-  const local = getLocalBackup(userId);
+  // Merge the localStorage backup ONLY when this device has unsynced changes
+  // (dirty flag). Union by id — local wins for shared ids, remote-only items
+  // kept in remote order, local-only appended. When not dirty, remote is
+  // authoritative so deletions made on other devices propagate (no resurrection).
+  const dirty = isDirty(uid);
+  if (dirty) {
+    const local = getLocalBackup(userId);
 
-  let localExpenses: Expense[] = [];
-  let localIncome: Income[]    = [];
-  let localCategories: Category[] = [];
-  try { localExpenses   = local.expenses   ? JSON.parse(local.expenses)   : []; } catch { /* corrupted */ }
-  try { localIncome     = local.income     ? JSON.parse(local.income)     : []; } catch { /* corrupted */ }
-  try { localCategories = local.categories ? JSON.parse(local.categories) : []; } catch { /* corrupted */ }
-  if (!Array.isArray(localExpenses))   localExpenses   = [];
-  if (!Array.isArray(localIncome))     localIncome     = [];
-  if (!Array.isArray(localCategories)) localCategories = [];
+    let localExpenses: Expense[] = [];
+    let localIncome: Income[]    = [];
+    let localCategories: Category[] = [];
+    try { localExpenses   = local.expenses   ? JSON.parse(local.expenses)   : []; } catch { /* corrupted */ }
+    try { localIncome     = local.income     ? JSON.parse(local.income)     : []; } catch { /* corrupted */ }
+    try { localCategories = local.categories ? JSON.parse(local.categories) : []; } catch { /* corrupted */ }
+    if (!Array.isArray(localExpenses))   localExpenses   = [];
+    if (!Array.isArray(localIncome))     localIncome     = [];
+    if (!Array.isArray(localCategories)) localCategories = [];
 
-  // Merge: add any local items not present in Supabase (by id)
-  const remoteExpenseIds = new Set(remote.expenses.map((e) => e.id));
-  const missingExpenses  = localExpenses.filter((e) => !remoteExpenseIds.has(e.id));
-
-  const remoteIncomeIds = new Set(remote.income.map((i) => i.id));
-  const missingIncome   = localIncome.filter((i) => !remoteIncomeIds.has(i.id));
-
-  // Also merge categories created locally but not yet in Supabase
-  const remoteCatIds = new Set(remote.categories.map((c) => c.id));
-  const missingCategories = localCategories.filter((c) => !remoteCatIds.has(c.id));
-
-  const needsMerge = missingExpenses.length > 0 || missingIncome.length > 0 || missingCategories.length > 0 || remoteCatsChanged;
-  if (needsMerge) {
-    remote.expenses   = [...remote.expenses,   ...missingExpenses];
-    remote.income     = [...remote.income,     ...missingIncome];
-    remote.categories = [...remote.categories, ...missingCategories];
-    // Push merged data back to Supabase
-    await syncToSupabase(remote);
+    const mergeById = <T extends { id: string }>(remoteArr: T[], localArr: T[]): T[] => {
+      const localById = new Map(localArr.map((x) => [x.id, x]));
+      const remoteIds = new Set(remoteArr.map((x) => x.id));
+      return [
+        ...remoteArr.map((x) => localById.get(x.id) ?? x),
+        ...localArr.filter((x) => !remoteIds.has(x.id)),
+      ];
+    };
+    remote.expenses   = mergeById(remote.expenses,   localExpenses);
+    remote.income     = mergeById(remote.income,     localIncome);
+    remote.categories = mergeById(remote.categories, localCategories);
   }
 
-  if (thisLoad !== loadVersion) return;
+  // Apply the financial-cycle mapping directly — migrateToFinancialCycle()
+  // would schedule a sync; the conditional push below covers any relabelling.
+  const cycled = applyCycle(remote.expenses, remote.income, useBudgetStore.getState().financialCycleStart);
+  remote.expenses = cycled.expenses;
+  remote.income = cycled.income;
+
+  remoteHydrated = true;
+  loadRetryCount = 0;
+  if (loadRetryTimer) { clearTimeout(loadRetryTimer); loadRetryTimer = null; }
+  useBudgetStore.setState({ networkError: false });
+
   // Apply data (settings already applied above, strip from setState to avoid stale key)
   const { settings: _s, ...remoteData } = remote;
   useBudgetStore.setState(remoteData);
+  localHydrated = true;
   backupToLocalStorage(remote);
 
-  // Re-apply financial cycle mapping after data loads (in case cycle != calendar month)
-  if (useBudgetStore.getState().financialCycleStart > 1) {
-    useBudgetStore.getState().migrateToFinancialCycle();
+  // Push merged/migrated data back to Supabase when anything changed.
+  // A successful push clears the dirty flag via syncToSupabase; a failed one
+  // leaves it set so the next load re-merges.
+  if (dirty || remoteCatsChanged || cycled.changed) {
+    if (thisLoad !== loadVersion || useBudgetStore.getState().userId !== uid) return;
+    await syncToSupabase(remote);
   }
+}
+
+/** Clear all pending sync/load timers and flags — used on logout and when
+ *  switching users so no stale work fires for the previous session. */
+function clearPendingSyncWork() {
+  if (syncRetryTimeout) { clearTimeout(syncRetryTimeout); syncRetryTimeout = null; }
+  if (syncDebounceTimer) { clearTimeout(syncDebounceTimer); syncDebounceTimer = null; }
+  if (loadRetryTimer) { clearTimeout(loadRetryTimer); loadRetryTimer = null; }
+  syncRetryCount = 0;
+  loadRetryCount = 0;
+  syncInFlight = false;
+  syncPendingAfterFlight = false;
+  remoteHydrated = false;
+  localHydrated = false;
+  loadVersion++; // cancel any in-flight load
 }
 
 export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((set, get) => ({
@@ -528,13 +694,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
 
   setUserId: (userId: string | null) => {
     // On logout: clear pending sync timers to prevent stale writes
-    if (!userId) {
-      if (syncRetryTimeout) { clearTimeout(syncRetryTimeout); syncRetryTimeout = null; }
-      if (syncDebounceTimer) { clearTimeout(syncDebounceTimer); syncDebounceTimer = null; }
-      syncRetryCount = 0;
-      syncInFlight = false;
-      syncPendingAfterFlight = false;
-    }
+    if (!userId) clearPendingSyncWork();
     set({ userId });
     // Clean up old unscoped localStorage keys to prevent cross-user contamination
     if (userId && typeof window !== 'undefined') {
@@ -542,6 +702,14 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
       localStorage.removeItem('budget_income');
       localStorage.removeItem('budget_categories');
     }
+  },
+
+  // Full logout reset: clears in-memory data + session flags so the previous
+  // user's data isn't shown or synced. localStorage backup is intentionally
+  // kept — a re-login of the same user still has its offline copy.
+  resetForLogout: () => {
+    clearPendingSyncWork();
+    set({ userId: null, expenses: [], income: [], categories: defaultCategories, syncing: false, networkError: false });
   },
 
   setCurrency: (currency: string) => {
@@ -608,12 +776,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
 
   migrateToFinancialCycle: () => {
     const { financialCycleStart, expenses, income } = get();
-    const newExpenses = expenses.map(e =>
-      e.date ? { ...e, ...getFinancialPeriod(e.date, financialCycleStart) } : e
-    );
-    const newIncome = income.map(i =>
-      i.date ? { ...i, ...getFinancialPeriod(i.date, financialCycleStart) } : i
-    );
+    const { expenses: newExpenses, income: newIncome } = applyCycle(expenses, income, financialCycleStart);
     set({ expenses: newExpenses, income: newIncome });
     scheduleSyncToSupabase();
   },
