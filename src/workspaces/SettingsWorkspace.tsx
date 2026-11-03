@@ -2,12 +2,20 @@
 
 import { useBudgetStore } from '@/store/budgetStore';
 import { useAuth } from '@/components/AuthProvider';
+import { useTheme } from '@/hooks/useTheme';
 import { currencies } from '@/utils/currency';
 import { formatFinancialPeriodRange, ordinalSuffix } from '@/utils/financialCycle';
 import CategoryFilterBar from '@/components/CategoryFilterBar';
 import CategoryOrderList from '@/components/CategoryOrderList';
 import FinancialCycleSettings from '@/components/FinancialCycleSettings';
-import { Settings, User, DollarSign, Calendar, MapPin, Tag, ListOrdered, LogOut, PiggyBank } from 'lucide-react';
+import type { ThemePreference } from '@/lib/theme';
+import { Settings, User, DollarSign, Calendar, MapPin, Tag, ListOrdered, LogOut, PiggyBank, Sun, Moon, Monitor } from 'lucide-react';
+
+const THEME_OPTIONS: { value: ThemePreference; label: string; Icon: typeof Sun }[] = [
+  { value: 'light',  label: 'Light',  Icon: Sun },
+  { value: 'dark',   label: 'Dark',   Icon: Moon },
+  { value: 'system', label: 'System', Icon: Monitor },
+];
 
 export default function SettingsWorkspace() {
   const {
@@ -19,6 +27,7 @@ export default function SettingsWorkspace() {
     savingsTarget, setSavingsTarget,
   } = useBudgetStore();
   const { user, signOut } = useAuth();
+  const { preference: themePreference, setPreference: setThemePreference } = useTheme();
 
   const isDarren   = user?.email === 'darren412@gmail.com';
   const periodRange = formatFinancialPeriodRange(selectedMonth, selectedYear, financialCycleStart);
@@ -109,6 +118,74 @@ export default function SettingsWorkspace() {
             <LogOut size={15} />
             Sign out
           </button>
+        </div>
+
+        {/* ── Appearance ── */}
+        <div className="settings-card">
+          <div className="settings-card-title">
+            <div style={{
+              width: 28, height: 28, borderRadius: 'var(--r-sm)',
+              background: 'var(--brand-50)', border: '1px solid var(--brand-100)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Moon size={14} style={{ color: 'var(--brand-600)' }} />
+            </div>
+            Appearance
+          </div>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-400)', marginBottom: 12 }}>
+            Light, dark, or follow your device setting
+          </p>
+          <div
+            role="radiogroup"
+            aria-label="Theme"
+            style={{ display: 'flex', gap: 4, background: 'var(--bg-muted)', padding: 4, borderRadius: 'var(--r-lg)' }}
+          >
+            {THEME_OPTIONS.map(({ value, label, Icon }) => {
+              const checked = themePreference === value;
+              return (
+                <button
+                  key={value}
+                  role="radio"
+                  aria-checked={checked}
+                  tabIndex={checked ? 0 : -1}
+                  onClick={() => setThemePreference(value)}
+                  onKeyDown={e => {
+                    const idx = THEME_OPTIONS.findIndex(o => o.value === themePreference);
+                    let next = -1;
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (idx + 1) % THEME_OPTIONS.length;
+                    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (idx - 1 + THEME_OPTIONS.length) % THEME_OPTIONS.length;
+                    if (next >= 0) {
+                      e.preventDefault();
+                      setThemePreference(THEME_OPTIONS[next].value);
+                      const btns = e.currentTarget.parentElement?.querySelectorAll('button');
+                      btns?.[next]?.focus();
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    padding: '8px 0',
+                    borderRadius: 'var(--r-md)',
+                    border: 'none',
+                    fontFamily: 'inherit',
+                    fontSize: '0.8125rem',
+                    fontWeight: checked ? 700 : 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    background: checked ? 'var(--bg-surface)' : 'transparent',
+                    color: checked ? 'var(--brand-600)' : 'var(--text-500)',
+                    boxShadow: checked ? 'var(--shadow-xs)' : 'none',
+                  }}
+                >
+                  <Icon size={13} />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* ── Currency ── */}
@@ -248,7 +325,7 @@ export default function SettingsWorkspace() {
             <div className="settings-card-title">
               <div style={{
                 width: 28, height: 28, borderRadius: 'var(--r-sm)',
-                background: 'var(--purple-50)', border: '1px solid #ddd6fe',
+                background: 'var(--purple-50)', border: '1px solid var(--purple-200)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <MapPin size={14} style={{ color: 'var(--purple-600)' }} />
@@ -287,7 +364,7 @@ export default function SettingsWorkspace() {
           <div className="settings-card-title">
             <div style={{
               width: 28, height: 28, borderRadius: 'var(--r-sm)',
-              background: 'var(--cyan-50)', border: '1px solid #a5f3fc',
+              background: 'var(--cyan-50)', border: '1px solid var(--cyan-200)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <Tag size={14} style={{ color: 'var(--cyan-500)' }} />

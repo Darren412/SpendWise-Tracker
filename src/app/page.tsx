@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import LeftPane from '@/components/LeftPane';
+import MobileNav from '@/components/MobileNav';
 import TopToolbar from '@/components/TopToolbar';
 import AddTransactionModal from '@/components/AddTransactionModal';
 import LoginPage from '@/components/LoginPage';
@@ -34,7 +35,7 @@ function WorkspaceSkeleton() {
         <div className="skeleton" style={{ width: 320, height: 14, borderRadius: 6 }} />
       </div>
       {/* KPI skeleton */}
-      <div className="stagger-fade" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div className="stagger-fade" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 24 }}>
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="skeleton" style={{ height: 110, borderRadius: 16 }} />
         ))}
@@ -129,6 +130,12 @@ export default function Home() {
 
         {/* ── Fixed sidebar nav ── */}
         <LeftPane
+          activeWorkspace={activeWorkspace}
+          onWorkspaceChange={handleWorkspaceChange}
+        />
+
+        {/* ── Mobile bottom nav (<768px) ── */}
+        <MobileNav
           activeWorkspace={activeWorkspace}
           onWorkspaceChange={handleWorkspaceChange}
         />
