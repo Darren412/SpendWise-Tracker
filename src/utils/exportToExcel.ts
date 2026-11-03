@@ -24,6 +24,13 @@ function fmtCurrency(n: number, sym: string) {
   return `${sym}${n.toFixed(2)}`;
 }
 
+// Free-text cells that start with a spreadsheet formula trigger (=, +, -, @
+// or tab/CR) are prefixed with a single quote so Excel treats them as text.
+// Applied only to user-entered strings — never numbers or formatted dates.
+function safeCell(v: string): string {
+  return /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+}
+
 type AnyRow = Record<string, string | number>;
 
 function buildExpenseSheet(filtered: Expense[], categories: Category[], label: string, sym: string) {
@@ -42,8 +49,8 @@ function buildExpenseSheet(filtered: Expense[], categories: Category[], label: s
       rows.push({
         'No.': i + 1,
         Date: fmtDate(e.date),
-        Category: `${categories.find(c => c.id === e.category)?.icon ?? ''} ${resolveName(e.category)}`,
-        Description: e.description,
+        Category: safeCell(`${categories.find(c => c.id === e.category)?.icon ?? ''} ${resolveName(e.category)}`),
+        Description: safeCell(e.description),
         [`Amount (${sym})`]: e.amount,
       });
     });
@@ -70,7 +77,7 @@ function buildIncomeSheet(filtered: Income[], label: string, sym: string) {
       rows.push({
         'No.': idx + 1,
         Date: fmtDate(i.date),
-        Source: i.source,
+        Source: safeCell(i.source),
         [`Amount (${sym})`]: i.amount,
       });
     });
@@ -111,7 +118,7 @@ function buildMonthlySummary(
     const spent = filteredExpenses.filter(e => e.category === cat.id).reduce((s, e) => s + e.amount, 0);
     const txCount = filteredExpenses.filter(e => e.category === cat.id).length;
     rows.push({
-      Metric: `${cat.icon} ${cat.name}`,
+      Metric: safeCell(`${cat.icon} ${cat.name}`),
       Value: spent,
       Transactions: txCount,
     });
