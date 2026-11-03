@@ -129,6 +129,7 @@ export function generateDue(
           date,
           recurringId: rule.id,
           tax: rule.tax,
+          funding: rule.funding,
         });
       } else {
         income.push({

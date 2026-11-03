@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { RecurrenceFrequency, RecurringRule, TaxInfo } from '@/types';
+import { RecurrenceFrequency, RecurringRule, TaxInfo, FundingSource } from '@/types';
 import { useBudgetStore, generateId } from '@/store/budgetStore';
 import CategorySelect from '@/components/CategorySelect';
 import DateInput from '@/components/DateInput';
 import TaxFields from '@/components/TaxFields';
+import FundingPicker from '@/components/balance/FundingPicker';
+import { validateFunding } from '@/lib/reserve';
 import { todayLocalISO } from '@/utils/financialCycle';
 
 const FREQUENCIES: { value: RecurrenceFrequency; label: string }[] = [
@@ -51,6 +53,10 @@ export default function RecurringRuleForm({ initial, onSave, onCancel }: Recurri
   const [endDate, setEndDate] = useState(initial?.endDate ?? todayLocalISO());
   const [formCity, setFormCity] = useState(initial?.city ?? (selectedCity === 'Both' ? 'Bangalore' : selectedCity));
   const [tax, setTax] = useState<TaxInfo | undefined>(initial?.tax);
+  const [funding, setFunding] = useState<{ source: FundingSource; reserveAmount: string }>({
+    source: initial?.funding?.source ?? 'budget',
+    reserveAmount: initial?.funding?.reserveAmount !== undefined ? String(initial.funding.reserveAmount) : '',
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const typeCategories = type === 'expense'
@@ -64,6 +70,13 @@ export default function RecurringRuleForm({ initial, onSave, onCancel }: Recurri
     if (!amount || isNaN(amt) || amt <= 0) e.amount = 'Enter an amount greater than 0';
     if (!category) e.category = 'Pick a category';
     if (hasEnd && (!endDate || endDate < startDate)) e.endDate = 'End date must be on or after the start date';
+    if (type === 'expense' && !isNaN(amt) && amt > 0) {
+      const fErr = validateFunding({
+        amount: amt, source: funding.source,
+        reserveAmount: funding.source === 'split' ? parseFloat(funding.reserveAmount) : undefined,
+      });
+      if (fErr) e.funding = fErr;
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -85,6 +98,11 @@ export default function RecurringRuleForm({ initial, onSave, onCancel }: Recurri
       generatedThrough: initial?.generatedThrough,
       createdAt: initial?.createdAt ?? new Date().toISOString(),
       tax,
+      funding: type === 'expense' && funding.source !== 'budget'
+        ? funding.source === 'split'
+          ? { source: 'split', reserveAmount: parseFloat(funding.reserveAmount) }
+          : { source: funding.source }
+        : undefined,
     });
   };
 
@@ -218,6 +236,21 @@ export default function RecurringRuleForm({ initial, onSave, onCancel }: Recurri
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Pay from — expense rules only; generated occurrences copy this */}
+      {type === 'expense' && (
+        <div>
+          <FundingPicker
+            amount={parseFloat(amount)}
+            date={startDate}
+            source={funding.source}
+            reserveAmount={funding.reserveAmount}
+            onChange={setFunding}
+            compact
+          />
+          {errorText(errors.funding)}
         </div>
       )}
 

@@ -70,10 +70,14 @@ export default function Home() {
     }
   }, [authLoading, userId]);
 
-  const [planningTab, setPlanningTab] = useState<'save' | 'goals' | 'budgets' | undefined>(undefined);
+  const [planningTab, setPlanningTab] = useState<'save' | 'reserve' | 'goals' | 'budgets' | undefined>(undefined);
+  const [txnFunding, setTxnFunding] = useState<'budget' | 'reserve' | 'split' | undefined>(undefined);
 
   const handleWorkspaceChange = (id: string, subTab?: string) => {
-    setPlanningTab(id === 'planning' ? (subTab as 'save' | 'goals' | 'budgets' | undefined) : undefined);
+    setPlanningTab(id === 'planning' ? (subTab as 'save' | 'reserve' | 'goals' | 'budgets' | undefined) : undefined);
+    setTxnFunding(id === 'transactions'
+      ? (['budget', 'reserve', 'split'].includes(subTab ?? '') ? (subTab as 'budget' | 'reserve' | 'split') : undefined)
+      : undefined);
     setActiveWorkspace(id as Workspace);
   };
 
@@ -82,6 +86,18 @@ export default function Home() {
   const { newOnes } = useBudgetAlerts();
   const [alertToast, setAlertToast] = useState('');
   const toastedRef = useRef<Set<string>>(new Set());
+
+  // Reserve shortfall notices from recurring generation — surfaced once via
+  // toast, then cleared from the store.
+  const reserveNotices = useBudgetStore(s => s.reserveNotices);
+  const clearReserveNotices = useBudgetStore(s => s.clearReserveNotices);
+  const [reserveToast, setReserveToast] = useState('');
+  useEffect(() => {
+    if (reserveNotices.length === 0) return;
+    setReserveToast(reserveNotices.slice(0, 2).join(' ')
+      + (reserveNotices.length > 2 ? ` …and ${reserveNotices.length - 2} more.` : ''));
+    clearReserveNotices();
+  }, [reserveNotices, clearReserveNotices]);
   useEffect(() => {
     const fresh = newOnes.filter(a => !toastedRef.current.has(a.key));
     if (fresh.length === 0) return;
@@ -168,8 +184,8 @@ export default function Home() {
                 {activeWorkspace === 'overview'     && <OverviewWorkspace     onNavigate={handleWorkspaceChange} />}
                 {activeWorkspace === 'analytics'    && <AnalyticsWorkspace    />}
                 {activeWorkspace === 'trends'       && <TrendsWorkspace       />}
-                {activeWorkspace === 'planning'     && <PlanningWorkspace     initialTab={planningTab} />}
-                {activeWorkspace === 'transactions' && <TransactionsWorkspace onAddExpense={() => setAddModal({ open: true, tab: 'expense' })} onAddIncome={() => setAddModal({ open: true, tab: 'income' })} />}
+                {activeWorkspace === 'planning'     && <PlanningWorkspace     initialTab={planningTab} onNavigate={handleWorkspaceChange} />}
+                {activeWorkspace === 'transactions' && <TransactionsWorkspace onAddExpense={() => setAddModal({ open: true, tab: 'expense' })} onAddIncome={() => setAddModal({ open: true, tab: 'income' })} initialFunding={txnFunding} />}
                 {activeWorkspace === 'insights'     && <InsightsWorkspace     />}
                 {activeWorkspace === 'reports'      && <ReportsWorkspace      />}
                 {activeWorkspace === 'settings'     && <SettingsWorkspace     />}
@@ -193,6 +209,14 @@ export default function Home() {
         message={alertToast}
         accent="var(--amber-500)"
         onClose={() => setAlertToast('')}
+      />
+
+      {/* Reserve shortfall toast (recurring occurrences capped to fit) */}
+      <Toast
+        open={!!reserveToast}
+        message={reserveToast}
+        accent="var(--amber-500)"
+        onClose={() => setReserveToast('')}
       />
     </>
   );

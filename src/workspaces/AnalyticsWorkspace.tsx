@@ -11,6 +11,7 @@ import {
   AreaChart, Area,
 } from 'recharts';
 import { useBudgetStore } from '@/store/budgetStore';
+import { useRegularExpenses } from '@/hooks/useRegularExpenses';
 import { formatCurrency, formatCurrencyShort, currencySymbol } from '@/utils/currency';
 import { getFinancialMonthRange } from '@/utils/financialCycle';
 import DailySpendTracker from '@/components/DailySpendTracker';
@@ -32,7 +33,6 @@ function prevPeriod(month: string, year: number): { month: string; year: number 
 
 export default function AnalyticsWorkspace() {
   const {
-    expenses: allExpenses,
     income: allIncome,
     categories,
     selectedMonth, selectedYear,
@@ -41,6 +41,9 @@ export default function AnalyticsWorkspace() {
     currency,
     financialCycleStart,
   } = useBudgetStore();
+
+  // Analytics measures spending behaviour — regular (budget) portions only.
+  const allExpenses = useRegularExpenses();
 
   const sym = currencySymbol(currency);
   const { start, end } = getFinancialMonthRange(selectedMonth, selectedYear, financialCycleStart);

@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useBudgetStore } from '@/store/budgetStore';
+import { useRegularExpenses } from '@/hooks/useRegularExpenses';
 import { budgetTrackedSpend } from '@/lib/trends';
 import {
   evaluateBudgetAlerts, visibleAlerts, newlyTriggered, BudgetAlert,
@@ -21,16 +22,19 @@ export interface BudgetAlerts {
  */
 export function useBudgetAlerts(): BudgetAlerts {
   const {
-    expenses, categories, selectedMonth, selectedYear,
+    categories, selectedMonth, selectedYear,
     budgetCategoryIds, categoryBudgets, alertThresholds, alertsEnabled,
     acknowledgedAlerts, notifiedAlerts, getMonthlyBudget, spendingTargets,
   } = useBudgetStore();
+  // Budget alerts measure REGULAR spend — a reserve-funded expense must
+  // never trigger or worsen an alert.
+  const regularExpenses = useRegularExpenses();
 
   return useMemo(() => {
     if (!alertsEnabled) return { alerts: [], visible: [], newOnes: [] };
 
-    // Same period set Overview uses — label-matched, unscoped
-    const periodExpenses = expenses.filter(e => e.month === selectedMonth && e.year === selectedYear);
+    // Same period set Overview uses — label-matched, unscoped, budget portions
+    const periodExpenses = regularExpenses.filter(e => e.month === selectedMonth && e.year === selectedYear);
     const periodKey = `${selectedYear}-${selectedMonth}`;
 
     const alerts = evaluateBudgetAlerts({
@@ -59,7 +63,7 @@ export function useBudgetAlerts(): BudgetAlerts {
     const newOnes = newlyTriggered(visible, notifiedAlerts);
     return { alerts: tagged, visible, newOnes };
   }, [
-    expenses, categories, selectedMonth, selectedYear,
+    regularExpenses, categories, selectedMonth, selectedYear,
     budgetCategoryIds, categoryBudgets, alertThresholds, alertsEnabled,
     acknowledgedAlerts, notifiedAlerts, getMonthlyBudget, spendingTargets,
   ]);

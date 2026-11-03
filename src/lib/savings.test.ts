@@ -452,3 +452,40 @@ describe('worked example (6-month realistic dataset)', () => {
     }
   });
 });
+
+describe('reserve-funded spend is excluded from analysis', () => {
+  it('a pure reserve payment creates no opportunity and appears in reserveOutflows', () => {
+    // 3 complete baseline months of modest dining spend + a ₹3,00,000
+    // reserve-funded purchase in the analysed month — must not raise an
+    // opportunity for that category
+    const a = analyzeSavings(base({
+      expenses: [
+        ...repeatMonthly('dining', BASE3, 5000),
+        exp('fun', 300000, '2026-06-10', 'car down payment', { funding: { source: 'reserve' } }),
+      ],
+      ...JUNE,
+    }));
+    if (a.status !== 'ok') throw new Error('expected ok');
+    const funOpp = a.opportunities.find(o => o.catId === 'fun');
+    expect(funOpp).toBeUndefined();
+    expect(a.reserveOutflows).toHaveLength(1);
+    expect(a.reserveOutflows[0].amount).toBe(300000);
+    expect(a.reserveOutflows[0].categoryName).toBe('Movies');
+  });
+
+  it('a split txn contributes only its budget portion', () => {
+    const a = analyzeSavings(base({
+      expenses: [
+        ...repeatMonthly('dining', BASE3, 5000),
+        exp('dining', 100000, '2026-06-10', 'big dinner', { funding: { source: 'split', reserveAmount: 90000 } }),
+      ],
+      ...JUNE,
+    }));
+    if (a.status !== 'ok') throw new Error('expected ok');
+    // only ₹10,000 of the ₹1,00,000 txn lands in the analysed spend
+    const diningOpp = a.opportunities.find(o => o.catId === 'dining');
+    expect(diningOpp?.currentToDate).toBe(10000);
+    expect(a.reserveOutflows).toHaveLength(1);
+    expect(a.reserveOutflows[0].amount).toBe(90000);
+  });
+});

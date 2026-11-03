@@ -21,6 +21,7 @@ export interface ChartTheme {
   tooltipBorder: string;
   tooltipText: string;
   budget: string;
+  reserve: string;    // reserve-funded spend (distinct from regular expenses)
   series: string[];   // rotating palette for categorical series
 }
 
@@ -61,6 +62,7 @@ export function getChartTheme(): ChartTheme {
     tooltipBorder: get('--border-default', FALLBACKS.tooltipBorder),
     tooltipText: get('--text-900', FALLBACKS.text),
     budget,
+    reserve: get('--amber-400', '#fbbf24'),
     series: [income, expenses, savings, budget, '#8b5cf6', '#06b6d4', '#ec4899', '#64748b'],
   };
 }

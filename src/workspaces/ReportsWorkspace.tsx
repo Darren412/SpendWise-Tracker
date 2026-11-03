@@ -9,10 +9,11 @@ import { applyTransactionFilters, EMPTY_FILTERS, TxnRow } from '@/lib/transactio
 import { buildMonthlySeries, withMoM } from '@/lib/trends';
 import { useBalanceLedger } from '@/hooks/useBalanceLedger';
 import { summarizeTax } from '@/lib/tax';
+import { buildReserveLedger } from '@/lib/reserve';
 import { toCSV } from '@/lib/export/csv';
 import {
   transactionsDataset, monthlySummaryDataset, categorySpendingDataset,
-  budgetReportDataset, taxDataset, Dataset, BudgetReportDataset,
+  budgetReportDataset, taxDataset, reserveLedgerDataset, Dataset, BudgetReportDataset,
 } from '@/lib/export/datasets';
 import { buildReportHTML } from '@/lib/export/pdfReport';
 import { downloadText } from '@/lib/export/download';
@@ -21,12 +22,12 @@ import DateInput from '@/components/DateInput';
 import ExportModal from '@/components/ExportModal';
 import TaxSummaryPanel from '@/components/TaxSummaryPanel';
 
-type ReportType = 'transactions' | 'monthly' | 'category' | 'budget' | 'tax';
+type ReportType = 'transactions' | 'monthly' | 'category' | 'budget' | 'reserve' | 'tax';
 type ReportRange = 'period' | '3' | '6' | '12' | 'custom';
 
 const REPORT_LABELS: Record<ReportType, string> = {
   transactions: 'Transactions', monthly: 'Monthly summary', category: 'Category spending',
-  budget: 'Budget report', tax: 'Tax report',
+  budget: 'Budget report', reserve: 'Reserve ledger', tax: 'Tax report',
 };
 
 const RANGE_OPTIONS: { value: ReportRange; label: string }[] = [
@@ -42,7 +43,7 @@ export default function ReportsWorkspace() {
     expenses, income, categories,
     selectedMonth, selectedYear, selectedCity, excludedCategoryIds,
     budgetCategoryIds, getMonthlyBudget, financialCycleStart, currency,
-    categoryBudgets,
+    categoryBudgets, reserveTransfers,
   } = useBudgetStore();
   const ledger = useBalanceLedger();
 
@@ -105,6 +106,14 @@ export default function ReportsWorkspace() {
     return s.length ? `${s[0].start} → ${s[s.length - 1].end}` : '—';
   };
 
+  /** Date bounds for report types that filter entries by date (reserve ledger). */
+  const rangeBounds = (): { from: string; to: string } | undefined => {
+    if (range === 'custom') return { from: customFrom, to: customTo };
+    const s = rangeSeries();
+    if (s.length === 0) return undefined;
+    return { from: s[0].start, to: s[s.length - 1].end };
+  };
+
   const buildDataset = (): { dataset: Dataset; title: string; rangeText: string } => {
     const title = REPORT_LABELS[reportType];
     const rangeText = rangeLabel();
@@ -112,11 +121,13 @@ export default function ReportsWorkspace() {
       case 'transactions':
         return { title, rangeText, dataset: transactionsDataset(rangeRows(), categories) };
       case 'monthly':
-        return { title, rangeText, dataset: monthlySummaryDataset(withMoM(rangeSeries()), ledger) };
+        return { title, rangeText, dataset: monthlySummaryDataset(withMoM(rangeSeries()), ledger, reserveTransfers) };
       case 'category':
         return { title, rangeText, dataset: categorySpendingDataset(rangeRows(), categories) };
       case 'budget':
         return { title, rangeText, dataset: budgetReportDataset(rangeSeries(), categoryBudgets, categories) };
+      case 'reserve':
+        return { title, rangeText, dataset: reserveLedgerDataset(buildReserveLedger(reserveTransfers, expenses), rangeBounds()) };
       case 'tax':
         return { title, rangeText, dataset: taxDataset(summarizeTax(rangeRows(), categories)) };
     }
@@ -143,10 +154,12 @@ export default function ReportsWorkspace() {
           subtitle: 'Spendwise',
           dateRangeLabel: rangeText,
           currency,
-          summary: dataset.totals
-            ? Object.entries(dataset.totals).filter(([, v]) => v !== '' && v !== undefined).slice(0, 5)
-                .map(([k, v]) => ({ label: k, value: typeof v === 'number' ? formatCurrency(v as number, currency) : String(v) }))
-            : [],
+          summary: dataset.summary
+            ? dataset.summary.filter(s => s.value !== '').map(s => ({ label: s.label, value: typeof s.value === 'number' ? formatCurrency(s.value, currency) : s.value }))
+            : dataset.totals
+              ? Object.entries(dataset.totals).filter(([, v]) => v !== '' && v !== undefined).slice(0, 5)
+                  .map(([k, v]) => ({ label: k, value: typeof v === 'number' ? formatCurrency(v as number, currency) : String(v) }))
+              : [],
           sections: [
             { kind: 'table', title, columns: dataset.columns, rows: dataset.rows, totalsRow: dataset.totals },
             ...(extra ? [{ kind: 'table' as const, title: 'Category budgets', columns: extra.columns, rows: extra.rows }] : []),

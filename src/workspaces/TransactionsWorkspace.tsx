@@ -5,7 +5,7 @@ import {
   Search, Plus, Trash2, ChevronDown, ChevronUp, X,
   TrendingUp, TrendingDown, Minus, ArrowDownRight, ArrowUpRight,
   CheckSquare, Square, Download, MapPin, SlidersHorizontal,
-  Pencil, Check, RotateCcw, Zap, Calendar, Repeat, FileDown,
+  Pencil, Check, RotateCcw, Zap, Calendar, Repeat, FileDown, PiggyBank,
 } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { currencySymbol, formatCurrency } from '@/utils/currency';
@@ -17,13 +17,17 @@ import { downloadText } from '@/lib/export/download';
 import { buildReportHTML } from '@/lib/export/pdfReport';
 import { printHTML } from '@/lib/export/print';
 import { getEffectiveTax } from '@/lib/tax';
-import { RecurrenceFrequency } from '@/types';
+import { RecurrenceFrequency, FundingSource, Expense } from '@/types';
+import { fundingSource, fundingParts, validateFunding } from '@/lib/reserve';
+import { useReserve } from '@/hooks/useReserve';
 import RecurringManager from '@/components/RecurringManager';
 import DateInput from '@/components/DateInput';
+import FundingPicker, { ReserveShortfallDialog } from '@/components/balance/FundingPicker';
 
 interface TransactionsWorkspaceProps {
   onAddExpense: () => void;
   onAddIncome: () => void;
+  initialFunding?: TransactionFilters['funding']; // deep-link e.g. from the Reserve tab
 }
 
 type Tab = 'all' | 'expenses' | 'income' | 'recurring';
@@ -48,9 +52,11 @@ interface EditState {
   category: string;
   payee: string;
   notes: string;
+  fundingSource: FundingSource;
+  reserveAmount: string;
 }
 
-export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: TransactionsWorkspaceProps) {
+export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initialFunding }: TransactionsWorkspaceProps) {
   const {
     expenses, income, categories, recurring,
     selectedMonth, selectedYear, selectedCity,
@@ -62,12 +68,13 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
 
   const sym = currencySymbol(currency);
   const { start, end } = getFinancialMonthRange(selectedMonth, selectedYear, financialCycleStart);
+  const { availableOn } = useReserve();
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [tab, setTab]           = useState<Tab>('all');
   const [sortKey, setSortKey]   = useState<SortKey>('date');
   const [sortDir, setSortDir]   = useState<SortDir>('desc');
-  const [filters, setFilters]   = useState<TransactionFilters>(EMPTY_FILTERS);
+  const [filters, setFilters]   = useState<TransactionFilters>(initialFunding ? { ...EMPTY_FILTERS, funding: initialFunding } : EMPTY_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
   const [exportOpen, setExportOpen]   = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -98,6 +105,8 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
   // ── Expand / edit state ───────────────────────────────────────────────────
   const [expandedId, setExpandedId]   = useState<string | null>(null);
   const [editState, setEditState]     = useState<EditState | null>(null);
+  const [editError, setEditError]     = useState('');
+  const [editShortfall, setEditShortfall] = useState<{ requested: number; available: number } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -131,6 +140,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
     [allFilteredRows, filters.type]);
 
   const totalExpAmt = filteredExpenses.reduce((s, e) => s + e.amount, 0);
+  const reserveExpAmt = filteredExpenses.reduce((s, e) => s + fundingParts(e).reserve, 0);
   const totalIncAmt = filteredIncome.reduce((s, i) => s + i.amount, 0);
   const netAmt      = totalIncAmt - totalExpAmt;
 
@@ -199,18 +209,29 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
   const startEdit = (row: AnyRow) => {
     if (row._type === 'expense') {
       const r = row as ExpRow;
-      setEditState({ id: r.id, type: 'expense', description: r.description, amount: String(r.amount), date: r.date, category: r.category, payee: r.payee ?? '', notes: r.notes ?? '' });
+      setEditState({ id: r.id, type: 'expense', description: r.description, amount: String(r.amount), date: r.date, category: r.category, payee: r.payee ?? '', notes: r.notes ?? '',
+        fundingSource: r.funding?.source ?? 'budget',
+        reserveAmount: r.funding?.reserveAmount !== undefined ? String(r.funding.reserveAmount) : '' });
     } else {
       const r = row as IncRow;
-      setEditState({ id: r.id, type: 'income', description: r.source ?? '', amount: String(r.amount), date: r.date, category: r.category ?? '', payee: '', notes: r.notes ?? '' });
+      setEditState({ id: r.id, type: 'income', description: r.source ?? '', amount: String(r.amount), date: r.date, category: r.category ?? '', payee: '', notes: r.notes ?? '', fundingSource: 'budget', reserveAmount: '' });
     }
     setExpandedId(row.id);
   };
 
-  const saveEdit = () => {
+  const buildFundingPatch = (reservePart: number | null): Expense['funding'] => {
+    if (!editState || editState.type !== 'expense') return undefined;
+    if (reservePart !== null) {
+      return reservePart > 0 ? { source: 'split', reserveAmount: reservePart } : undefined;
+    }
+    if (editState.fundingSource === 'budget') return undefined;
+    if (editState.fundingSource === 'reserve') return { source: 'reserve' };
+    return { source: 'split', reserveAmount: parseFloat(editState.reserveAmount) };
+  };
+
+  const doSaveEdit = (reservePart: number | null) => {
     if (!editState) return;
     const amt = parseFloat(editState.amount);
-    if (!editState.description.trim() || isNaN(amt) || amt <= 0) return;
     const period = getFinancialPeriod(editState.date, financialCycleStart);
     if (editState.type === 'expense') {
       updateExpense(editState.id, {
@@ -220,6 +241,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
         category: editState.category,
         payee: editState.payee.trim() || undefined,
         notes: editState.notes.trim() || undefined,
+        funding: buildFundingPatch(reservePart),
         ...period,
       });
     } else {
@@ -234,6 +256,28 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
     setEditState(null);
   };
 
+  const saveEdit = () => {
+    if (!editState) return;
+    const amt = parseFloat(editState.amount);
+    if (!editState.description.trim() || isNaN(amt) || amt <= 0) return;
+    if (editState.type === 'expense') {
+      const fErr = validateFunding({
+        amount: amt, source: editState.fundingSource,
+        reserveAmount: editState.fundingSource === 'split' ? parseFloat(editState.reserveAmount) : undefined,
+      });
+      if (fErr) { setEditError(fErr); return; }
+      setEditError('');
+      const requested = editState.fundingSource === 'reserve' ? amt
+        : editState.fundingSource === 'split' ? parseFloat(editState.reserveAmount) : 0;
+      const avail = availableOn(editState.date, { excludeExpenseId: editState.id });
+      if (requested > 0 && requested > avail) {
+        setEditShortfall({ requested, available: avail });
+        return;
+      }
+    }
+    doSaveEdit(null);
+  };
+
   // ── Sort toggle ───────────────────────────────────────────────────────────
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -245,6 +289,9 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
     all: 'All', only: 'Tax-related', deductible: 'Tax deductible',
     'non-deductible': 'Tax non-deductible', exclude: 'Not tax-related',
   };
+  const FUNDING_FILTER_LABELS: Record<TransactionFilters['funding'], string> = {
+    all: 'All', budget: 'Monthly budget', reserve: 'Reserve', split: 'Split',
+  };
   const activeFilters: { label: string; onRemove: () => void }[] = [];
   if (filters.search.trim()) activeFilters.push({ label: `“${filters.search.trim()}”`, onRemove: () => updateFilter({ search: '' }) });
   if (filters.dateFrom || filters.dateTo) activeFilters.push({ label: 'Using custom range', onRemove: () => updateFilter({ dateFrom: undefined, dateTo: undefined }) });
@@ -254,6 +301,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
   if (filters.amountMax !== undefined) activeFilters.push({ label: `≤ ${sym}${filters.amountMax}`, onRemove: () => updateFilter({ amountMax: undefined }) });
   if (filters.recurring !== 'all') activeFilters.push({ label: filters.recurring === 'only' ? 'Recurring only' : 'Non-recurring', onRemove: () => updateFilter({ recurring: 'all' }) });
   if (filters.tax !== 'all') activeFilters.push({ label: TAX_FILTER_LABELS[filters.tax], onRemove: () => updateFilter({ tax: 'all' }) });
+  if (filters.funding !== 'all') activeFilters.push({ label: `Paid from ${FUNDING_FILTER_LABELS[filters.funding]}`, onRemove: () => updateFilter({ funding: 'all' }) });
 
   const resetFilters = () => setFilters(f => ({ ...EMPTY_FILTERS, type: f.type }));
   // The type/tab isn't counted — it has its own visible control
@@ -397,7 +445,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
         {[
           {
             label: 'Money Out', value: `${sym}${Math.round(totalExpAmt).toLocaleString('en-IN')}`,
-            sub: `${filteredExpenses.length} expense${filteredExpenses.length !== 1 ? 's' : ''}`,
+            sub: `${filteredExpenses.length} expense${filteredExpenses.length !== 1 ? 's' : ''}${reserveExpAmt > 0 ? ` · of which ${sym}${Math.round(reserveExpAmt).toLocaleString('en-IN')} from reserve` : ''}`,
             color: 'var(--red-500)', bg: 'var(--red-50)', border: 'var(--red-100)',
             Icon: ArrowUpRight,
           },
@@ -746,6 +794,23 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
               </select>
             </div>
 
+            {/* Pay from */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                Pay from
+              </label>
+              <select
+                value={filters.funding}
+                onChange={e => updateFilter({ funding: e.target.value as TransactionFilters['funding'] })}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--r-sm)', fontSize: '0.8125rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-700)', fontFamily: 'inherit', outline: 'none' }}
+              >
+                <option value="all">All</option>
+                <option value="budget">Monthly budget</option>
+                <option value="reserve">Reserve</option>
+                <option value="split">Split</option>
+              </select>
+            </div>
+
             {/* Category chips — multi-select across expense + income categories */}
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
@@ -999,6 +1064,24 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                                 </>
                               )}
                               <span>{isExp ? getCatName(catId) : 'Income'}</span>
+                              {isExp && (() => {
+                                const src = fundingSource(row as ExpRow);
+                                if (src === 'budget') return (
+                                  <span style={{ fontWeight: 600, color: 'var(--text-400)' }}>· Budget</span>
+                                );
+                                const parts = fundingParts(row as ExpRow);
+                                return (
+                                  <span style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 700,
+                                    color: 'var(--warning-text)', background: 'var(--amber-50)',
+                                    border: '1px solid var(--amber-200)', borderRadius: 99, padding: '0 6px',
+                                  }}>
+                                    <PiggyBank size={9} />
+                                    <span className="sw-txn-hide-sm">{src === 'reserve' ? 'Reserve' : `Split ${formatCurrency(parts.budget, currency)} + ${formatCurrency(parts.reserve, currency)}`}</span>
+                                    <span className="sw-mobile-only">{src === 'reserve' ? 'Reserve' : 'Split'}</span>
+                                  </span>
+                                );
+                              })()}
                               <span className="sw-mobile-only" style={{ fontSize: '0.6875rem' }}>· {fmtTime(row.date)}</span>
                             </div>
                           </div>
@@ -1141,6 +1224,21 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                                     {isExp ? '−' : '+'}{formatCurrency(row.amount, currency)}
                                   </div>
                                 </div>
+                                {isExp && (
+                                  <div>
+                                    <div style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Funding</div>
+                                    <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-700)' }}>
+                                      {(() => {
+                                        const src = fundingSource(row as ExpRow);
+                                        if (src === 'budget') return 'Monthly Budget';
+                                        const parts = fundingParts(row as ExpRow);
+                                        return src === 'reserve'
+                                          ? 'Reserve'
+                                          : `Split: ${formatCurrency(parts.budget, currency)} Budget + ${formatCurrency(parts.reserve, currency)} Reserve`;
+                                      })()}
+                                    </div>
+                                  </div>
+                                )}
                                 {effTax?.isTaxRelated && (
                                   <div>
                                     <div style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Tax</div>
@@ -1310,6 +1408,25 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                                 />
                               </div>
                             </div>
+                            {/* Pay from — expense only */}
+                            {editState!.type === 'expense' && (
+                              <div style={{ marginBottom: 12, maxWidth: 520 }}>
+                                <FundingPicker
+                                  amount={parseFloat(editState!.amount)}
+                                  date={editState!.date}
+                                  source={editState!.fundingSource}
+                                  reserveAmount={editState!.reserveAmount}
+                                  onChange={v => setEditState(s => s && ({ ...s, fundingSource: v.source, reserveAmount: v.reserveAmount }))}
+                                  excludeExpenseId={editState!.id}
+                                  compact
+                                />
+                              </div>
+                            )}
+                            {editError && (
+                              <div role="alert" style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--red-500)', marginBottom: 10 }}>
+                                {editError}
+                              </div>
+                            )}
                             <div style={{ display: 'flex', gap: 8 }}>
                               <button
                                 onClick={saveEdit}
@@ -1363,6 +1480,16 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
         )}
       </div>
       </>)}
+
+      {editShortfall && (
+        <ReserveShortfallDialog
+          shortfall={editShortfall}
+          currency={currency}
+          onUseAvailable={() => { setEditShortfall(null); doSaveEdit(editShortfall.available); }}
+          onChange={() => setEditShortfall(null)}
+          onCancel={() => setEditShortfall(null)}
+        />
+      )}
     </div>
   );
 }

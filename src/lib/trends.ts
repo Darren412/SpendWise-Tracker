@@ -1,5 +1,6 @@
 import { Category, Expense, Income } from '@/types';
 import { getFinancialMonthRange, todayLocalISO } from '@/utils/financialCycle';
+import { fundingParts, fundingSource, budgetPortionExpenses } from '@/lib/reserve';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -34,11 +35,16 @@ export interface MonthPoint {
   start: string;         // 'YYYY-MM-DD' period bounds
   end: string;
   income: number;
-  expenses: number;
-  savings: number;
-  savingsRate: number | null;   // null when income is 0
+  expenses: number;             // REGULAR (budget portions) — what behaviour/budget charts use
+  reserveExpenses: number;      // reserve-funded portions, same scoping
+  reserveTxnTotal: number;      // full amounts of purely reserve-funded txns
+  splitTxnTotal: number;        // full amounts of split-funded txns
+  actualExpenses: number;       // expenses + reserveExpenses — total money out
+  netCashFlow: number;          // income − actualExpenses
+  savings: number;              // operating: income − regular expenses
+  savingsRate: number | null;   // operating savings / income — null when income is 0
   budget: number | null;        // null when no budget set
-  budgetSpent: number;
+  budgetSpent: number;          // regular spend inside tracked categories
   budgetUsedPct: number | null; // null when no budget
   txnCount: number;
   byCategory: Record<string, number>;
@@ -99,14 +105,19 @@ export function buildMonthlySeries(
     });
 
     const inc = periodIncome.reduce((s, i) => s + i.amount, 0);
-    const exp = scopedExpenses.reduce((s, e) => s + e.amount, 0);
+    const exp = scopedExpenses.reduce((s, e) => s + fundingParts(e).budget, 0);
+    const expReserve = scopedExpenses.reduce((s, e) => s + fundingParts(e).reserve, 0);
+    const expReserveTxns = scopedExpenses.reduce((s, e) => s + (fundingSource(e) === 'reserve' ? e.amount : 0), 0);
+    const expSplitTxns = scopedExpenses.reduce((s, e) => s + (fundingSource(e) === 'split' ? e.amount : 0), 0);
     const savings = inc - exp;
     const budget = opts.getBudget(month, y);
-    const budgetSpent = budgetTrackedSpend(periodExpenses, opts.budgetCategoryIds);
+    // Budget-tracked spend counts only the budget portion of each expense
+    const budgetSpent = budgetTrackedSpend(budgetPortionExpenses(periodExpenses), opts.budgetCategoryIds);
 
     const byCategory: Record<string, number> = {};
     for (const e of scopedExpenses) {
-      byCategory[e.category] = (byCategory[e.category] ?? 0) + e.amount;
+      const part = fundingParts(e).budget;
+      if (part > 0) byCategory[e.category] = (byCategory[e.category] ?? 0) + part;
     }
 
     points.unshift({
@@ -118,6 +129,11 @@ export function buildMonthlySeries(
       end: endISO,
       income: inc,
       expenses: exp,
+      reserveExpenses: expReserve,
+      reserveTxnTotal: expReserveTxns,
+      splitTxnTotal: expSplitTxns,
+      actualExpenses: exp + expReserve,
+      netCashFlow: inc - exp - expReserve,
       savings,
       savingsRate: inc > 0 ? round1((savings / inc) * 100) : null,
       budget: budget > 0 ? budget : null,

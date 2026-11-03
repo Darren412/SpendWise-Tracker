@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useBudgetStore } from '@/store/budgetStore';
+import { useRegularExpenses } from '@/hooks/useRegularExpenses';
 import { Expense, Category } from '@/types';
 import { formatCurrency, currencySymbol } from '@/utils/currency';
 import { getFinancialMonthRange } from '@/utils/financialCycle';
@@ -134,9 +135,11 @@ function DayTooltip({ active, payload, categories, currency, avgDaily }: DayTool
 
 export default function DailySpendTracker() {
   const {
-    expenses, categories, excludedCategoryIds, setExcludedCategoryIds,
+    categories, excludedCategoryIds, setExcludedCategoryIds,
     selectedMonth, selectedYear, selectedCity, currency, financialCycleStart,
   } = useBudgetStore();
+  // Daily spend tracks REGULAR spend — reserve outflows aren't behaviour
+  const expenses = useRegularExpenses();
   const [pinnedDay, setPinnedDay] = useState<number | null>(null);
 
   // Reset pinned day whenever any filter or period changes

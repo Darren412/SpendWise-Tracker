@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  applyTransactionFilters, countActiveFilters, EMPTY_FILTERS,
+  applyTransactionFilters, countActiveFilters, describeFilters, EMPTY_FILTERS,
   TransactionFilters, FilterContext,
 } from '@/lib/transactionFilters';
 import { Category, Expense, Income } from '@/types';
@@ -150,5 +150,30 @@ describe('countActiveFilters', () => {
     expect(countActiveFilters(EMPTY_FILTERS)).toBe(0);
     expect(countActiveFilters(F({ search: 'x', amountMin: 1, tax: 'only', type: 'income' }))).toBe(4);
     expect(countActiveFilters(F({ dateFrom: '2026-01-01', categoryIds: ['a'], city: 'Bangalore', recurring: 'exclude' }))).toBe(4);
+  });
+});
+
+describe('funding filter', () => {
+  const funded = [
+    exp({ id: 'fb', description: 'Budget txn', date: '2026-11-10' }),
+    exp({ id: 'fr', description: 'Reserve txn', date: '2026-11-10', funding: { source: 'reserve' } }),
+    exp({ id: 'fs', description: 'Split txn', date: '2026-11-10', funding: { source: 'split', reserveAmount: 40 } }),
+  ];
+
+  it('all → every expense + income; specific → matching source only, income excluded', () => {
+    expect(applyTransactionFilters(funded, baseIncome, F(), ctx()).map(r => r.id)).toEqual(
+      ['fb', 'fr', 'fs', 'i1', 'i2']);
+    expect(applyTransactionFilters(funded, baseIncome, F({ funding: 'reserve' }), ctx()).map(r => r.id)).toEqual(['fr']);
+    expect(applyTransactionFilters(funded, baseIncome, F({ funding: 'split' }), ctx()).map(r => r.id)).toEqual(['fs']);
+    expect(applyTransactionFilters(funded, baseIncome, F({ funding: 'budget' }), ctx()).map(r => r.id)).toEqual(['fb']);
+  });
+
+  it('income is excluded whenever a non-all funding filter is set (even type=income)', () => {
+    expect(applyTransactionFilters([], baseIncome, F({ funding: 'reserve', type: 'income' }), ctx())).toEqual([]);
+  });
+
+  it('count + describe cover the funding dimension', () => {
+    expect(countActiveFilters(F({ funding: 'reserve' }))).toBe(1);
+    expect(describeFilters(F({ funding: 'reserve' }), cats, '₹').join(' ')).toContain('Funding: reserve');
   });
 });

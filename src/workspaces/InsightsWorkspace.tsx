@@ -9,6 +9,9 @@ import {
   CalendarRange, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
+import { useRegularExpenses } from '@/hooks/useRegularExpenses';
+import { useReserve } from '@/hooks/useReserve';
+import { fundingParts } from '@/lib/reserve';
 import { currencySymbol } from '@/utils/currency';
 import { getFinancialMonthRange } from '@/utils/financialCycle';
 import {
@@ -27,6 +30,7 @@ import {
   buildYearlyCategoryBreakdown,
   buildYearlyNarrativeSummary,
   generateYearlyInsightCards,
+  buildReserveInsight,
   type AIInsightCard,
   type ChatMessage,
   type InsightSeverity,
@@ -235,6 +239,7 @@ export default function InsightsWorkspace() {
 
   const sym = currencySymbol(currency);
   const { start, end } = getFinancialMonthRange(selectedMonth, selectedYear, financialCycleStart);
+  const { balance: reserveBalance } = useReserve();
 
   // ── Chat state ─────────────────────────────────────────────────────────────
   const [chatOpen,    setChatOpen]    = useState(false);
@@ -265,15 +270,18 @@ export default function InsightsWorkspace() {
   }, [expenses, income, selectedYear]);
 
   // ── Computed data ──────────────────────────────────────────────────────────
+  // All behaviour analysis runs on REGULAR spend (budget portions). The
+  // actual expense list is kept separately for reserve-outflow reporting.
+  const regularAll = useRegularExpenses();
 
   const periodExpenses = useMemo(() =>
-    expenses.filter(e => {
+    regularAll.filter(e => {
       const d = new Date(e.date + 'T00:00:00');
       return d >= start && d <= end &&
         (selectedCity === 'Both' || !e.city || e.city === selectedCity) &&
         (excludedCategoryIds.length === 0 || !excludedCategoryIds.includes(e.category));
     }),
-    [expenses, start, end, selectedCity, excludedCategoryIds]);
+    [regularAll, start, end, selectedCity, excludedCategoryIds]);
 
   const periodIncome = useMemo(() =>
     income.filter(i => { const d = new Date(i.date + 'T00:00:00'); return d >= start && d <= end; }),
@@ -283,29 +291,54 @@ export default function InsightsWorkspace() {
   const totalIncome   = useMemo(() => periodIncome.reduce((s, i) => s + i.amount, 0), [periodIncome]);
   const savingsRate   = totalIncome > 0 ? Math.round(((totalIncome - totalExpenses) / totalIncome) * 100) : 0;
 
-  const monthHistory  = useMemo(() => buildMonthHistory(expenses, income, selectedMonth, selectedYear, financialCycleStart, 6), [expenses, income, selectedMonth, selectedYear, financialCycleStart]);
-  const catTrends     = useMemo(() => buildCategoryTrends(expenses, categories, selectedMonth, selectedYear, selectedCity, financialCycleStart, excludedCategoryIds), [expenses, categories, selectedMonth, selectedYear, selectedCity, financialCycleStart, excludedCategoryIds]);
-  const recurringItems = useMemo(() => detectRecurring(expenses, 6), [expenses]);
-  const anomalies     = useMemo(() => detectAnomalies(periodExpenses, expenses, categories, 3), [periodExpenses, expenses, categories]);
+  // Actual-money figures for the same period — reserve outflow reporting
+  const actualPeriodExpenses = useMemo(() =>
+    expenses.filter(e => {
+      const d = new Date(e.date + 'T00:00:00');
+      return d >= start && d <= end &&
+        (selectedCity === 'Both' || !e.city || e.city === selectedCity) &&
+        (excludedCategoryIds.length === 0 || !excludedCategoryIds.includes(e.category));
+    }),
+    [expenses, start, end, selectedCity, excludedCategoryIds]);
+
+  const reservePeriod = useMemo(() => {
+    const items = actualPeriodExpenses.filter(e => fundingParts(e).reserve > 0);
+    return { total: items.reduce((s, e) => s + fundingParts(e).reserve, 0), count: items.length };
+  }, [actualPeriodExpenses]);
+
+  const monthHistory  = useMemo(() => buildMonthHistory(regularAll, income, selectedMonth, selectedYear, financialCycleStart, 6), [regularAll, income, selectedMonth, selectedYear, financialCycleStart]);
+  const catTrends     = useMemo(() => buildCategoryTrends(regularAll, categories, selectedMonth, selectedYear, selectedCity, financialCycleStart, excludedCategoryIds), [regularAll, categories, selectedMonth, selectedYear, selectedCity, financialCycleStart, excludedCategoryIds]);
+  const recurringItems = useMemo(() => detectRecurring(regularAll, 6), [regularAll]);
+  const anomalies     = useMemo(() => detectAnomalies(periodExpenses, regularAll, categories, 3), [periodExpenses, regularAll, categories]);
   const prediction    = useMemo(() => buildPrediction(periodExpenses, monthHistory, start, end, totalIncome), [periodExpenses, monthHistory, start, end, totalIncome]);
   const behaviorProfile = useMemo(() => buildBehaviorProfile(periodExpenses, categories), [periodExpenses, categories]);
   const cityComparison  = useMemo(() => buildCityComparison(periodExpenses, categories), [periodExpenses, categories]);
   const healthScore   = useMemo(() => computeHealthScore(totalExpenses, totalIncome, monthHistory, catTrends, recurringItems), [totalExpenses, totalIncome, monthHistory, catTrends, recurringItems]);
-  const insightCards  = useMemo(() => generateInsightCards(totalExpenses, totalIncome, savingsRate, catTrends, monthHistory, anomalies, prediction, recurringItems, sym), [totalExpenses, totalIncome, savingsRate, catTrends, monthHistory, anomalies, prediction, recurringItems, sym]);
+  const insightCards  = useMemo(() => {
+    const cards = generateInsightCards(totalExpenses, totalIncome, savingsRate, catTrends, monthHistory, anomalies, prediction, recurringItems, sym);
+    const reserveCard = buildReserveInsight(actualPeriodExpenses, categories, sym);
+    return reserveCard ? [reserveCard, ...cards] : cards;
+  }, [totalExpenses, totalIncome, savingsRate, catTrends, monthHistory, anomalies, prediction, recurringItems, actualPeriodExpenses, categories, sym]);
   const narrativeLines = useMemo(() => buildNarrativeSummary(totalExpenses, totalIncome, catTrends, prediction, healthScore, sym), [totalExpenses, totalIncome, catTrends, prediction, healthScore, sym]);
 
   // ── Yearly computed data ───────────────────────────────────────────────────
   const yearSummary = useMemo(() =>
-    buildYearSummary(expenses, income, yearlyYear, financialCycleStart),
-    [expenses, income, yearlyYear, financialCycleStart]);
+    buildYearSummary(regularAll, income, yearlyYear, financialCycleStart),
+    [regularAll, income, yearlyYear, financialCycleStart]);
 
   const yearlyCatTrends = useMemo(() =>
-    buildYearlyCategoryBreakdown(expenses, categories, yearlyYear, selectedCity, financialCycleStart, excludedCategoryIds, yearlyYear - 1),
-    [expenses, categories, yearlyYear, selectedCity, financialCycleStart, excludedCategoryIds]);
+    buildYearlyCategoryBreakdown(regularAll, categories, yearlyYear, selectedCity, financialCycleStart, excludedCategoryIds, yearlyYear - 1),
+    [regularAll, categories, yearlyYear, selectedCity, financialCycleStart, excludedCategoryIds]);
+
+  // Reserve outflows for the displayed year (actual amounts)
+  const reserveYear = useMemo(() => {
+    const items = expenses.filter(e => e.year === yearlyYear && fundingParts(e).reserve > 0);
+    return { total: items.reduce((s, e) => s + fundingParts(e).reserve, 0), count: items.length };
+  }, [expenses, yearlyYear]);
 
   const yearlyNarrative = useMemo(() =>
-    buildYearlyNarrativeSummary(yearSummary, yearlyCatTrends, sym),
-    [yearSummary, yearlyCatTrends, sym]);
+    buildYearlyNarrativeSummary(yearSummary, yearlyCatTrends, sym, reserveYear),
+    [yearSummary, yearlyCatTrends, sym, reserveYear]);
 
   const yearlyInsightCards = useMemo(() =>
     generateYearlyInsightCards(yearSummary, yearlyCatTrends, sym),
@@ -326,11 +359,11 @@ export default function InsightsWorkspace() {
     const q = chatInput.trim();
     if (!q) return;
     const userMsg: ChatMessage = { role: 'user', text: q, timestamp: new Date() };
-    const response = processChat(q, { totalExpenses, totalIncome, savingsRate, catTrends, monthHistory, anomalies, prediction, recurringItems, cityComparison, behaviorProfile, healthScore, sym });
+    const response = processChat(q, { totalExpenses, totalIncome, savingsRate, catTrends, monthHistory, anomalies, prediction, recurringItems, cityComparison, behaviorProfile, healthScore, sym, reserveBalance, reserveUsed: reservePeriod });
     const aiMsg: ChatMessage = { role: 'assistant', text: response, timestamp: new Date() };
     setChatHistory(prev => [...prev, userMsg, aiMsg]);
     setChatInput('');
-  }, [chatInput, totalExpenses, totalIncome, savingsRate, catTrends, monthHistory, anomalies, prediction, recurringItems, cityComparison, behaviorProfile, healthScore, sym]);
+  }, [chatInput, totalExpenses, totalIncome, savingsRate, catTrends, monthHistory, anomalies, prediction, recurringItems, cityComparison, behaviorProfile, healthScore, sym, reserveBalance, reservePeriod]);
 
   // ── Computed display values ────────────────────────────────────────────────
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -441,7 +474,7 @@ export default function InsightsWorkspace() {
 
         {/* KPI Cards */}
         {[
-          { label: 'Total Spent', value: `${sym}${Math.round(totalExpenses).toLocaleString('en-IN')}`, sub: `${periodExpenses.length} txns`, color: 'var(--danger-text)', Icon: TrendingUp },
+          { label: 'Total Spent', value: `${sym}${Math.round(totalExpenses).toLocaleString('en-IN')}`, sub: `${periodExpenses.length} txns${reservePeriod.total > 0 ? ` · +${sym}${Math.round(reservePeriod.total).toLocaleString('en-IN')} from reserve` : ''}`, color: 'var(--danger-text)', Icon: TrendingUp },
           { label: 'Income', value: totalIncome > 0 ? `${sym}${Math.round(totalIncome).toLocaleString('en-IN')}` : '—', sub: totalIncome > 0 ? 'this period' : 'not set', color: 'var(--success-text)', Icon: ArrowUpRight },
           { label: 'Savings Rate', value: totalIncome > 0 ? `${savingsRate}%` : '—', sub: savingsRate >= 20 ? 'Healthy' : savingsRate > 0 ? 'Below target' : '—', color: savingsRate >= 20 ? 'var(--success-text)' : savingsRate > 0 ? 'var(--warning-text)' : 'var(--text-400)', Icon: ShieldCheck },
           { label: 'Daily Burn', value: `${sym}${Math.round(prediction.dailyBurnRate).toLocaleString('en-IN')}`, sub: `${prediction.daysRemaining}d remaining`, color: 'var(--brand-text)', Icon: Activity },
@@ -1095,7 +1128,7 @@ export default function InsightsWorkspace() {
       {/* ── YEARLY KPI STRIP ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Total Spent', value: `${sym}${Math.round(yearSummary.totalExpenses).toLocaleString('en-IN')}`, sub: `${yearSummary.txnCount} txns · ${yearSummary.activeMonths} months`, color: 'var(--danger-text)', Icon: TrendingUp },
+          { label: 'Total Spent', value: `${sym}${Math.round(yearSummary.totalExpenses).toLocaleString('en-IN')}`, sub: `${yearSummary.txnCount} txns · ${yearSummary.activeMonths} months${reserveYear.total > 0 ? ` · +${sym}${Math.round(reserveYear.total).toLocaleString('en-IN')} from reserve` : ''}`, color: 'var(--danger-text)', Icon: TrendingUp },
           { label: 'Total Income', value: yearSummary.totalIncome > 0 ? `${sym}${Math.round(yearSummary.totalIncome).toLocaleString('en-IN')}` : '—', sub: `${yearlyYear} total`, color: 'var(--success-text)', Icon: ArrowUpRight },
           { label: 'Net Savings', value: yearSummary.totalIncome > 0 ? `${sym}${Math.round(yearSummary.totalSavings).toLocaleString('en-IN')}` : '—', sub: yearSummary.totalSavings >= 0 ? 'Surplus' : 'Deficit', color: yearSummary.totalSavings >= 0 ? 'var(--success-text)' : 'var(--danger-text)', Icon: ShieldCheck },
           { label: 'Savings Rate', value: yearSummary.totalIncome > 0 ? `${yearlySavingsRate}%` : '—', sub: yearlySavingsRate >= 20 ? 'Healthy' : yearlySavingsRate > 0 ? 'Below target' : '—', color: yearlySavingsRate >= 20 ? 'var(--success-text)' : yearlySavingsRate > 0 ? 'var(--warning-text)' : 'var(--text-400)', Icon: Target },
