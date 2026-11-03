@@ -5,6 +5,7 @@ import { useBudgetStore, generateId } from '@/store/budgetStore';
 import { Expense } from '@/types';
 import CategorySelect from '@/components/CategorySelect';
 import DateInput from '@/components/DateInput';
+import { todayLocalISO } from '@/utils/financialCycle';
 
 export default function ExpenseForm() {
   const { addExpense, categories, selectedCity } = useBudgetStore();
@@ -18,7 +19,7 @@ export default function ExpenseForm() {
     category:    defaultCatId,
     description: '',
     amount:      '',
-    date:        new Date().toISOString().split('T')[0],
+    date:        todayLocalISO(),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -44,7 +45,7 @@ export default function ExpenseForm() {
       category:    expenseCategories[0]?.id ?? '',
       description: '',
       amount:      '',
-      date:        new Date().toISOString().split('T')[0],
+      date:        todayLocalISO(),
     });
   };
 

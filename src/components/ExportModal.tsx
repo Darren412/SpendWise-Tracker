@@ -5,6 +5,7 @@ import { X, FileSpreadsheet, Calendar, CalendarDays, CalendarRange, Database } f
 import { useBudgetStore } from '@/store/budgetStore';
 import { exportToExcel, ExportFilter } from '@/utils/exportToExcel';
 import DateInput from '@/components/DateInput';
+import { todayLocalISO } from '@/utils/financialCycle';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -24,7 +25,7 @@ export default function ExportModal({ isOpen, onClose }: Props) {
   const [scope, setScope] = useState<Scope>('current-month');
   const [chosenMonth, setChosenMonth] = useState(selectedMonth);
   const [chosenYear, setChosenYear]   = useState(selectedYear);
-  const [chosenDay, setChosenDay]     = useState(() => new Date().toISOString().split('T')[0]);
+  const [chosenDay, setChosenDay]     = useState(() => todayLocalISO());
   const [chosenYearOnly, setChosenYearOnly] = useState(selectedYear);
 
   // All years present in data

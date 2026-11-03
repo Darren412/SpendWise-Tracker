@@ -5,6 +5,7 @@ import { useBudgetStore, generateId } from '@/store/budgetStore';
 import { Income } from '@/types';
 import CategorySelect from '@/components/CategorySelect';
 import DateInput from '@/components/DateInput';
+import { todayLocalISO } from '@/utils/financialCycle';
 
 export default function IncomeForm() {
   const { addIncome, categories } = useBudgetStore();
@@ -16,7 +17,7 @@ export default function IncomeForm() {
     category: defaultIncomeCatId,
     source:   '',
     amount:   '',
-    date:     new Date().toISOString().split('T')[0],
+    date:     todayLocalISO(),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -40,7 +41,7 @@ export default function IncomeForm() {
       category: defaultIncomeCatId,
       source:   '',
       amount:   '',
-      date:     new Date().toISOString().split('T')[0],
+      date:     todayLocalISO(),
     });
   };
 
