@@ -70,7 +70,10 @@ export default function Home() {
     }
   }, [authLoading, userId]);
 
-  const handleWorkspaceChange = (id: string) => {
+  const [planningTab, setPlanningTab] = useState<'save' | 'goals' | 'budgets' | undefined>(undefined);
+
+  const handleWorkspaceChange = (id: string, subTab?: string) => {
+    setPlanningTab(id === 'planning' ? (subTab as 'save' | 'goals' | 'budgets' | undefined) : undefined);
     setActiveWorkspace(id as Workspace);
   };
 
@@ -85,7 +88,7 @@ export default function Home() {
     fresh.forEach(a => toastedRef.current.add(a.key));
     const first = fresh[0];
     const msg = fresh.length === 1
-      ? `${first.name}: ${first.pct}% of budget used`
+      ? `${first.name}: ${first.pct}% of ${first.isTarget ? 'target' : 'budget'} used`
       : `${fresh.length} budget alerts — ${first.name} at ${first.pct}% and ${fresh.length - 1} more`;
     setAlertToast(msg);
     useBudgetStore.getState().markAlertsNotified(fresh.map(a => a.key));
@@ -165,7 +168,7 @@ export default function Home() {
                 {activeWorkspace === 'overview'     && <OverviewWorkspace     onNavigate={handleWorkspaceChange} />}
                 {activeWorkspace === 'analytics'    && <AnalyticsWorkspace    />}
                 {activeWorkspace === 'trends'       && <TrendsWorkspace       />}
-                {activeWorkspace === 'planning'     && <PlanningWorkspace     />}
+                {activeWorkspace === 'planning'     && <PlanningWorkspace     initialTab={planningTab} />}
                 {activeWorkspace === 'transactions' && <TransactionsWorkspace onAddExpense={() => setAddModal({ open: true, tab: 'expense' })} onAddIncome={() => setAddModal({ open: true, tab: 'income' })} />}
                 {activeWorkspace === 'insights'     && <InsightsWorkspace     />}
                 {activeWorkspace === 'reports'      && <ReportsWorkspace      />}

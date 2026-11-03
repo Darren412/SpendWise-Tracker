@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import {
-  Target, PiggyBank, Bell, Plus, X, AlertTriangle, XCircle, CheckCircle2,
+  Target, PiggyBank, Bell, Plus, X, AlertTriangle, XCircle, CheckCircle2, Sparkles,
 } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { SavingsGoal } from '@/types';
@@ -12,8 +12,9 @@ import { budgetTrackedSpend } from '@/lib/trends';
 import { formatCurrency } from '@/utils/currency';
 import GoalCard from '@/components/goals/GoalCard';
 import GoalForm from '@/components/goals/GoalForm';
+import SavingsTab from '@/components/savings/SavingsTab';
 
-type Tab = 'goals' | 'budgets';
+type Tab = 'save' | 'goals' | 'budgets';
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '8px 11px', borderRadius: 'var(--r-sm)',
@@ -31,7 +32,7 @@ const sectionTitle: React.CSSProperties = {
   textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 12,
 };
 
-export default function PlanningWorkspace() {
+export default function PlanningWorkspace({ initialTab }: { initialTab?: Tab }) {
   const {
     goals, addGoal, updateGoal, deleteGoal,
     expenses, categories,
@@ -43,7 +44,7 @@ export default function PlanningWorkspace() {
     currency,
   } = useBudgetStore();
 
-  const [tab, setTab] = useState<Tab>('goals');
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'save');
   const [showArchived, setShowArchived] = useState(false);
   const [formGoal, setFormGoal] = useState<'new' | SavingsGoal | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SavingsGoal | null>(null);
@@ -118,10 +119,11 @@ export default function PlanningWorkspace() {
       <div className="ws-header">
         <div>
           <h1 className="ws-title">Planning</h1>
-          <p className="ws-subtitle">Savings goals, budgets and alert thresholds</p>
+          <p className="ws-subtitle">Spend optimization, savings goals, budgets and alerts</p>
         </div>
         <div className="ws-tab-bar" role="group" aria-label="Planning sections">
           {([
+            { id: 'save', label: 'Where Can I Save?', Icon: Sparkles },
             { id: 'goals', label: 'Savings Goals', Icon: PiggyBank },
             { id: 'budgets', label: 'Budgets & Alerts', Icon: Bell },
           ] as const).map(({ id, label, Icon }) => (
@@ -131,6 +133,9 @@ export default function PlanningWorkspace() {
           ))}
         </div>
       </div>
+
+      {/* ══════════ TAB: WHERE CAN I SAVE? ══════════ */}
+      {tab === 'save' && <SavingsTab />}
 
       {/* ══════════ TAB: SAVINGS GOALS ══════════ */}
       {tab === 'goals' && (
