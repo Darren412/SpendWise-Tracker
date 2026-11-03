@@ -1,5 +1,6 @@
 import { Category, Expense, Income } from '@/types';
 import { getEffectiveTax } from '@/lib/tax';
+import { fundingSource } from '@/lib/reserve';
 
 export interface TransactionFilters {
   search: string;
@@ -10,6 +11,7 @@ export interface TransactionFilters {
   recurring: 'all' | 'only' | 'exclude';
   tax: 'all' | 'only' | 'deductible' | 'non-deductible' | 'exclude';
   city?: string;                         // '' / undefined = all
+  funding: 'all' | 'budget' | 'reserve' | 'split';  // expenses only — income excluded when non-'all'
 }
 
 export const EMPTY_FILTERS: TransactionFilters = {
@@ -18,6 +20,7 @@ export const EMPTY_FILTERS: TransactionFilters = {
   type: 'all',
   recurring: 'all',
   tax: 'all',
+  funding: 'all',
 };
 
 export type TxnRow = (Expense & { _type: 'expense' }) | (Income & { _type: 'income' });
@@ -96,6 +99,7 @@ export function applyTransactionFilters(
       if (!amountPass(e.amount)) continue;
       if (!recurringPass(e)) continue;
       if (!taxPass(e)) continue;
+      if (filters.funding !== 'all' && fundingSource(e) !== filters.funding) continue;
       if (q) {
         const eff = getEffectiveTax(e, ctx.categories);
         if (!matchesSearch(
@@ -107,7 +111,8 @@ export function applyTransactionFilters(
     }
   }
 
-  if (filters.type !== 'expense') {
+  // Income rows have no funding — any non-'all' funding filter excludes them
+  if (filters.type !== 'expense' && filters.funding === 'all') {
     for (const i of income) {
       if (!inRange(i.date)) continue;
       // Category filter applies to income too when income.category is set;
@@ -161,6 +166,10 @@ export function describeFilters(
     all: '',
   };
   if (f.tax !== 'all') out.push(`Tax: ${taxLabels[f.tax]}`);
+  const fundingLabels: Record<TransactionFilters['funding'], string> = {
+    budget: 'monthly budget', reserve: 'reserve', split: 'split', all: '',
+  };
+  if (f.funding !== 'all') out.push(`Funding: ${fundingLabels[f.funding]}`);
   if (f.city) out.push(`City: ${f.city}`);
   if (f.search.trim()) out.push(`Search: "${f.search.trim()}"`);
   return out;
@@ -178,6 +187,7 @@ export function countActiveFilters(f: TransactionFilters): number {
   if (f.amountMax !== undefined) n++;
   if (f.recurring !== 'all') n++;
   if (f.tax !== 'all') n++;
+  if (f.funding !== 'all') n++;
   if (f.city) n++;
   return n;
 }

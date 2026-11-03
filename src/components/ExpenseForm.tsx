@@ -2,10 +2,13 @@
 
 import { useState } from 'react';
 import { useBudgetStore, generateId } from '@/store/budgetStore';
-import { Expense, RecurrenceFrequency, RecurringRule, TaxInfo } from '@/types';
+import { Expense, RecurrenceFrequency, RecurringRule, TaxInfo, FundingSource } from '@/types';
 import CategorySelect from '@/components/CategorySelect';
 import DateInput from '@/components/DateInput';
 import TaxFields from '@/components/TaxFields';
+import FundingPicker, { ReserveShortfallDialog } from '@/components/balance/FundingPicker';
+import { useReserve } from '@/hooks/useReserve';
+import { validateFunding } from '@/lib/reserve';
 import { todayLocalISO } from '@/utils/financialCycle';
 import { ChevronDown } from 'lucide-react';
 
@@ -34,10 +37,15 @@ export default function ExpenseForm() {
   const [endDate, setEndDate] = useState(todayLocalISO());
   const [tax, setTax] = useState<TaxInfo | undefined>(undefined);
   const [error, setError] = useState('');
+  const [funding, setFunding] = useState<{ source: FundingSource; reserveAmount: string }>({ source: 'budget', reserveAmount: '' });
+  const [shortfall, setShortfall] = useState<{ requested: number; available: number } | null>(null);
+  const { availableOn } = useReserve();
+  const { currency } = useBudgetStore();
 
   const resetMore = () => {
     setPayee(''); setNotes(''); setRepeat(false);
     setFrequency('monthly'); setHasEnd(false); setTax(undefined); setError('');
+    setFunding({ source: 'budget', reserveAmount: '' });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -51,7 +59,39 @@ export default function ExpenseForm() {
       setError('Repeat end date must be on or after the transaction date.');
       return;
     }
+    const fundingErr = validateFunding({
+      amount: parsedAmount, source: funding.source,
+      reserveAmount: funding.source === 'split' ? parseFloat(funding.reserveAmount) : undefined,
+    });
+    if (fundingErr) { setError(fundingErr); return; }
     setError('');
+
+    const requestedReserve = funding.source === 'reserve' ? parsedAmount
+      : funding.source === 'split' ? parseFloat(funding.reserveAmount) : 0;
+
+    // One-off expenses must not drive the reserve negative — the shortfall
+    // dialog offers a budget+reserve fallback. Rules aren't checked: future
+    // occurrences are validated when they appear.
+    if (!repeat && requestedReserve > 0 && requestedReserve > availableOn(formData.date)) {
+      setShortfall({ requested: requestedReserve, available: availableOn(formData.date) });
+      return;
+    }
+
+    doSave(null);
+  };
+
+  /** Actually writes the txn/rule. `reservePart` overrides the split input when
+   *  the shortfall dialog downgraded a full-reserve spend to a partial one. */
+  const doSave = (reservePart: number | null) => {
+    const parsedAmount = parseFloat(formData.amount);
+    const buildFunding = (): Expense['funding'] => {
+      if (funding.source === 'budget') return undefined;
+      if (reservePart !== null) {
+        return reservePart > 0 ? { source: 'split', reserveAmount: reservePart } : undefined;
+      }
+      if (funding.source === 'reserve') return { source: 'reserve' };
+      return { source: 'split', reserveAmount: parseFloat(funding.reserveAmount) };
+    };
 
     if (repeat) {
       // Create the rule — runRecurringGeneration (inside addRecurringRule)
@@ -69,6 +109,7 @@ export default function ExpenseForm() {
         paused: false,
         createdAt: new Date().toISOString(),
         tax,
+        funding: buildFunding(),
       };
       addRecurringRule(rule);
     } else {
@@ -85,6 +126,7 @@ export default function ExpenseForm() {
         payee:       payee.trim() || undefined,
         notes:       notes.trim() || undefined,
         tax,
+        funding:     buildFunding(),
       };
       addExpense(expense);
     }
@@ -216,6 +258,15 @@ export default function ExpenseForm() {
         />
       </div>
 
+      {/* Pay from (funding) */}
+      <FundingPicker
+        amount={parseFloat(formData.amount)}
+        date={formData.date}
+        source={funding.source}
+        reserveAmount={funding.reserveAmount}
+        onChange={setFunding}
+      />
+
       {/* ── More details (payee, notes, repeat, tax) ── */}
       <div>
         <button
@@ -344,6 +395,16 @@ export default function ExpenseForm() {
       >
         {repeat ? 'Add recurring expense' : 'Add Expense'}
       </button>
+
+      {shortfall && (
+        <ReserveShortfallDialog
+          shortfall={shortfall}
+          currency={currency}
+          onUseAvailable={() => { setShortfall(null); doSave(shortfall.available); }}
+          onChange={() => setShortfall(null)}
+          onCancel={() => setShortfall(null)}
+        />
+      )}
     </form>
   );
 }
