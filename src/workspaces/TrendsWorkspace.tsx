@@ -7,8 +7,9 @@ import {
 } from 'recharts';
 import {
   LineChart as LineChartIcon, TrendingUp, TrendingDown, Minus,
-  BarChart2, GitCompareArrows, CalendarClock, Info,
+  BarChart2, GitCompareArrows, CalendarClock, CalendarRange, Info,
 } from 'lucide-react';
+import YearlySummary from '@/components/YearlySummary';
 import { useBudgetStore } from '@/store/budgetStore';
 import { formatCurrency, formatCurrencyShort } from '@/utils/currency';
 import { todayLocalISO } from '@/utils/financialCycle';
@@ -17,7 +18,7 @@ import { forecast, ForecastPoint } from '@/lib/forecast';
 import { useChartTheme } from '@/components/charts/chartTheme';
 import ChartTooltip from '@/components/charts/ChartTooltip';
 
-type Tab = 'trends' | 'compare' | 'forecast';
+type Tab = 'trends' | 'yearly' | 'compare' | 'forecast';
 const PERIODS = [3, 6, 12] as const;
 
 const srOnly: React.CSSProperties = {
@@ -215,20 +216,23 @@ export default function TrendsWorkspace() {
           <h1 className="ws-title">Trends</h1>
           <p className="ws-subtitle">Monthly patterns, comparisons and forward estimates</p>
         </div>
-        {/* Period length */}
-        <div className="ws-tab-bar" role="group" aria-label="Period length">
-          {PERIODS.map(p => (
-            <button key={p} className={`ws-tab${months === p ? ' active' : ''}`} onClick={() => setMonths(p)}>
-              {p}M
-            </button>
-          ))}
-        </div>
+        {/* Period length (not used by the Yearly Overview, which has its own year picker) */}
+        {tab !== 'yearly' && (
+          <div className="ws-tab-bar" role="group" aria-label="Period length">
+            {PERIODS.map(p => (
+              <button key={p} className={`ws-tab${months === p ? ' active' : ''}`} onClick={() => setMonths(p)}>
+                {p}M
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Tabs ── */}
       <div className="ws-tab-bar" style={{ marginBottom: 16, alignSelf: 'flex-start' }}>
         {([
           { id: 'trends', label: 'Monthly Trends', Icon: BarChart2 },
+          { id: 'yearly', label: 'Yearly Overview', Icon: CalendarRange },
           { id: 'compare', label: 'Compare', Icon: GitCompareArrows },
           { id: 'forecast', label: 'Forecast', Icon: CalendarClock },
         ] as const).map(({ id, label, Icon }) => (
@@ -237,6 +241,9 @@ export default function TrendsWorkspace() {
           </button>
         ))}
       </div>
+
+      {/* ════════════════════ TAB: YEARLY OVERVIEW ════════════════════ */}
+      {tab === 'yearly' && <YearlySummary />}
 
       {/* ════════════════════ TAB: MONTHLY TRENDS ════════════════════ */}
       {tab === 'trends' && (
