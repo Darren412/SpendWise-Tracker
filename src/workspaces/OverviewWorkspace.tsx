@@ -10,6 +10,8 @@ import { useBudgetStore } from '@/store/budgetStore';
 import { formatCurrencyShort, currencySymbol } from '@/utils/currency';
 import { getFinancialMonthRange, formatFinancialPeriodRange, getCurrentFinancialPeriod } from '@/utils/financialCycle';
 import { budgetTrackedSpend } from '@/lib/trends';
+import BudgetAlertsBanner from '@/components/BudgetAlertsBanner';
+import GoalsSummaryCard from '@/components/GoalsSummaryCard';
 
 interface OverviewWorkspaceProps {
   onNavigate: (workspace: string) => void;
@@ -300,6 +302,9 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
           </button>
         </div>
       </div>
+
+      {/* ── Budget alerts (visible breaches for this period) ── */}
+      <BudgetAlertsBanner onNavigate={onNavigate} />
 
       {/* ── KPI cards ── */}
       <div className="ws-kpi-grid stagger-fade">
@@ -698,6 +703,9 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
           </div>
         )}
       </div>
+
+      {/* ── Savings goals summary ── */}
+      <GoalsSummaryCard onNavigate={onNavigate} />
 
       {/* ── Lower row ── */}
       <div className="ws-lower-grid stagger-fade" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>

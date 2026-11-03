@@ -11,7 +11,7 @@ import { summarizeTax } from '@/lib/tax';
 import { toCSV } from '@/lib/export/csv';
 import {
   transactionsDataset, monthlySummaryDataset, categorySpendingDataset,
-  budgetReportDataset, taxDataset, Dataset,
+  budgetReportDataset, taxDataset, Dataset, BudgetReportDataset,
 } from '@/lib/export/datasets';
 import { buildReportHTML } from '@/lib/export/pdfReport';
 import { downloadText } from '@/lib/export/download';
@@ -42,6 +42,7 @@ export default function ReportsWorkspace() {
     expenses, income, categories,
     selectedMonth, selectedYear, selectedCity, excludedCategoryIds,
     budgetCategoryIds, getMonthlyBudget, financialCycleStart, currency,
+    categoryBudgets,
   } = useBudgetStore();
 
   const [showExport, setShowExport] = useState(false);
@@ -114,7 +115,7 @@ export default function ReportsWorkspace() {
       case 'category':
         return { title, rangeText, dataset: categorySpendingDataset(rangeRows(), categories) };
       case 'budget':
-        return { title, rangeText, dataset: budgetReportDataset(rangeSeries()) };
+        return { title, rangeText, dataset: budgetReportDataset(rangeSeries(), categoryBudgets, categories) };
       case 'tax':
         return { title, rangeText, dataset: taxDataset(summarizeTax(rangeRows(), categories)) };
     }
@@ -129,8 +130,11 @@ export default function ReportsWorkspace() {
     setGenerating(true);
     try {
       const { dataset, title, rangeText } = buildDataset();
+      const extra = (dataset as BudgetReportDataset).categorySection;
       if (format === 'csv') {
-        downloadText(toCSV(dataset.columns, dataset.rows, dataset.totals),
+        let csv = toCSV(dataset.columns, dataset.rows, dataset.totals);
+        if (extra) csv += toCSV(extra.columns, extra.rows).slice(1); // strip second BOM
+        downloadText(csv,
           `spendwise-${reportType}-${range === 'custom' ? 'custom' : range}.csv`, 'text/csv');
       } else {
         const html = buildReportHTML({
@@ -142,7 +146,10 @@ export default function ReportsWorkspace() {
             ? Object.entries(dataset.totals).filter(([, v]) => v !== '' && v !== undefined).slice(0, 5)
                 .map(([k, v]) => ({ label: k, value: typeof v === 'number' ? formatCurrency(v as number, currency) : String(v) }))
             : [],
-          sections: [{ kind: 'table', title, columns: dataset.columns, rows: dataset.rows, totalsRow: dataset.totals }],
+          sections: [
+            { kind: 'table', title, columns: dataset.columns, rows: dataset.rows, totalsRow: dataset.totals },
+            ...(extra ? [{ kind: 'table' as const, title: 'Category budgets', columns: extra.columns, rows: extra.rows }] : []),
+          ],
         });
         printHTML(html, `spendwise-${reportType}`);
       }
