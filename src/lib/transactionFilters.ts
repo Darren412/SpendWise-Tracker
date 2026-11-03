@@ -130,6 +130,42 @@ export function applyTransactionFilters(
   return out;
 }
 
+/** Human-readable filter summary lines for report headers/footers. */
+export function describeFilters(
+  f: TransactionFilters,
+  categories: Category[],
+  sym: string,
+  period?: { label: string; range: string } // shown when no custom range is set
+): string[] {
+  const out: string[] = [];
+  const catName = (id: string) => categories.find(c => c.id === id)?.name ?? id;
+
+  if (f.dateFrom || f.dateTo) {
+    const fmt = (d?: string) => d
+      ? new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+      : '…';
+    out.push(`Date: ${fmt(f.dateFrom)} – ${fmt(f.dateTo)}`);
+  } else if (period) {
+    out.push(`Period: ${period.label}${period.range ? ` (${period.range})` : ''}`);
+  }
+  if (f.categoryIds.length > 0) out.push(`Category: ${f.categoryIds.map(catName).join(', ')}`);
+  if (f.type === 'expense') out.push('Type: Expenses only');
+  if (f.type === 'income') out.push('Type: Income only');
+  if (f.amountMin !== undefined) out.push(`Amount ≥ ${sym}${f.amountMin}`);
+  if (f.amountMax !== undefined) out.push(`Amount ≤ ${sym}${f.amountMax}`);
+  if (f.recurring === 'only') out.push('Recurring: only');
+  if (f.recurring === 'exclude') out.push('Recurring: excluded');
+  const taxLabels: Record<TransactionFilters['tax'], string> = {
+    only: 'tax-related only', deductible: 'deductible only',
+    'non-deductible': 'non-deductible only', exclude: 'not tax-related',
+    all: '',
+  };
+  if (f.tax !== 'all') out.push(`Tax: ${taxLabels[f.tax]}`);
+  if (f.city) out.push(`City: ${f.city}`);
+  if (f.search.trim()) out.push(`Search: "${f.search.trim()}"`);
+  return out;
+}
+
 /** Number of filter dimensions that differ from EMPTY_FILTERS. */
 export function countActiveFilters(f: TransactionFilters): number {
   let n = 0;

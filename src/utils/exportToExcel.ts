@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { Expense, Income, Category } from '@/types';
+import { safeCell } from '@/lib/export/sanitize';
 import { currencySymbol } from '@/utils/currency';
 
 export type ExportFilter =
@@ -27,9 +28,7 @@ function fmtCurrency(n: number, sym: string) {
 // Free-text cells that start with a spreadsheet formula trigger (=, +, -, @
 // or tab/CR) are prefixed with a single quote so Excel treats them as text.
 // Applied only to user-entered strings — never numbers or formatted dates.
-function safeCell(v: string): string {
-  return /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
-}
+// (Implementation lives in src/lib/export/sanitize.ts — shared with the CSV exporter.)
 
 type AnyRow = Record<string, string | number>;
 
