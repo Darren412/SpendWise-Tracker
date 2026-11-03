@@ -79,7 +79,7 @@ export default function GoalForm({ initial, onSave, onCancel }: GoalFormProps) {
         {errors.name && <div role="alert" style={errorStyle}>{errors.name}</div>}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 12 }}>
         {/* Target amount */}
         <div>
           <label htmlFor="goal-target" style={labelStyle}>Target ({sym})</label>

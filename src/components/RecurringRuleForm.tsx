@@ -132,7 +132,7 @@ export default function RecurringRuleForm({ initial, onSave, onCancel }: Recurri
       </div>
 
       {/* Amount + Frequency */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
         <div>
           <label style={labelStyle} htmlFor="rr-amount">Amount</label>
           <input
@@ -172,7 +172,7 @@ export default function RecurringRuleForm({ initial, onSave, onCancel }: Recurri
       </div>
 
       {/* Dates */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
         <div>
           <label style={labelStyle}>Starts</label>
           <DateInput value={startDate} onChange={setStartDate} style={inputStyle} />

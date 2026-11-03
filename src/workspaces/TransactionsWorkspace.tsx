@@ -314,7 +314,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
         {
           kind: 'barChart', title: 'Spending by category',
           categories: catDs.rows.map(r => String(r.category)),
-          series: [{ label: 'Spent', values: catDs.rows.map(r => Number(r.total)), color: '#ef4444' }],
+          series: [{ label: 'Spent', values: catDs.rows.map(r => Number(r.total)), color: 'var(--danger-text)' }],
         },
         {
           kind: 'table', title: `Transactions (${sortedRows.length})`,
@@ -393,7 +393,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
           KPI STRIP (transactions only — hidden on the Recurring tab)
       ══════════════════════════════════════════════════════════════════════ */}
       {tab !== 'recurring' && (
-      <div className="stagger-fade" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+      <div className="stagger-fade" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
           {
             label: 'Money Out', value: `${sym}${Math.round(totalExpAmt).toLocaleString('en-IN')}`,
@@ -859,9 +859,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
         style={{ padding: 0, overflow: 'hidden' }}
       >
         {/* Table header */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '28px 40px 1fr 140px 100px 90px 80px',
+        <div className="sw-txn-grid" style={{
           gap: 0,
           padding: '0 16px',
           height: 38,
@@ -880,8 +878,8 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
             Description
             {sortKey === 'description' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
           </button>
-          <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-400)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Category</span>
-          <button onClick={() => handleSort('date')} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-400)', letterSpacing: '0.07em', textTransform: 'uppercase', padding: 0 }}>
+          <span className="sw-txn-hide-sm" style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-400)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>Category</span>
+          <button className="sw-txn-hide-sm" onClick={() => handleSort('date')} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-400)', letterSpacing: '0.07em', textTransform: 'uppercase', padding: 0 }}>
             Date
             {sortKey === 'date' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
           </button>
@@ -957,9 +955,8 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                       <div key={row.id} style={{ borderBottom: '1px solid var(--border-default)' }}>
                         {/* Main row */}
                         <div
+                          className="sw-txn-grid"
                           style={{
-                            display: 'grid',
-                            gridTemplateColumns: '28px 40px 1fr 140px 100px 90px 80px',
                             alignItems: 'center',
                             padding: '0 16px',
                             minHeight: 52,
@@ -1002,11 +999,12 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                                 </>
                               )}
                               <span>{isExp ? getCatName(catId) : 'Income'}</span>
+                              <span className="sw-mobile-only" style={{ fontSize: '0.6875rem' }}>· {fmtTime(row.date)}</span>
                             </div>
                           </div>
 
                           {/* Category badge */}
-                          <div style={{ paddingRight: 8 }}>
+                          <div className="sw-txn-hide-sm" style={{ paddingRight: 8 }}>
                             {isExp ? (
                               <span style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -1023,7 +1021,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                           </div>
 
                           {/* Date */}
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-500)', whiteSpace: 'nowrap' }}>
+                          <span className="sw-txn-hide-sm" style={{ fontSize: '0.75rem', color: 'var(--text-500)', whiteSpace: 'nowrap' }}>
                             {fmtTime(row.date)}
                           </span>
 
@@ -1063,8 +1061,10 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
 
                         {/* ── Delete confirm inline ── */}
                         {isDelConfirm && (
-                          <div style={{
-                            display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 10px 74px',
+                          <div
+                            className="sw-txn-subpanel"
+                            style={{
+                            display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 10px',
                             background: 'var(--red-50)', borderTop: '1px dashed var(--red-100)',
                             animation: 'txnFadeIn 0.15s ease',
                           }}>
@@ -1088,8 +1088,10 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
 
                         {/* ── Expanded detail panel ── */}
                         {isExpanded && !isEditing && (
-                          <div style={{
-                            padding: '16px 16px 16px 74px',
+                          <div
+                            className="sw-txn-subpanel"
+                            style={{
+                            padding: '16px 16px 16px',
                             background: 'var(--bg-subtle)',
                             borderTop: '1px dashed var(--border-default)',
                             animation: 'txnSlideDown 0.18s ease',
@@ -1227,8 +1229,10 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
 
                         {/* ── Inline edit panel ── */}
                         {isEditing && (
-                          <div style={{
-                            padding: '14px 16px 14px 74px',
+                          <div
+                            className="sw-txn-subpanel"
+                            style={{
+                            padding: '14px 16px 14px',
                             background: 'var(--brand-50)',
                             borderTop: '1px dashed var(--brand-200)',
                             animation: 'txnSlideDown 0.18s ease',

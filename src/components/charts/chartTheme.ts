@@ -1,3 +1,7 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
 /**
  * Chart palette resolved from the app's CSS custom properties so charts
  * follow the active theme (dark mode in Phase 4). Values are read live via
@@ -59,4 +63,23 @@ export function getChartTheme(): ChartTheme {
     budget,
     series: [income, expenses, savings, budget, '#8b5cf6', '#06b6d4', '#ec4899', '#64748b'],
   };
+}
+
+/**
+ * Reactive variant — re-resolves the palette when <html data-theme> flips,
+ * so mounted charts update on theme change without a reload.
+ */
+export function useChartTheme(): ChartTheme {
+  const [theme, setTheme] = useState<ChartTheme>(() => getChartTheme());
+  useEffect(() => {
+    const refresh = () => setTheme(getChartTheme());
+    refresh();
+    if (typeof MutationObserver === 'undefined' || !document.documentElement) return;
+    const obs = new MutationObserver((muts) => {
+      if (muts.some(m => m.attributeName === 'data-theme')) refresh();
+    });
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
+  }, []);
+  return theme;
 }

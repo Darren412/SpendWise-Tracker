@@ -14,7 +14,7 @@ import { formatCurrency, formatCurrencyShort } from '@/utils/currency';
 import { todayLocalISO } from '@/utils/financialCycle';
 import { buildMonthlySeries, withMoM, categoryTrends, MonthPointMoM } from '@/lib/trends';
 import { forecast, ForecastPoint } from '@/lib/forecast';
-import { getChartTheme } from '@/components/charts/chartTheme';
+import { useChartTheme } from '@/components/charts/chartTheme';
 import ChartTooltip from '@/components/charts/ChartTooltip';
 
 type Tab = 'trends' | 'compare' | 'forecast';
@@ -91,7 +91,7 @@ export default function TrendsWorkspace() {
   } = useBudgetStore();
 
   const today = todayLocalISO();
-  const theme = getChartTheme();
+  const theme = useChartTheme();
 
   const [months, setMonths] = useState<3 | 6 | 12>(6);
   const [tab, setTab] = useState<Tab>('trends');

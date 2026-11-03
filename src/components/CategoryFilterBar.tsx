@@ -165,7 +165,7 @@ export default function CategoryFilterBar() {
 
   // ── Add ───────────────────────────────────────────────────────────────────
   const startAdd = () => {
-    setAddState({ name: '', icon: '📦', color: '#6b7280', type: filterTab === 'income' ? 'income' : 'expense' });
+    setAddState({ name: '', icon: '📦', color: 'var(--text-500)', type: filterTab === 'income' ? 'income' : 'expense' });
     setEditState(null);
     setDeleteState(null);
   };
@@ -184,9 +184,9 @@ export default function CategoryFilterBar() {
         className="flex items-center gap-2 rounded-xl text-sm font-semibold transition-all"
         style={{
           padding: '8px 14px',
-          background: noneExcluded ? '#fff' : '#4f46e5',
-          color:      noneExcluded ? '#374151' : '#fff',
-          border:     noneExcluded ? '1px solid #e8ecf0' : '1px solid #4f46e5',
+          background: noneExcluded ? 'var(--bg-surface)' : 'var(--brand-600)',
+          color:      noneExcluded ? 'var(--text-700)' : '#fff',
+          border:     noneExcluded ? '1px solid var(--border-default)' : '1px solid var(--brand-600)',
           boxShadow:  noneExcluded
             ? '0 1px 4px rgba(0,0,0,0.06)'
             : '0 2px 8px rgba(79,70,229,0.3)',
@@ -219,8 +219,8 @@ export default function CategoryFilterBar() {
             left: dropdownPos.left,
             width: dropdownPos.width,
             zIndex: 9999,
-            background: '#fff',
-            border: '1px solid #e8ecf0',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-default)',
             borderRadius: 16,
             boxShadow: '0 16px 48px rgba(0,0,0,0.14), 0 4px 16px rgba(0,0,0,0.08)',
             overflow: 'hidden',
@@ -228,9 +228,9 @@ export default function CategoryFilterBar() {
           }}
         >
           {/* ── Search ── */}
-          <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #f3f4f6' }}>
+          <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--border-default)' }}>
             <div style={{ position: 'relative', marginBottom: 8 }}>
-              <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
+              <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-400)', pointerEvents: 'none' }} />
               <input
                 ref={searchRef}
                 type="text"
@@ -238,18 +238,18 @@ export default function CategoryFilterBar() {
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search categories…"
                 style={{
-                  width: '100%', background: '#f4f6f9', border: '1px solid #e8ecf0',
+                  width: '100%', background: 'var(--bg-muted)', border: '1px solid var(--border-default)',
                   borderRadius: 10, padding: '7px 10px 7px 30px', fontSize: 12,
-                  color: '#111827', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+                  color: 'var(--text-900)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
                   transition: 'border-color 0.15s',
                 }}
-                onFocus={e => { e.target.style.borderColor = '#6366f1'; }}
-                onBlur={e => { e.target.style.borderColor = '#e8ecf0'; }}
+                onFocus={e => { e.target.style.borderColor = 'var(--brand-500)'; }}
+                onBlur={e => { e.target.style.borderColor = 'var(--border-default)'; }}
               />
               {search && (
                 <button
                   onClick={() => setSearch('')}
-                  style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0 }}
+                  style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-400)', padding: 0 }}
                 >
                   <X size={12} />
                 </button>
@@ -262,9 +262,9 @@ export default function CategoryFilterBar() {
                 onClick={selectAll}
                 style={{
                   flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  background: noneExcluded ? '#4f46e5' : '#f4f6f9',
-                  color: noneExcluded ? '#fff' : '#6b7280',
-                  border: noneExcluded ? '1px solid #4f46e5' : '1px solid #e8ecf0',
+                  background: noneExcluded ? 'var(--brand-600)' : 'var(--bg-muted)',
+                  color: noneExcluded ? '#fff' : 'var(--text-500)',
+                  border: noneExcluded ? '1px solid var(--brand-600)' : '1px solid var(--border-default)',
                   fontFamily: 'inherit', transition: 'all 0.12s',
                 }}
               >
@@ -274,7 +274,7 @@ export default function CategoryFilterBar() {
                 onClick={deselectAll}
                 style={{
                   flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                  background: '#f4f6f9', border: '1px solid #e8ecf0', color: '#6b7280',
+                  background: 'var(--bg-muted)', border: '1px solid var(--border-default)', color: 'var(--text-500)',
                   fontFamily: 'inherit', transition: 'background 0.12s',
                 }}
               >
@@ -284,7 +284,7 @@ export default function CategoryFilterBar() {
           </div>
 
           {/* ── Expense / Income tab strip ── */}
-          <div style={{ display: 'flex', borderBottom: '1px solid #f3f4f6', background: '#fafbfc' }}>
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--border-default)', background: 'var(--bg-subtle)' }}>
             {(['expense', 'income'] as const).map(tab => (
               <button
                 key={tab}
@@ -292,8 +292,8 @@ export default function CategoryFilterBar() {
                 style={{
                   flex: 1, padding: '8px 0', fontSize: 11, fontWeight: 700, cursor: 'pointer',
                   background: 'transparent', border: 'none', fontFamily: 'inherit',
-                  color: filterTab === tab ? '#4f46e5' : '#9ca3af',
-                  borderBottom: filterTab === tab ? '2px solid #4f46e5' : '2px solid transparent',
+                  color: filterTab === tab ? 'var(--brand-text)' : 'var(--text-400)',
+                  borderBottom: filterTab === tab ? '2px solid var(--brand-600)' : '2px solid transparent',
                   textTransform: 'capitalize', transition: 'color 0.15s',
                 }}
               >
@@ -309,7 +309,7 @@ export default function CategoryFilterBar() {
             {filteredCats.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px 12px' }}>
                 <div style={{ fontSize: 22, marginBottom: 6 }}>🔍</div>
-                <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>
+                <p style={{ fontSize: 12, color: 'var(--text-400)', margin: 0 }}>
                   {search ? `No categories matching "${search}"` : 'No categories yet'}
                 </p>
               </div>
@@ -335,7 +335,7 @@ export default function CategoryFilterBar() {
                         onClick={() => { if (canToggle) toggle(cat.id); }}
                         onMouseEnter={e => {
                           if (canToggle) (e.currentTarget as HTMLDivElement).style.background =
-                            active ? `${cat.color}18` : '#f9fafb';
+                            active ? `${cat.color}18` : 'var(--bg-subtle)';
                         }}
                         onMouseLeave={e => {
                           (e.currentTarget as HTMLDivElement).style.background =
@@ -346,8 +346,8 @@ export default function CategoryFilterBar() {
                         {filterTab === 'expense' && (
                           <div style={{
                             width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-                            background: active ? cat.color : '#fff',
-                            border: `1.5px solid ${active ? cat.color : '#d1d5db'}`,
+                            background: active ? cat.color : 'var(--bg-surface)',
+                            border: `1.5px solid ${active ? cat.color : 'var(--text-300)'}`,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             transition: 'background 0.12s, border-color 0.12s',
                           }}>
@@ -375,21 +375,21 @@ export default function CategoryFilterBar() {
                             onClick={e => e.stopPropagation()}
                             style={{
                               flex: 1, borderRadius: 8, fontSize: 12, fontWeight: 600,
-                              background: '#f4f6f9', border: '1.5px solid #4f46e5',
-                              padding: '3px 8px', color: '#111827', fontFamily: 'inherit', outline: 'none',
+                              background: 'var(--bg-muted)', border: '1.5px solid var(--brand-600)',
+                              padding: '3px 8px', color: 'var(--text-900)', fontFamily: 'inherit', outline: 'none',
                             }}
                           />
                         ) : (
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <p style={{
-                              fontSize: 12, fontWeight: 600, color: '#111827', margin: 0,
+                              fontSize: 12, fontWeight: 600, color: 'var(--text-900)', margin: 0,
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                               textDecoration: active ? 'none' : 'line-through',
                             }}>
                               {cat.name}
                             </p>
                             {monthTotal > 0 && active && (
-                              <p style={{ fontSize: 10, color: '#9ca3af', margin: 0 }}>
+                              <p style={{ fontSize: 10, color: 'var(--text-400)', margin: 0 }}>
                                 {currencySymbol(currency)}{monthTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} this month
                               </p>
                             )}
@@ -403,10 +403,10 @@ export default function CategoryFilterBar() {
                         >
                           {isEditingThis ? (
                             <>
-                              <button onClick={saveEdit} style={{ color: '#10b981', padding: '3px 4px', borderRadius: 5, background: '#ecfdf5', border: 'none', cursor: 'pointer' }} title="Save">
+                              <button onClick={saveEdit} style={{ color: 'var(--success-text)', padding: '3px 4px', borderRadius: 5, background: 'var(--green-50)', border: 'none', cursor: 'pointer' }} title="Save">
                                 <Check size={12} strokeWidth={2.5} />
                               </button>
-                              <button onClick={() => setEditState(null)} style={{ color: '#9ca3af', padding: '3px 4px', borderRadius: 5, background: '#f4f6f9', border: 'none', cursor: 'pointer' }} title="Cancel">
+                              <button onClick={() => setEditState(null)} style={{ color: 'var(--text-400)', padding: '3px 4px', borderRadius: 5, background: 'var(--bg-muted)', border: 'none', cursor: 'pointer' }} title="Cancel">
                                 <X size={12} />
                               </button>
                             </>
@@ -414,19 +414,19 @@ export default function CategoryFilterBar() {
                             <>
                               <button
                                 onClick={() => startEdit(cat.id, cat.name)}
-                                style={{ color: '#9ca3af', padding: '4px', borderRadius: 5, background: 'transparent', border: 'none', cursor: 'pointer' }}
+                                style={{ color: 'var(--text-400)', padding: '4px', borderRadius: 5, background: 'transparent', border: 'none', cursor: 'pointer' }}
                                 title="Rename"
-                                onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
+                                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-muted)')}
                                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                               >
                                 <Pencil size={11} />
                               </button>
                               <button
                                 onClick={() => startDelete(cat.id)}
-                                style={{ color: '#9ca3af', padding: '4px', borderRadius: 5, background: 'transparent', border: 'none', cursor: 'pointer' }}
+                                style={{ color: 'var(--text-400)', padding: '4px', borderRadius: 5, background: 'transparent', border: 'none', cursor: 'pointer' }}
                                 title="Delete"
-                                onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.color = '#f87171'; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#9ca3af'; }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-50)'; e.currentTarget.style.color = 'var(--danger-text)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-400)'; }}
                               >
                                 <Trash2 size={11} />
                               </button>
@@ -438,15 +438,15 @@ export default function CategoryFilterBar() {
 
                     {/* Delete confirmation */}
                     {isDeletingThis && (
-                      <div style={{ padding: '10px 12px', background: '#fef2f2', borderTop: '1px solid #fee2e2', borderBottom: '1px solid #fee2e2' }}>
-                        <p style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', marginBottom: 4, marginTop: 0 }}>
+                      <div style={{ padding: '10px 12px', background: 'var(--red-50)', borderTop: '1px solid var(--red-100)', borderBottom: '1px solid var(--red-100)' }}>
+                        <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--danger-text)', marginBottom: 4, marginTop: 0 }}>
                           Delete &quot;{cat.name}&quot;?
                         </p>
-                        <p style={{ fontSize: 10, color: '#9ca3af', marginBottom: 8, marginTop: 0 }}>Reassign transactions to:</p>
+                        <p style={{ fontSize: 10, color: 'var(--text-400)', marginBottom: 8, marginTop: 0 }}>Reassign transactions to:</p>
                         <select
                           value={deleteState.reassignToId}
                           onChange={e => setDeleteState({ ...deleteState, reassignToId: e.target.value })}
-                          style={{ width: '100%', padding: '6px 8px', borderRadius: 8, fontSize: 12, marginBottom: 8, background: '#fff', border: '1px solid #e8ecf0', color: '#111827', fontFamily: 'inherit', outline: 'none' }}
+                          style={{ width: '100%', padding: '6px 8px', borderRadius: 8, fontSize: 12, marginBottom: 8, background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-900)', fontFamily: 'inherit', outline: 'none' }}
                         >
                           {categories
                             .filter(c => c.id !== cat.id && (c.type === cat.type || c.type === 'both' || cat.type === 'both'))
@@ -456,7 +456,7 @@ export default function CategoryFilterBar() {
                           <button onClick={confirmDelete} style={{ flex: 1, padding: '6px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer' }}>
                             Delete &amp; Reassign
                           </button>
-                          <button onClick={() => setDeleteState(null)} style={{ flex: 1, padding: '6px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: '#f4f6f9', color: '#6b7280', border: '1px solid #e8ecf0', cursor: 'pointer' }}>
+                          <button onClick={() => setDeleteState(null)} style={{ flex: 1, padding: '6px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: 'var(--bg-muted)', color: 'var(--text-500)', border: '1px solid var(--border-default)', cursor: 'pointer' }}>
                             Cancel
                           </button>
                         </div>
@@ -469,25 +469,25 @@ export default function CategoryFilterBar() {
           </div>
 
           {/* ── Add category ── */}
-          <div style={{ borderTop: '1px solid #f3f4f6', padding: '8px 12px 10px' }}>
+          <div style={{ borderTop: '1px solid var(--border-default)', padding: '8px 12px 10px' }}>
             {!addState ? (
               <button
                 onClick={startAdd}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                   padding: '8px 10px', borderRadius: 10, fontSize: 12, fontWeight: 700,
-                  color: '#4f46e5', background: '#f0f0ff', border: '1px dashed #c7d2fe',
+                  color: 'var(--brand-text)', background: 'var(--brand-50)', border: '1px dashed var(--brand-200)',
                   cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.12s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#e8e9ff')}
-                onMouseLeave={e => (e.currentTarget.style.background = '#f0f0ff')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--brand-100)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--brand-50)')}
               >
                 <Plus size={13} />
                 Add {filterTab === 'income' ? 'Income' : 'Expense'} Category
               </button>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: 'var(--text-700)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                   New {addState.type} category
                 </p>
                 <input
@@ -497,19 +497,19 @@ export default function CategoryFilterBar() {
                   onChange={e => setAddState({ ...addState, name: e.target.value })}
                   onKeyDown={e => { if (e.key === 'Enter') confirmAdd(); if (e.key === 'Escape') setAddState(null); }}
                   placeholder="Category name"
-                  style={{ width: '100%', padding: '7px 10px', borderRadius: 8, fontSize: 12, background: '#f4f6f9', border: '1.5px solid #e8ecf0', color: '#111827', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
-                  onFocus={e => { e.target.style.borderColor = '#6366f1'; }}
-                  onBlur={e => { e.target.style.borderColor = '#e8ecf0'; }}
+                  style={{ width: '100%', padding: '7px 10px', borderRadius: 8, fontSize: 12, background: 'var(--bg-muted)', border: '1.5px solid var(--border-default)', color: 'var(--text-900)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+                  onFocus={e => { e.target.style.borderColor = 'var(--brand-500)'; }}
+                  onBlur={e => { e.target.style.borderColor = 'var(--border-default)'; }}
                 />
                 <div style={{ display: 'flex', gap: 6 }}>
                   {(['expense', 'income', 'both'] as const).map(t => (
-                    <button key={t} onClick={() => setAddState({ ...addState, type: t })} style={{ flex: 1, padding: '5px 4px', borderRadius: 7, fontSize: 10, fontWeight: 600, background: addState.type === t ? '#4f46e5' : '#f4f6f9', color: addState.type === t ? '#fff' : '#6b7280', border: addState.type === t ? '1px solid #4f46e5' : '1px solid #e8ecf0', cursor: 'pointer', textTransform: 'capitalize', fontFamily: 'inherit' }}>
+                    <button key={t} onClick={() => setAddState({ ...addState, type: t })} style={{ flex: 1, padding: '5px 4px', borderRadius: 7, fontSize: 10, fontWeight: 600, background: addState.type === t ? '#4f46e5' : 'var(--bg-muted)', color: addState.type === t ? '#fff' : 'var(--text-500)', border: addState.type === t ? '1px solid #4f46e5' : '1px solid var(--border-default)', cursor: 'pointer', textTransform: 'capitalize', fontFamily: 'inherit' }}>
                       {t}
                     </button>
                   ))}
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <select value={addState.icon} onChange={e => setAddState({ ...addState, icon: e.target.value })} style={{ flex: '0 0 auto', padding: '6px 8px', borderRadius: 8, fontSize: 16, background: '#f4f6f9', border: '1px solid #e8ecf0', color: '#111827', fontFamily: 'inherit', outline: 'none' }}>
+                  <select value={addState.icon} onChange={e => setAddState({ ...addState, icon: e.target.value })} style={{ flex: '0 0 auto', padding: '6px 8px', borderRadius: 8, fontSize: 16, background: 'var(--bg-muted)', border: '1px solid var(--border-default)', color: 'var(--text-900)', fontFamily: 'inherit', outline: 'none' }}>
                     {EMOJI_ICONS.map(e => <option key={e} value={e}>{e}</option>)}
                   </select>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, flex: 1 }}>
@@ -519,10 +519,10 @@ export default function CategoryFilterBar() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={confirmAdd} disabled={!addState.name.trim()} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 700, background: addState.name.trim() ? '#4f46e5' : '#e8ecf0', color: addState.name.trim() ? '#fff' : '#9ca3af', border: 'none', cursor: addState.name.trim() ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+                  <button onClick={confirmAdd} disabled={!addState.name.trim()} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 700, background: addState.name.trim() ? '#4f46e5' : 'var(--border-default)', color: addState.name.trim() ? '#fff' : 'var(--text-400)', border: 'none', cursor: addState.name.trim() ? 'pointer' : 'default', fontFamily: 'inherit' }}>
                     Add
                   </button>
-                  <button onClick={() => setAddState(null)} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#f4f6f9', color: '#6b7280', border: '1px solid #e8ecf0', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <button onClick={() => setAddState(null)} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'var(--bg-muted)', color: 'var(--text-500)', border: '1px solid var(--border-default)', cursor: 'pointer', fontFamily: 'inherit' }}>
                     Cancel
                   </button>
                 </div>

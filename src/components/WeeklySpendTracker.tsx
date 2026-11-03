@@ -28,7 +28,7 @@ interface WeekData {
 // ── Week colors ─────────────────────────────────────────────────────────
 
 const weekColors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b'];
-const weekColorsLight = ['#eef2ff', '#f5f3ff', '#fdf2f8', '#fffbeb'];
+const weekColorsLight = ['var(--brand-50)', 'var(--purple-50)', 'var(--red-50)', 'var(--amber-50)'];
 
 // ── Premium tooltip ─────────────────────────────────────────────────────
 
@@ -47,8 +47,8 @@ function WeekTooltip({ active, payload, currency, totalSpent }: WeekTooltipProps
 
   return (
     <div style={{
-      background: '#fff',
-      border: '1px solid #e8ecf0',
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border-default)',
       borderRadius: 14,
       boxShadow: '0 12px 40px rgba(0,0,0,0.14)',
       minWidth: 220,
@@ -57,16 +57,16 @@ function WeekTooltip({ active, payload, currency, totalSpent }: WeekTooltipProps
       fontFamily: 'inherit',
     }}>
       <div style={{
-        background: weekColorsLight[data.week - 1] ?? '#f8fafc',
+        background: weekColorsLight[data.week - 1] ?? 'var(--bg-subtle)',
         padding: '12px 16px 10px',
-        borderBottom: '1px solid #f3f4f6',
+        borderBottom: '1px solid var(--border-default)',
       }}>
-        <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
           {data.label}
         </p>
-        <p style={{ fontSize: 10, color: '#9ca3af' }}>{data.dateRange}</p>
+        <p style={{ fontSize: 10, color: 'var(--text-400)' }}>{data.dateRange}</p>
         <p style={{
-          fontSize: 22, fontWeight: 800, color: '#111827',
+          fontSize: 22, fontWeight: 800, color: 'var(--text-900)',
           fontVariantNumeric: 'tabular-nums', lineHeight: 1, marginTop: 6,
         }}>
           {sym}{data.total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
@@ -74,15 +74,15 @@ function WeekTooltip({ active, payload, currency, totalSpent }: WeekTooltipProps
       </div>
       <div style={{ padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-          <span style={{ color: '#6b7280' }}>Transactions</span>
-          <span style={{ fontWeight: 700, color: '#111827' }}>{data.txnCount}</span>
+          <span style={{ color: 'var(--text-500)' }}>Transactions</span>
+          <span style={{ fontWeight: 700, color: 'var(--text-900)' }}>{data.txnCount}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-          <span style={{ color: '#6b7280' }}>Avg / day</span>
-          <span style={{ fontWeight: 700, color: '#111827' }}>{formatCurrency(data.avgPerDay, currency)}</span>
+          <span style={{ color: 'var(--text-500)' }}>Avg / day</span>
+          <span style={{ fontWeight: 700, color: 'var(--text-900)' }}>{formatCurrency(data.avgPerDay, currency)}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-          <span style={{ color: '#6b7280' }}>Share of month</span>
+          <span style={{ color: 'var(--text-500)' }}>Share of month</span>
           <span style={{ fontWeight: 700, color: weekColors[data.week - 1] }}>{pct}%</span>
         </div>
       </div>
@@ -112,7 +112,7 @@ function WeekCategoryBreakdown({ expenses, categories, currency }: {
   if (catTotals.length === 0) {
     return (
       <div style={{ padding: '20px 0', textAlign: 'center' }}>
-        <p style={{ fontSize: 11, color: '#9ca3af' }}>No transactions this week</p>
+        <p style={{ fontSize: 11, color: 'var(--text-400)' }}>No transactions this week</p>
       </div>
     );
   }
@@ -125,24 +125,24 @@ function WeekCategoryBreakdown({ expenses, categories, currency }: {
           <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 28, height: 28, borderRadius: 8,
-              background: cat ? `${cat.color}1a` : '#f3f4f6',
+              background: cat ? `${cat.color}1a` : 'var(--bg-muted)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 13, flexShrink: 0,
             }}>
               {cat?.icon ?? '📦'}
             </div>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#374151', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-700)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {cat?.name ?? 'Uncategorised'}
             </span>
-            <div style={{ width: 60, height: 5, borderRadius: 100, background: '#f3f4f6', flexShrink: 0 }}>
+            <div style={{ width: 60, height: 5, borderRadius: 100, background: 'var(--bg-muted)', flexShrink: 0 }}>
               <div style={{
                 height: '100%', borderRadius: 100,
-                background: cat?.color ?? '#9ca3af',
+                background: cat?.color ?? 'var(--bg-muted)',
                 width: `${Math.min(pct, 100)}%`,
                 transition: 'width 0.3s ease',
               }} />
             </div>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums', flexShrink: 0, width: 56, textAlign: 'right' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-900)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, width: 56, textAlign: 'right' }}>
               {formatCurrency(total, currency)}
             </span>
           </div>
@@ -248,15 +248,15 @@ export default function WeeklySpendTracker() {
 
   // Week-over-week trend indicators
   const getTrend = (weekIdx: number): { icon: typeof TrendingUp; color: string; label: string } => {
-    if (weekIdx === 0) return { icon: Minus, color: '#9ca3af', label: 'Baseline' };
+    if (weekIdx === 0) return { icon: Minus, color: 'var(--text-400)', label: 'Baseline' };
     const curr = weeklyData[weekIdx]?.total ?? 0;
     const prev = weeklyData[weekIdx - 1]?.total ?? 0;
-    if (prev === 0 && curr === 0) return { icon: Minus, color: '#9ca3af', label: 'No activity' };
-    if (prev === 0) return { icon: TrendingUp, color: '#ef4444', label: 'New spending' };
+    if (prev === 0 && curr === 0) return { icon: Minus, color: 'var(--text-400)', label: 'No activity' };
+    if (prev === 0) return { icon: TrendingUp, color: 'var(--danger-text)', label: 'New spending' };
     const change = ((curr - prev) / prev) * 100;
-    if (Math.abs(change) < 5) return { icon: Minus, color: '#9ca3af', label: `${change >= 0 ? '+' : ''}${change.toFixed(0)}%` };
-    if (change > 0) return { icon: TrendingUp, color: '#ef4444', label: `+${change.toFixed(0)}%` };
-    return { icon: TrendingDown, color: '#10b981', label: `${change.toFixed(0)}%` };
+    if (Math.abs(change) < 5) return { icon: Minus, color: 'var(--text-400)', label: `${change >= 0 ? '+' : ''}${change.toFixed(0)}%` };
+    if (change > 0) return { icon: TrendingUp, color: 'var(--danger-text)', label: `+${change.toFixed(0)}%` };
+    return { icon: TrendingDown, color: 'var(--success-text)', label: `${change.toFixed(0)}%` };
   };
 
   return (
@@ -265,12 +265,12 @@ export default function WeeklySpendTracker() {
       {/* ── Header ── */}
       <div className="flex items-start justify-between mb-5 flex-wrap gap-4">
         <div className="flex items-center gap-3">
-          <div className="icon-pill" style={{ background: '#f0fdf4' }}>
-            <CalendarDays size={15} color="#10b981" />
+          <div className="icon-pill" style={{ background: 'var(--green-50)' }}>
+            <CalendarDays size={15} color="var(--success-text)" />
           </div>
           <div>
             <p className="card-header-label mb-0">Weekly Spend Breakdown</p>
-            <p className="text-xs" style={{ color: '#9ca3af' }}>
+            <p className="text-xs" style={{ color: 'var(--text-400)' }}>
               Spending distribution across 4 weeks of your financial period
             </p>
           </div>
@@ -279,18 +279,18 @@ export default function WeeklySpendTracker() {
         {/* Summary stats */}
         <div className="flex items-center gap-5 flex-wrap">
           <div className="text-right">
-            <p className="text-xs" style={{ color: '#9ca3af' }}>Avg / week</p>
-            <p className="text-sm font-bold num-mono" style={{ color: '#10b981' }}>{formatCurrency(avgWeekly, currency)}</p>
+            <p className="text-xs" style={{ color: 'var(--text-400)' }}>Avg / week</p>
+            <p className="text-sm font-bold num-mono" style={{ color: 'var(--success-text)' }}>{formatCurrency(avgWeekly, currency)}</p>
           </div>
           <div className="text-right">
-            <p className="text-xs" style={{ color: '#9ca3af' }}>Peak week</p>
-            <p className="text-sm font-bold num-mono" style={{ color: '#ef4444' }}>
+            <p className="text-xs" style={{ color: 'var(--text-400)' }}>Peak week</p>
+            <p className="text-sm font-bold num-mono" style={{ color: 'var(--danger-text)' }}>
               {peakWeek && peakWeek.total > 0 ? peakWeek.label : '—'}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs" style={{ color: '#9ca3af' }}>Total spent</p>
-            <p className="text-sm font-bold num-mono" style={{ color: '#111827' }}>{formatCurrency(totalSpent, currency)}</p>
+            <p className="text-xs" style={{ color: 'var(--text-400)' }}>Total spent</p>
+            <p className="text-sm font-bold num-mono" style={{ color: 'var(--text-900)' }}>{formatCurrency(totalSpent, currency)}</p>
           </div>
         </div>
       </div>
@@ -300,19 +300,19 @@ export default function WeeklySpendTracker() {
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           justifyContent: 'center', padding: '48px 24px', gap: 12,
-          background: '#f8fafc', borderRadius: 16, border: '1.5px dashed #e8ecf0',
+          background: 'var(--bg-subtle)', borderRadius: 16, border: '1.5px dashed var(--border-default)',
         }}>
           <div style={{
             width: 52, height: 52, borderRadius: '50%',
-            background: '#f0fdf4', display: 'flex', alignItems: 'center',
+            background: 'var(--green-50)', display: 'flex', alignItems: 'center',
             justifyContent: 'center',
           }}>
-            <CalendarDays size={22} color="#86efac" />
+            <CalendarDays size={22} color="var(--success-text)" />
           </div>
-          <p style={{ fontSize: 14, fontWeight: 700, color: '#374151', textAlign: 'center' }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-700)', textAlign: 'center' }}>
             No spending data this period
           </p>
-          <p style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', maxWidth: 280 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-400)', textAlign: 'center', maxWidth: 280 }}>
             Add expenses to see your weekly spending breakdown
           </p>
         </div>
@@ -325,17 +325,18 @@ export default function WeeklySpendTracker() {
               margin={{ top: 10, right: 10, left: -8, bottom: 0 }}
               barCategoryGap="20%"
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default)" vertical={false} />
 
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 11, fill: '#6b7280', fontWeight: 600 }}
+                tick={{ fontSize: 11, fill: 'var(--text-400)', fontWeight: 600 }}
                 tickLine={false}
                 axisLine={false}
+                interval="preserveStartEnd"
               />
 
               <YAxis
-                tick={{ fontSize: 10, fill: '#9ca3af' }}
+                tick={{ fontSize: 10, fill: 'var(--text-400)' }}
                 tickLine={false}
                 axisLine={false}
                 width={50}
@@ -379,8 +380,8 @@ export default function WeeklySpendTracker() {
                   key={week.week}
                   onClick={() => setExpandedWeek(isExpanded ? null : week.week)}
                   style={{
-                    background: isExpanded ? weekColorsLight[week.week - 1] : '#fff',
-                    border: `1.5px solid ${isExpanded ? weekColors[week.week - 1] + '40' : '#e8ecf0'}`,
+                    background: isExpanded ? weekColorsLight[week.week - 1] : 'var(--bg-surface)',
+                    border: `1.5px solid ${isExpanded ? weekColors[week.week - 1] + '40' : 'var(--border-default)'}`,
                     borderRadius: 14,
                     padding: '14px 16px',
                     cursor: 'pointer',
@@ -394,7 +395,7 @@ export default function WeeklySpendTracker() {
                         width: 8, height: 8, borderRadius: '50%',
                         background: weekColors[week.week - 1],
                       }} />
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-700)' }}>
                         {week.label}
                       </span>
                     </div>
@@ -413,7 +414,7 @@ export default function WeeklySpendTracker() {
 
                   {/* Amount */}
                   <p style={{
-                    fontSize: 18, fontWeight: 800, color: '#111827',
+                    fontSize: 18, fontWeight: 800, color: 'var(--text-900)',
                     fontVariantNumeric: 'tabular-nums', lineHeight: 1, marginBottom: 4,
                   }}>
                     {sym}{week.total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
@@ -421,24 +422,24 @@ export default function WeeklySpendTracker() {
 
                   {/* Meta row */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <span style={{ fontSize: 10, color: '#9ca3af' }}>
+                    <span style={{ fontSize: 10, color: 'var(--text-400)' }}>
                       {week.txnCount} txn{week.txnCount !== 1 ? 's' : ''}
                     </span>
-                    <span style={{ fontSize: 10, color: '#d1d5db' }}>|</span>
-                    <span style={{ fontSize: 10, color: '#9ca3af' }}>
+                    <span style={{ fontSize: 10, color: 'var(--text-300)' }}>|</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-400)' }}>
                       {pct}% of total
                     </span>
                   </div>
 
                   {/* Date range */}
-                  <p style={{ fontSize: 10, color: '#b0b7c3' }}>
+                  <p style={{ fontSize: 10, color: 'var(--text-400)' }}>
                     {week.dateRange}
                   </p>
 
                   {/* Progress bar */}
                   <div style={{
                     width: '100%', height: 4, borderRadius: 100,
-                    background: '#f3f4f6', marginTop: 8,
+                    background: 'var(--bg-muted)', marginTop: 8,
                   }}>
                     <div style={{
                       height: '100%', borderRadius: 100,
@@ -467,17 +468,17 @@ export default function WeeklySpendTracker() {
                 background: weekColorsLight[expandedWeek - 1],
                 padding: '14px 18px',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                borderBottom: '1px solid #f0f2f5',
+                borderBottom: '1px solid var(--border-default)',
               }}>
                 <div>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
                     {weeklyData[expandedWeek - 1].label} Detail
                   </p>
-                  <p style={{ fontSize: 10, color: '#9ca3af' }}>
+                  <p style={{ fontSize: 10, color: 'var(--text-400)' }}>
                     {weeklyData[expandedWeek - 1].dateRange}
                   </p>
                   <p style={{
-                    fontSize: 22, fontWeight: 800, color: '#111827',
+                    fontSize: 22, fontWeight: 800, color: 'var(--text-900)',
                     fontVariantNumeric: 'tabular-nums', lineHeight: 1, marginTop: 6,
                   }}>
                     {formatCurrency(weeklyData[expandedWeek - 1].total, currency)}
@@ -486,16 +487,16 @@ export default function WeeklySpendTracker() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   {/* Stats */}
                   <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: 10, color: '#9ca3af' }}>Avg / day</p>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: '#10b981', fontVariantNumeric: 'tabular-nums' }}>
+                    <p style={{ fontSize: 10, color: 'var(--text-400)' }}>Avg / day</p>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--success-text)', fontVariantNumeric: 'tabular-nums' }}>
                       {formatCurrency(weeklyData[expandedWeek - 1].avgPerDay, currency)}
                     </p>
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); setExpandedWeek(null); }}
                     style={{
-                      fontSize: 11, color: '#9ca3af', background: '#f4f6f9',
-                      border: '1px solid #e8ecf0', padding: '5px 12px',
+                      fontSize: 11, color: 'var(--text-400)', background: 'var(--bg-muted)',
+                      border: '1px solid var(--border-default)', padding: '5px 12px',
                       borderRadius: 8, cursor: 'pointer', fontWeight: 600,
                     }}
                   >
@@ -505,8 +506,8 @@ export default function WeeklySpendTracker() {
               </div>
 
               {/* Category breakdown */}
-              <div style={{ padding: '16px 18px', background: '#fff' }}>
-                <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+              <div style={{ padding: '16px 18px', background: 'var(--bg-surface)' }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
                   Category Breakdown
                 </p>
                 <WeekCategoryBreakdown
@@ -520,17 +521,17 @@ export default function WeeklySpendTracker() {
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '10px 18px',
-                background: '#f8fafc', borderTop: '1px solid #f0f2f5',
+                background: 'var(--bg-subtle)', borderTop: '1px solid var(--border-default)',
               }}>
-                <span style={{ fontSize: 12, color: '#6b7280' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-500)' }}>
                   {weeklyData[expandedWeek - 1].txnCount} transaction{weeklyData[expandedWeek - 1].txnCount !== 1 ? 's' : ''}
                 </span>
                 <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: 10, color: '#9ca3af', marginRight: 8 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-400)', marginRight: 8 }}>
                     vs avg {sym}{Math.round(avgWeekly).toLocaleString('en-IN')}
                   </span>
                   <span style={{
-                    fontSize: 15, fontWeight: 800, color: '#111827',
+                    fontSize: 15, fontWeight: 800, color: 'var(--text-900)',
                     fontVariantNumeric: 'tabular-nums',
                   }}>
                     {formatCurrency(weeklyData[expandedWeek - 1].total, currency)}
@@ -545,11 +546,11 @@ export default function WeeklySpendTracker() {
             {weeklyData.map((week) => (
               <div key={week.week} className="flex items-center gap-1.5">
                 <div style={{ width: 10, height: 10, borderRadius: 3, background: weekColors[week.week - 1] }} />
-                <span style={{ fontSize: 10, color: '#9ca3af' }}>{week.label}</span>
+                <span style={{ fontSize: 10, color: 'var(--text-400)' }}>{week.label}</span>
               </div>
             ))}
             {!expandedWeek && (
-              <span style={{ fontSize: 10, color: '#c4c9d4', marginLeft: 'auto' }}>Click a week card for details</span>
+              <span style={{ fontSize: 10, color: 'var(--text-300)', marginLeft: 'auto' }}>Click a week card for details</span>
             )}
           </div>
         </>

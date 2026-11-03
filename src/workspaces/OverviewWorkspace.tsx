@@ -609,11 +609,11 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '8px 12px', marginTop: 10,
-                background: '#fef2f2', borderRadius: 8,
-                border: '1px solid #fecaca',
+                background: 'var(--red-50)', borderRadius: 8,
+                border: '1px solid var(--red-200)',
               }}>
-                <AlertTriangle size={14} style={{ color: '#ef4444', flexShrink: 0 }} />
-                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#991b1b' }}>
+                <AlertTriangle size={14} style={{ color: 'var(--danger-text)', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--danger-text)' }}>
                   You&apos;ve exceeded your budget by {sym}{Math.abs(Math.round(budgetRemaining)).toLocaleString('en-IN')}
                 </span>
               </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { formatCurrency } from '@/utils/currency';
-import { getChartTheme } from '@/components/charts/chartTheme';
+import { useChartTheme } from '@/components/charts/chartTheme';
 
 interface PayloadEntry {
   name?: string | number;
@@ -23,8 +23,8 @@ interface ChartTooltipProps {
 
 /** Shared dark/light-aware tooltip for all workspace charts. */
 export default function ChartTooltip({ active, label, payload, currency, format = 'currency', footer }: ChartTooltipProps) {
+  const t = useChartTheme();
   if (!active || !payload || payload.length === 0) return null;
-  const t = getChartTheme();
   const fmt = (v: number | string | (number | string)[] | undefined) => {
     if (typeof v === 'number') return format === 'percent' ? `${v.toFixed(1)}%` : formatCurrency(v, currency);
     if (Array.isArray(v)) return v.map(String).join(', ');

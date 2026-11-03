@@ -48,12 +48,12 @@ export default function FinancialCycleSettings() {
         style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
       >
         <div className="flex items-center gap-3">
-          <div className="icon-pill" style={{ background: '#f5f3ff' }}>
-            <Settings size={14} color="#7c3aed" />
+          <div className="icon-pill" style={{ background: 'var(--purple-50)' }}>
+            <Settings size={14} color="var(--purple-text)" />
           </div>
           <div>
             <p className="card-header-label mb-0">Financial Cycle</p>
-            <p className="text-xs" style={{ color: '#9ca3af' }}>
+            <p className="text-xs" style={{ color: 'var(--text-400)' }}>
               {isCalendar
                 ? 'Standard calendar month (1st – last)'
                 : `Salary cycle · starts ${currentLabel}`}
@@ -62,13 +62,13 @@ export default function FinancialCycleSettings() {
         </div>
         <div className="flex items-center gap-2">
           {!isCalendar && (
-            <span className="badge" style={{ background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' }}>
+            <span className="badge" style={{ background: 'var(--purple-50)', color: 'var(--purple-text)', border: '1px solid var(--purple-200)' }}>
               {financialCycleStart}th cycle
             </span>
           )}
           <svg
             width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="#9ca3af" strokeWidth="2"
+            stroke="var(--text-400)" strokeWidth="2"
             style={{ transform: open ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}
           >
             <polyline points="6 9 12 15 18 9" />
@@ -78,12 +78,12 @@ export default function FinancialCycleSettings() {
 
       {/* ── Expanded panel ── */}
       {open && (
-        <div className="px-5 pb-5 space-y-4" style={{ borderTop: '1px solid #f0f2f5' }}>
+        <div className="px-5 pb-5 space-y-4" style={{ borderTop: '1px solid var(--border-default)' }}>
 
           {/* Info callout */}
-          <div className="flex gap-2.5 mt-4 p-3 rounded-xl" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
-            <Info size={14} style={{ color: '#d97706', flexShrink: 0, marginTop: 1 }} />
-            <p className="text-xs" style={{ color: '#92400e', lineHeight: 1.6 }}>
+          <div className="flex gap-2.5 mt-4 p-3 rounded-xl" style={{ background: 'var(--amber-50)', border: '1px solid var(--amber-200)' }}>
+            <Info size={14} style={{ color: 'var(--warning-text)', flexShrink: 0, marginTop: 1 }} />
+            <p className="text-xs" style={{ color: 'var(--warning-text)', lineHeight: 1.6 }}>
               This sets the day of the month when your financial period resets.
               {' '}Setting it to <strong>25</strong> means your &quot;July&quot; financial period runs from
               {' '}<strong>Jun 25 → Jul 24</strong>, matching a salary received on the 25th.
@@ -103,9 +103,9 @@ export default function FinancialCycleSettings() {
                     onClick={() => setDraft(d)}
                     className="px-4 py-2 rounded-xl text-xs font-bold transition-all"
                     style={{
-                      background:  isSelected ? '#7c3aed' : '#f4f6f9',
-                      color:       isSelected ? '#fff'    : '#374151',
-                      border:      isSelected ? '1px solid #7c3aed' : '1px solid #e8ecf0',
+                      background:  isSelected ? 'var(--purple-600)' : 'var(--bg-muted)',
+                      color:       isSelected ? '#fff'    : 'var(--text-700)',
+                      border:      isSelected ? '1px solid var(--purple-600)' : '1px solid var(--border-default)',
                       cursor: 'pointer',
                     }}
                   >
@@ -134,21 +134,21 @@ export default function FinancialCycleSettings() {
           </div>
 
           {/* Live preview */}
-          <div className="rounded-xl p-3" style={{ background: '#f8fafc', border: '1px solid #e8ecf0' }}>
+          <div className="rounded-xl p-3" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)' }}>
             <div className="flex items-center gap-2 mb-2">
-              <Calendar size={13} style={{ color: '#6b7280' }} />
-              <p className="text-xs font-semibold" style={{ color: '#374151' }}>Period preview</p>
+              <Calendar size={13} style={{ color: 'var(--text-500)' }} />
+              <p className="text-xs font-semibold" style={{ color: 'var(--text-700)' }}>Period preview</p>
             </div>
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: '#9ca3af' }}>Selected month view</span>
-                <span className="text-xs font-bold" style={{ color: draftIsCalendar ? '#6b7280' : '#7c3aed' }}>
+                <span className="text-xs" style={{ color: 'var(--text-400)' }}>Selected month view</span>
+                <span className="text-xs font-bold" style={{ color: draftIsCalendar ? 'var(--text-500)' : 'var(--purple-text)' }}>
                   {previewRange}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: '#9ca3af' }}>Current period would be</span>
-                <span className="text-xs font-bold" style={{ color: '#374151' }}>
+                <span className="text-xs" style={{ color: 'var(--text-400)' }}>Current period would be</span>
+                <span className="text-xs font-bold" style={{ color: 'var(--text-700)' }}>
                   {formatFinancialPeriodRange(currentPeriodWithDraft.month, currentPeriodWithDraft.year, draft)}
                 </span>
               </div>
@@ -157,22 +157,22 @@ export default function FinancialCycleSettings() {
 
           {/* Confirm dialog */}
           {showConfirm && (
-            <div className="rounded-xl p-4 space-y-3" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
-              <p className="text-xs font-semibold" style={{ color: '#7f1d1d' }}>
+            <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--red-50)', border: '1px solid var(--red-200)' }}>
+              <p className="text-xs font-semibold" style={{ color: 'var(--danger-text)' }}>
                 ⚠️ This will re-assign ALL existing expenses and income to their correct financial period based on the <strong>{cycleDayLabel(draft)}</strong> cycle. This cannot be undone.
               </p>
               <div className="flex gap-2">
                 <button
                   onClick={confirmApply}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold"
-                  style={{ background: '#7c3aed', color: '#fff', border: 'none', cursor: 'pointer' }}
+                  style={{ background: 'var(--purple-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
                 >
                   <Check size={12} /> Apply & Migrate
                 </button>
                 <button
                   onClick={() => setShowConfirm(false)}
                   className="px-4 py-2 rounded-lg text-xs font-semibold"
-                  style={{ background: '#f4f6f9', color: '#374151', border: '1px solid #e8ecf0', cursor: 'pointer' }}
+                  style={{ background: 'var(--bg-muted)', color: 'var(--text-700)', border: '1px solid var(--border-default)', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
@@ -188,8 +188,8 @@ export default function FinancialCycleSettings() {
                 disabled={!isDirty}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all"
                 style={{
-                  background: isDirty ? '#7c3aed' : '#e8ecf0',
-                  color:      isDirty ? '#fff'    : '#9ca3af',
+                  background: isDirty ? 'var(--purple-600)' : 'var(--border-default)',
+                  color:      isDirty ? '#fff'    : 'var(--text-400)',
                   border: 'none', cursor: isDirty ? 'pointer' : 'default',
                 }}
               >
@@ -200,8 +200,8 @@ export default function FinancialCycleSettings() {
                 disabled={!isDirty}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all"
                 style={{
-                  background: '#f4f6f9', color: isDirty ? '#374151' : '#9ca3af',
-                  border: '1px solid #e8ecf0', cursor: isDirty ? 'pointer' : 'default',
+                  background: 'var(--bg-muted)', color: isDirty ? 'var(--text-700)' : 'var(--text-400)',
+                  border: '1px solid var(--border-default)', cursor: isDirty ? 'pointer' : 'default',
                 }}
               >
                 <RotateCcw size={11} /> Reset

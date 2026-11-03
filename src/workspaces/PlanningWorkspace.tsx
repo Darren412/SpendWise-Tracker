@@ -276,7 +276,7 @@ export default function PlanningWorkspace() {
               <input type="checkbox" checked={alertsEnabled} onChange={e => setAlertsEnabled(e.target.checked)} style={{ accentColor: 'var(--brand-600)', width: 15, height: 15 }} />
               Enable budget alerts
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, opacity: alertsEnabled ? 1 : 0.5 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, opacity: alertsEnabled ? 1 : 0.5 }}>
               <div>
                 <label htmlFor="th-warn" style={labelStyle}>Warning %</label>
                 <input

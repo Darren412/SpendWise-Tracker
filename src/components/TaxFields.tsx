@@ -76,7 +76,7 @@ export default function TaxFields({ value, onChange, defaultDate }: TaxFieldsPro
           borderRadius: 'var(--r-md)',
           display: 'flex', flexDirection: 'column', gap: 10,
         }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
             <div>
               <label style={labelStyle} htmlFor="tax-category">Tax category</label>
               <input

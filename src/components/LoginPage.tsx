@@ -41,7 +41,7 @@ export default function LoginPage() {
     width: '100%',
     padding: '11px 14px',
     paddingLeft: 40,
-    background: focused ? '#fff' : 'var(--bg-subtle)',
+    background: focused ? 'var(--bg-surface)' : 'var(--bg-subtle)',
     border: `1.5px solid ${focused ? 'var(--brand-500)' : 'var(--border-default)'}`,
     borderRadius: 'var(--r-md)',
     color: 'var(--text-900)',
@@ -136,7 +136,7 @@ export default function LoginPage() {
             Track spending, analyse cash flow, and understand your financial health — all in one premium dashboard.
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 32 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginTop: 32 }}>
             {features.map(f => (
               <div
                 key={f.text}
@@ -220,7 +220,7 @@ export default function LoginPage() {
                     onChange={e => setName(e.target.value)}
                     placeholder="Your name"
                     style={inputStyle()}
-                    onFocus={e => Object.assign(e.target.style, { background: '#fff', borderColor: 'var(--brand-500)', boxShadow: '0 0 0 3px rgba(99,102,241,0.12)' })}
+                    onFocus={e => Object.assign(e.target.style, { background: 'var(--bg-surface)', borderColor: 'var(--brand-500)', boxShadow: '0 0 0 3px rgba(99,102,241,0.12)' })}
                     onBlur={e => Object.assign(e.target.style, { background: 'var(--bg-subtle)', borderColor: 'var(--border-default)', boxShadow: 'none' })}
                   />
                 </div>
@@ -239,7 +239,7 @@ export default function LoginPage() {
                   required
                   placeholder="you@example.com"
                   style={inputStyle()}
-                  onFocus={e => Object.assign(e.target.style, { background: '#fff', borderColor: 'var(--brand-500)', boxShadow: '0 0 0 3px rgba(99,102,241,0.12)' })}
+                  onFocus={e => Object.assign(e.target.style, { background: 'var(--bg-surface)', borderColor: 'var(--brand-500)', boxShadow: '0 0 0 3px rgba(99,102,241,0.12)' })}
                   onBlur={e => Object.assign(e.target.style, { background: 'var(--bg-subtle)', borderColor: 'var(--border-default)', boxShadow: 'none' })}
                 />
               </div>
@@ -270,7 +270,7 @@ export default function LoginPage() {
                     minLength={6}
                     placeholder="••••••••"
                     style={{ ...inputStyle(), paddingRight: 40 }}
-                    onFocus={e => Object.assign(e.target.style, { background: '#fff', borderColor: 'var(--brand-500)', boxShadow: '0 0 0 3px rgba(99,102,241,0.12)' })}
+                    onFocus={e => Object.assign(e.target.style, { background: 'var(--bg-surface)', borderColor: 'var(--brand-500)', boxShadow: '0 0 0 3px rgba(99,102,241,0.12)' })}
                     onBlur={e => Object.assign(e.target.style, { background: 'var(--bg-subtle)', borderColor: 'var(--border-default)', boxShadow: 'none' })}
                   />
                   <button

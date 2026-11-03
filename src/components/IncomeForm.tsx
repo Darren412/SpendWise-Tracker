@@ -119,7 +119,7 @@ export default function IncomeForm() {
   };
 
   const focusInput = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.target.style.background = '#fff';
+    e.target.style.background = 'var(--bg-surface)';
     e.target.style.borderColor = 'var(--brand-500)';
     e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)';
   };
@@ -161,7 +161,7 @@ export default function IncomeForm() {
       </div>
 
       {/* Amount + Date */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
         <div>
           <label style={labelStyle}>Amount</label>
           <input
@@ -232,7 +232,7 @@ export default function IncomeForm() {
                 </span>
               </label>
               {repeat && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginTop: 10 }}>
                   <div>
                     <label style={labelStyle} htmlFor="inc-freq">Repeats</label>
                     <select
