@@ -1,10 +1,10 @@
-import { Category } from '@/types';
+import { Category, Expense } from '@/types';
 import { getEffectiveTax } from '@/lib/tax';
 import { TxnRow } from '@/lib/transactionFilters';
 import { MonthPointMoM } from '@/lib/trends';
 import { TaxSummary } from '@/lib/tax';
 import { YearBalance, getYearBalance } from '@/lib/balance';
-import { fundingSource, fundingParts, ReserveEntry, ReserveTransfer } from '@/lib/reserve';
+import { fundingSource, fundingParts, majorExpenseUsage } from '@/lib/funding';
 import { CsvColumn } from '@/lib/export/csv';
 
 export interface Dataset {
@@ -19,7 +19,7 @@ export interface Dataset {
 
 export function transactionsDataset(rows: TxnRow[], categories: Category[]): Dataset {
   const catName = (id?: string) => categories.find(c => c.id === id)?.name ?? (id ?? '');
-  const FUNDING_LABEL = { budget: 'Monthly Budget', reserve: 'Reserve', split: 'Split' } as const;
+  const FUNDING_LABEL = { budget: 'Monthly Budget', balance: 'Existing Balance', split: 'Split' } as const;
   const data = rows.map(r => {
     const isExp = r._type === 'expense';
     const effTax = getEffectiveTax(r, categories);
@@ -35,7 +35,7 @@ export function transactionsDataset(rows: TxnRow[], categories: Category[]): Dat
       signedAmount: isExp ? -r.amount : r.amount,
       fundingSource: isExp ? FUNDING_LABEL[fundingSource(r)] : '',
       budgetPortion: isExp ? parts!.budget : '',
-      reservePortion: isExp ? parts!.reserve : '',
+      balancePortion: isExp ? parts!.balance : '',
       recurring: !!r.recurringId,
       taxRelated: !!effTax?.isTaxRelated,
       taxCategory: effTax?.isTaxRelated ? (effTax.taxCategory ?? '') : '',
@@ -48,7 +48,7 @@ export function transactionsDataset(rows: TxnRow[], categories: Category[]): Dat
   const income = rows.filter(r => r._type === 'income').reduce((s, r) => s + r.amount, 0);
   const expenses = rows.filter(r => r._type === 'expense').reduce((s, r) => s + r.amount, 0);
   const regular = rows.filter(r => r._type === 'expense').reduce((s, r) => s + fundingParts(r).budget, 0);
-  const reserve = expenses - regular;
+  const major = expenses - regular;
   return {
     columns: [
       { key: 'date', header: 'Date' },
@@ -61,7 +61,7 @@ export function transactionsDataset(rows: TxnRow[], categories: Category[]): Dat
       { key: 'signedAmount', header: 'Signed Amount' },
       { key: 'fundingSource', header: 'Funding Source' },
       { key: 'budgetPortion', header: 'Budget Portion' },
-      { key: 'reservePortion', header: 'Reserve Portion' },
+      { key: 'balancePortion', header: 'Existing Balance Portion' },
       { key: 'recurring', header: 'Recurring' },
       { key: 'taxRelated', header: 'Tax Related' },
       { key: 'taxCategory', header: 'Tax Category' },
@@ -73,13 +73,13 @@ export function transactionsDataset(rows: TxnRow[], categories: Category[]): Dat
     rows: data,
     totals: {
       description: 'Total', amount: '', signedAmount: income - expenses,
-      budgetPortion: regular, reservePortion: reserve,
+      budgetPortion: regular, balancePortion: major,
       recurring: '', taxRelated: '',
     },
     summary: [
       { label: 'Income', value: income },
       { label: 'Regular expenses', value: regular },
-      { label: 'Reserve expenses', value: reserve },
+      { label: 'Balance-funded expenses', value: major },
       { label: 'Total actual expenses', value: expenses },
       { label: 'Net', value: income - expenses },
     ],
@@ -88,22 +88,19 @@ export function transactionsDataset(rows: TxnRow[], categories: Category[]): Dat
 
 // ── Monthly summary ───────────────────────────────────────────────────────
 
-export function monthlySummaryDataset(series: MonthPointMoM[], ledger?: YearBalance[], transfers?: ReserveTransfer[]): Dataset {
+export function monthlySummaryDataset(series: MonthPointMoM[], ledger?: YearBalance[]): Dataset {
   const hasBalance = (ledger?.length ?? 0) > 0;
   const balAt = (p: MonthPointMoM) => {
     const mb = ledger ? getYearBalance(ledger, p.year)?.months[+p.month - 1] : undefined;
     return mb && !mb.beforeBaseline ? mb : undefined;
   };
-  const transfersIn = (p: MonthPointMoM, dir: 'in' | 'out') =>
-    (transfers ?? []).filter(t => t.direction === dir && t.date >= p.start && t.date <= p.end)
-      .reduce((s, t) => s + t.amount, 0);
   const rows = series.map(p => ({
     month: `${p.label} (${p.start} – ${p.end})`,
     income: p.income,
     incomeMoM: p.incomeMoM ?? '',
     expenses: p.expenses,                                  // regular (budget portions)
     expensesMoM: p.expensesMoM ?? '',
-    reserveFundedExpenses: p.reserveTxnTotal,              // full amount of pure-reserve txns
+    majorExpenses: p.majorExpenses,                        // balance-funded portions
     splitFundedExpenses: p.splitTxnTotal,                  // full amount of split txns
     actualExpenses: p.actualExpenses,
     netCashFlow: p.netCashFlow,
@@ -113,9 +110,6 @@ export function monthlySummaryDataset(series: MonthPointMoM[], ledger?: YearBala
     budget: p.budget ?? '',
     budgetSpent: p.budgetSpent,
     budgetUsedPct: p.budgetUsedPct ?? '',
-    reserveIn: transfersIn(p, 'in'),                       // allocations — never income/expense
-    reserveOut: transfersIn(p, 'out'),
-    reserveSpend: p.reserveExpenses,                       // reserve portions spent
     txnCount: p.txnCount,
     ...(hasBalance ? {
       openingBalance: balAt(p)?.opening ?? '',
@@ -126,14 +120,11 @@ export function monthlySummaryDataset(series: MonthPointMoM[], ledger?: YearBala
     month: 'Total',
     income: series.reduce((s, p) => s + p.income, 0),
     expenses: series.reduce((s, p) => s + p.expenses, 0),
-    reserveFundedExpenses: series.reduce((s, p) => s + p.reserveTxnTotal, 0),
+    majorExpenses: series.reduce((s, p) => s + p.majorExpenses, 0),
     splitFundedExpenses: series.reduce((s, p) => s + p.splitTxnTotal, 0),
     actualExpenses: series.reduce((s, p) => s + p.actualExpenses, 0),
     netCashFlow: series.reduce((s, p) => s + p.netCashFlow, 0),
     savings: series.reduce((s, p) => s + p.savings, 0),
-    reserveIn: series.reduce((s, p) => s + transfersIn(p, 'in'), 0),
-    reserveOut: series.reduce((s, p) => s + transfersIn(p, 'out'), 0),
-    reserveSpend: series.reduce((s, p) => s + p.reserveExpenses, 0),
     txnCount: series.reduce((s, p) => s + p.txnCount, 0),
   };
   return {
@@ -143,7 +134,7 @@ export function monthlySummaryDataset(series: MonthPointMoM[], ledger?: YearBala
       { key: 'incomeMoM', header: 'Income MoM %' },
       { key: 'expenses', header: 'Regular Expenses' },
       { key: 'expensesMoM', header: 'Expenses MoM %' },
-      { key: 'reserveFundedExpenses', header: 'Reserve-Funded Expenses' },
+      { key: 'majorExpenses', header: 'Major Expenses (Existing Balance)' },
       { key: 'splitFundedExpenses', header: 'Split-Funded Expenses' },
       { key: 'actualExpenses', header: 'Total Actual Expenses' },
       { key: 'netCashFlow', header: 'Net Cash Flow' },
@@ -153,9 +144,6 @@ export function monthlySummaryDataset(series: MonthPointMoM[], ledger?: YearBala
       { key: 'budget', header: 'Budget' },
       { key: 'budgetSpent', header: 'Tracked Spend' },
       { key: 'budgetUsedPct', header: 'Budget Used %' },
-      { key: 'reserveIn', header: 'Reserve Contributions' },
-      { key: 'reserveOut', header: 'Reserve Releases' },
-      { key: 'reserveSpend', header: 'Reserve Spend' },
       { key: 'txnCount', header: 'Transactions' },
       ...(hasBalance ? [
         { key: 'openingBalance', header: 'Opening Balance' },
@@ -167,7 +155,7 @@ export function monthlySummaryDataset(series: MonthPointMoM[], ledger?: YearBala
     summary: [
       { label: 'Income', value: totals.income },
       { label: 'Regular expenses', value: totals.expenses },
-      { label: 'Reserve expenses', value: totals.reserveSpend },
+      { label: 'Balance-funded expenses', value: totals.majorExpenses },
       { label: 'Total actual expenses', value: totals.actualExpenses },
       { label: 'Operating surplus', value: totals.savings },
       ...(hasBalance ? [{
@@ -311,67 +299,72 @@ export function taxDataset(summary: TaxSummary): Dataset {
   };
 }
 
-// ── Reserve ledger ──────────────────────────────────────────────────────────
+// ── Major expenses (existing balance) ─────────────────────────────────────
 
-export interface ReserveLedgerDataset extends Dataset {
-  /** Range summary: opening/closing reserve + period flows. */
-  reserveSummary: {
-    opening: number;
-    contributions: number;
-    releases: number;
-    spend: number;
-    closing: number;
+export interface MajorExpensesDataset extends Dataset {
+  /** count, total drawn from the existing balance, available balance at end */
+  majorSummary: {
+    count: number;
+    totalFromBalance: number;
+    availableAtEnd: number | null;   // null when no baseline
   };
 }
 
-const RESERVE_KIND_LABEL: Record<ReserveEntry['kind'], string> = {
-  in: 'Added', out: 'Released', spend: 'Major expense',
-};
-
 /**
- * Ledger rows inside [from,to] (both inclusive); when no range is given the
- * whole ledger is exported. Amount is signed: +in, −out/spend.
+ * Expenses with a balance portion inside `range` (both inclusive; whole list
+ * when omitted). `availableAtEnd` = the overall balance at the range's end —
+ * pass null/undefined when no opening-balance baseline exists.
  */
-export function reserveLedgerDataset(
-  ledger: ReserveEntry[],
+export function majorExpensesDataset(
+  expenses: Expense[],
+  categories: Category[],
   range?: { from: string; to: string },
-): ReserveLedgerDataset {
-  const before = range ? ledger.filter(e => e.date < range.from) : [];
-  const opening = before.length ? before[before.length - 1].balanceAfter : 0;
-  const entries = range ? ledger.filter(e => e.date >= range.from && e.date <= range.to) : ledger;
+  availableAtEnd?: number | null,
+): MajorExpensesDataset {
+  const scoped = range
+    ? expenses.filter(e => e.date >= range.from && e.date <= range.to)
+    : expenses;
+  const { items } = majorExpenseUsage(scoped, range ?? { from: '0000-01-01', to: '9999-12-31' });
 
-  const contributions = entries.filter(e => e.kind === 'in').reduce((s, e) => s + e.amount, 0);
-  const releases = entries.filter(e => e.kind === 'out').reduce((s, e) => s + e.amount, 0);
-  const spend = entries.filter(e => e.kind === 'spend').reduce((s, e) => s + e.amount, 0);
-  const closing = entries.length ? entries[entries.length - 1].balanceAfter : opening;
+  const FUNDING_LABEL = { budget: 'Monthly Budget', balance: 'Existing Balance', split: 'Split' } as const;
+  const catName = (id: string) => categories.find(c => c.id === id)?.name ?? (id || '');
 
-  const rows = entries.map(e => ({
-    date: e.date,
-    type: RESERVE_KIND_LABEL[e.kind],
-    description: e.label,
-    amount: e.kind === 'in' ? e.amount : -e.amount,
-    balanceAfter: e.balanceAfter,
-  }));
+  const rows = items
+    .map(e => {
+      const parts = fundingParts(e);
+      return {
+        date: e.date,
+        description: e.description,
+        category: catName(e.category),
+        amount: e.amount,
+        balancePortion: parts.balance,
+        budgetPortion: parts.budget,
+        funding: FUNDING_LABEL[fundingSource(e)],
+      };
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
 
+  const totalFromBalance = rows.reduce((s, r) => s + (r.balancePortion as number), 0);
   return {
     columns: [
       { key: 'date', header: 'Date' },
-      { key: 'type', header: 'Type' },
       { key: 'description', header: 'Description' },
-      { key: 'amount', header: 'Amount' },
-      { key: 'balanceAfter', header: 'Balance After' },
+      { key: 'category', header: 'Category' },
+      { key: 'amount', header: 'Total Amount' },
+      { key: 'balancePortion', header: 'Existing Balance Portion' },
+      { key: 'budgetPortion', header: 'Budget Portion' },
+      { key: 'funding', header: 'Funding' },
     ],
     rows,
     totals: {
-      date: '', type: 'Closing reserve', description: '', amount: '', balanceAfter: closing,
+      description: 'Total', amount: rows.reduce((s, r) => s + (r.amount as number), 0),
+      balancePortion: totalFromBalance,
     },
     summary: [
-      { label: 'Opening reserve', value: opening },
-      { label: 'Contributions', value: contributions },
-      { label: 'Releases', value: releases },
-      { label: 'Reserve spend', value: spend },
-      { label: 'Closing reserve', value: closing },
+      { label: 'Major expenses', value: rows.length },
+      { label: 'Total from existing balance', value: totalFromBalance },
+      ...(availableAtEnd != null ? [{ label: 'Available balance at end', value: availableAtEnd }] : []),
     ],
-    reserveSummary: { opening, contributions, releases, spend, closing },
+    majorSummary: { count: rows.length, totalFromBalance, availableAtEnd: availableAtEnd ?? null },
   };
 }
