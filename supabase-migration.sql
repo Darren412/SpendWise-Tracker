@@ -15,6 +15,10 @@ create table if not exists public.budget_data (
   settings   jsonb          default '{}'::jsonb
 );
 
+-- 1b. Added 2026-11-03 (migration add_recurring_and_goals_columns)
+alter table public.budget_data add column if not exists recurring jsonb not null default '[]'::jsonb;
+alter table public.budget_data add column if not exists goals     jsonb not null default '[]'::jsonb;
+
 -- 2. Row Level Security: logged-in users can only touch their own row
 alter table public.budget_data enable row level security;
 
