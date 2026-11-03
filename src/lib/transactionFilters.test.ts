@@ -156,24 +156,25 @@ describe('countActiveFilters', () => {
 describe('funding filter', () => {
   const funded = [
     exp({ id: 'fb', description: 'Budget txn', date: '2026-11-10' }),
-    exp({ id: 'fr', description: 'Reserve txn', date: '2026-11-10', funding: { source: 'reserve' } }),
-    exp({ id: 'fs', description: 'Split txn', date: '2026-11-10', funding: { source: 'split', reserveAmount: 40 } }),
+    exp({ id: 'fr', description: 'Balance txn', date: '2026-11-10', funding: { source: 'balance' } }),
+    exp({ id: 'fs', description: 'Split txn', date: '2026-11-10', funding: { source: 'split', balanceAmount: 40 } }),
+    exp({ id: 'fl', description: 'Legacy reserve txn', date: '2026-11-10', funding: { source: 'reserve' } }), // legacy → 'balance'
   ];
 
   it('all → every expense + income; specific → matching source only, income excluded', () => {
     expect(applyTransactionFilters(funded, baseIncome, F(), ctx()).map(r => r.id)).toEqual(
-      ['fb', 'fr', 'fs', 'i1', 'i2']);
-    expect(applyTransactionFilters(funded, baseIncome, F({ funding: 'reserve' }), ctx()).map(r => r.id)).toEqual(['fr']);
+      ['fb', 'fr', 'fs', 'fl', 'i1', 'i2']);
+    expect(applyTransactionFilters(funded, baseIncome, F({ funding: 'balance' }), ctx()).map(r => r.id)).toEqual(['fr', 'fl']);
     expect(applyTransactionFilters(funded, baseIncome, F({ funding: 'split' }), ctx()).map(r => r.id)).toEqual(['fs']);
     expect(applyTransactionFilters(funded, baseIncome, F({ funding: 'budget' }), ctx()).map(r => r.id)).toEqual(['fb']);
   });
 
   it('income is excluded whenever a non-all funding filter is set (even type=income)', () => {
-    expect(applyTransactionFilters([], baseIncome, F({ funding: 'reserve', type: 'income' }), ctx())).toEqual([]);
+    expect(applyTransactionFilters([], baseIncome, F({ funding: 'balance', type: 'income' }), ctx())).toEqual([]);
   });
 
   it('count + describe cover the funding dimension', () => {
-    expect(countActiveFilters(F({ funding: 'reserve' }))).toBe(1);
-    expect(describeFilters(F({ funding: 'reserve' }), cats, '₹').join(' ')).toContain('Funding: reserve');
+    expect(countActiveFilters(F({ funding: 'balance' }))).toBe(1);
+    expect(describeFilters(F({ funding: 'balance' }), cats, '₹').join(' ')).toContain('Funding: existing balance');
   });
 });

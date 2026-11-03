@@ -92,11 +92,14 @@ export interface OpeningBalanceBaseline {
   updatedAt: string;        // ISO timestamp
 }
 
-export type FundingSource = 'budget' | 'reserve' | 'split';
+export type FundingSource = 'budget' | 'balance' | 'split';
 
 /** How an expense was paid — undefined means budget (backwards compatible). */
 export interface ExpenseFunding {
-  source: FundingSource;
-  /** only for 'split': 0 < reserveAmount < amount (2-decimal safe) */
+  /** 'reserve' is a legacy alias for 'balance' (pre-refactor data). */
+  source: FundingSource | 'reserve';
+  /** only for 'split': 0 < balanceAmount < amount (2-decimal safe) */
+  balanceAmount?: number;
+  /** legacy alias for balanceAmount (pre-refactor data) */
   reserveAmount?: number;
 }

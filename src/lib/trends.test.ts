@@ -161,8 +161,8 @@ describe('categoryTrends', () => {
   });
 });
 
-describe('reserve portions in the monthly series', () => {
-  const mkExp = (amount: number, date: string, funding?: { source: 'budget' | 'reserve' | 'split'; reserveAmount?: number }): Expense => ({
+describe('balance-funded portions in the monthly series', () => {
+  const mkExp = (amount: number, date: string, funding?: { source: 'budget' | 'balance' | 'split'; balanceAmount?: number }): Expense => ({
     id: `e-${date}-${amount}-${Math.random().toString(36).slice(2, 6)}`,
     category: 'food', description: 't', amount, date,
     month: date.slice(5, 7), year: +date.slice(0, 4), funding,
@@ -177,23 +177,23 @@ describe('reserve portions in the monthly series', () => {
     endMonth: '03', endYear: 2026, months: 1,
   };
 
-  it('regular + reserve = actual; netCashFlow = income − actual', () => {
+  it('regular + major = actual; netCashFlow = income − actual', () => {
     const s = buildMonthlySeries([
       mkExp(60000, '2026-03-05'),                                            // regular
-      mkExp(300000, '2026-03-10', { source: 'reserve' }),                    // pure reserve
-      mkExp(10000, '2026-03-12', { source: 'split', reserveAmount: 4000 }),  // split 6k/4k
+      mkExp(300000, '2026-03-10', { source: 'balance' }),                    // pure balance
+      mkExp(10000, '2026-03-12', { source: 'split', balanceAmount: 4000 }),  // split 6k/4k
     ], [mkInc(100000, '2026-03-01')], opts);
     const p = s[0];
     expect(p.expenses).toBe(66000);        // regular portions only
-    expect(p.reserveExpenses).toBe(304000);
+    expect(p.majorExpenses).toBe(304000);
     expect(p.actualExpenses).toBe(370000);
     expect(p.netCashFlow).toBe(100000 - 370000);
     expect(p.savings).toBe(100000 - 66000); // operating = income − regular
     expect(p.byCategory['food']).toBe(66000);
   });
 
-  it('pure-reserve txns still count as transactions but not in byCategory', () => {
-    const s = buildMonthlySeries([mkExp(50000, '2026-03-10', { source: 'reserve' })], [], opts);
+  it('pure-balance txns still count as transactions but not in byCategory', () => {
+    const s = buildMonthlySeries([mkExp(50000, '2026-03-10', { source: 'balance' })], [], opts);
     expect(s[0].txnCount).toBe(1);
     expect(s[0].byCategory['food']).toBeUndefined();
     expect(s[0].expenses).toBe(0);

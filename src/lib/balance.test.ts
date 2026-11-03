@@ -123,12 +123,8 @@ describe('effectiveDate', () => {
   });
 });
 
-describe('funding split + transfers', () => {
-  const mkT = (date: string, amount: number, direction: 'in' | 'out') => ({
-    id: `t${++uid}`, date, amount, direction: direction as 'in' | 'out', createdAt: `${date}T00:00:00Z`,
-  });
-
-  it('yearly spec: opening 10,00,000 + income 12,00,000 − regular 7,00,000 − reserve 3,00,000 = 12,00,000', () => {
+describe('funding split', () => {
+  it('yearly spec: opening 10,00,000 + income 12,00,000 − regular 7,00,000 − major 3,00,000 = 12,00,000', () => {
     const regExp: Expense[] = [];
     for (let m = 1; m <= 12; m++) {
       const mm = String(m).padStart(2, '0');
@@ -136,15 +132,15 @@ describe('funding split + transfers', () => {
     }
     const inc = specIncome.filter(i => i.year === 2026); // 1,200,000
     const ledger = buildBalanceLedger(
-      [...regExp, { ...mkExp(300000, '2026-03-15', '03', 2026), funding: { source: 'reserve' as const } }],
+      [...regExp, { ...mkExp(300000, '2026-03-15', '03', 2026), funding: { source: 'balance' as const } }],
       inc,
       mkBaseline({ amount: 1000000 }), OPTS,
     );
     const y26 = ledger[0];
     expect(y26.expenses).toBe(1000000);
     expect(y26.regularExpenses).toBe(700000);
-    expect(y26.reserveExpenses).toBe(300000);
-    expect(y26.regularExpenses + y26.reserveExpenses).toBe(y26.expenses);
+    expect(y26.majorExpenses).toBe(300000);
+    expect(y26.regularExpenses + y26.majorExpenses).toBe(y26.expenses);
     expect(y26.closing).toBe(1200000);
     expect(ledger[1].opening).toBe(1200000); // carried into 2027
   });
@@ -153,7 +149,7 @@ describe('funding split + transfers', () => {
     const ledger = buildBalanceLedger(
       [
         mkExp(60000, '2026-01-10', '01', 2026),
-        { ...mkExp(300000, '2026-01-20', '01', 2026), funding: { source: 'reserve' as const } },
+        { ...mkExp(300000, '2026-01-20', '01', 2026), funding: { source: 'balance' as const } },
       ],
       [mkInc(100000, '2026-01-05', '01', 2026)],
       mkBaseline({ amount: 1000000 }),
@@ -162,28 +158,21 @@ describe('funding split + transfers', () => {
     const jan = ledger[0].months[0];
     expect(jan.expenses).toBe(360000);
     expect(jan.regularExpenses).toBe(60000);
-    expect(jan.reserveExpenses).toBe(300000);
+    expect(jan.majorExpenses).toBe(300000);
     expect(jan.closing).toBe(740000);
     expect(jan.income - jan.regularExpenses).toBe(40000); // operating surplus
   });
 
-  it('split expenses decompose exactly; transfers are informational and never change closing', () => {
-    const base = [
-      { ...mkExp(300000, '2026-02-10', '02', 2026), funding: { source: 'split' as const, reserveAmount: 250000 } },
-    ];
-    const transfers = [mkT('2026-01-15', 400000, 'in'), mkT('2026-02-20', 50000, 'out')];
-    const noT = buildBalanceLedger(base, [], mkBaseline({ amount: 1000000 }),
+  it('split expenses decompose exactly — budget impact 50,000, overall impact 3,00,000 once', () => {
+    const ledger = buildBalanceLedger(
+      [{ ...mkExp(300000, '2026-02-10', '02', 2026), funding: { source: 'split' as const, balanceAmount: 250000 } }],
+      [], mkBaseline({ amount: 1000000 }),
       { financialCycleStart: 1, throughYear: 2026, today: '2026-12-31' });
-    const withT = buildBalanceLedger(base, [], mkBaseline({ amount: 1000000 }),
-      { financialCycleStart: 1, throughYear: 2026, today: '2026-12-31' }, transfers);
-    const feb = withT[0].months[1];
+    const feb = ledger[0].months[1];
     expect(feb.regularExpenses).toBe(50000);
-    expect(feb.reserveExpenses).toBe(250000);
-    expect(feb.regularExpenses + feb.reserveExpenses).toBe(feb.expenses);
-    expect(withT[0].months[0].reserveIn).toBe(400000);
-    expect(feb.reserveOut).toBe(50000);
-    expect(withT[0].closing).toBe(noT[0].closing); // transfers don't move the overall balance
-    expect(withT[0].closing).toBe(700000);          // 1,000,000 − 300,000
+    expect(feb.majorExpenses).toBe(250000);
+    expect(feb.regularExpenses + feb.majorExpenses).toBe(feb.expenses);
+    expect(ledger[0].closing).toBe(700000); // 1,000,000 − 300,000 exactly once
   });
 });
 

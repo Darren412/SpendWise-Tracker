@@ -1,6 +1,6 @@
 import { Category, Expense, Income } from '@/types';
 import { getFinancialMonthRange, todayLocalISO } from '@/utils/financialCycle';
-import { fundingParts, fundingSource, budgetPortionExpenses } from '@/lib/reserve';
+import { fundingParts, fundingSource, budgetPortionExpenses } from '@/lib/funding';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -36,10 +36,10 @@ export interface MonthPoint {
   end: string;
   income: number;
   expenses: number;             // REGULAR (budget portions) — what behaviour/budget charts use
-  reserveExpenses: number;      // reserve-funded portions, same scoping
-  reserveTxnTotal: number;      // full amounts of purely reserve-funded txns
+  majorExpenses: number;        // balance-funded portions, same scoping
+  majorTxnTotal: number;        // full amounts of purely balance-funded txns
   splitTxnTotal: number;        // full amounts of split-funded txns
-  actualExpenses: number;       // expenses + reserveExpenses — total money out
+  actualExpenses: number;       // expenses + majorExpenses — total money out
   netCashFlow: number;          // income − actualExpenses
   savings: number;              // operating: income − regular expenses
   savingsRate: number | null;   // operating savings / income — null when income is 0
@@ -106,8 +106,8 @@ export function buildMonthlySeries(
 
     const inc = periodIncome.reduce((s, i) => s + i.amount, 0);
     const exp = scopedExpenses.reduce((s, e) => s + fundingParts(e).budget, 0);
-    const expReserve = scopedExpenses.reduce((s, e) => s + fundingParts(e).reserve, 0);
-    const expReserveTxns = scopedExpenses.reduce((s, e) => s + (fundingSource(e) === 'reserve' ? e.amount : 0), 0);
+    const expMajor = scopedExpenses.reduce((s, e) => s + fundingParts(e).balance, 0);
+    const expMajorTxns = scopedExpenses.reduce((s, e) => s + (fundingSource(e) === 'balance' ? e.amount : 0), 0);
     const expSplitTxns = scopedExpenses.reduce((s, e) => s + (fundingSource(e) === 'split' ? e.amount : 0), 0);
     const savings = inc - exp;
     const budget = opts.getBudget(month, y);
@@ -129,11 +129,11 @@ export function buildMonthlySeries(
       end: endISO,
       income: inc,
       expenses: exp,
-      reserveExpenses: expReserve,
-      reserveTxnTotal: expReserveTxns,
+      majorExpenses: expMajor,
+      majorTxnTotal: expMajorTxns,
       splitTxnTotal: expSplitTxns,
-      actualExpenses: exp + expReserve,
-      netCashFlow: inc - exp - expReserve,
+      actualExpenses: exp + expMajor,
+      netCashFlow: inc - exp - expMajor,
       savings,
       savingsRate: inc > 0 ? round1((savings / inc) * 100) : null,
       budget: budget > 0 ? budget : null,
