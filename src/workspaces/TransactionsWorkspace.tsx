@@ -1,16 +1,21 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   Search, Plus, Trash2, ChevronDown, ChevronUp, X,
   TrendingUp, TrendingDown, Minus, ArrowDownRight, ArrowUpRight,
   CheckSquare, Square, Download, MapPin, SlidersHorizontal,
-  Pencil, Check, RotateCcw, Zap, Calendar, Repeat,
+  Pencil, Check, RotateCcw, Zap, Calendar, Repeat, FileDown,
 } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { currencySymbol, formatCurrency } from '@/utils/currency';
-import { getFinancialMonthRange, getFinancialPeriod } from '@/utils/financialCycle';
-import { applyTransactionFilters, countActiveFilters, EMPTY_FILTERS, TransactionFilters, TxnRow } from '@/lib/transactionFilters';
+import { getFinancialMonthRange, getFinancialPeriod, formatFinancialPeriodRange } from '@/utils/financialCycle';
+import { applyTransactionFilters, countActiveFilters, describeFilters, EMPTY_FILTERS, TransactionFilters, TxnRow } from '@/lib/transactionFilters';
+import { toCSV } from '@/lib/export/csv';
+import { transactionsDataset, categorySpendingDataset } from '@/lib/export/datasets';
+import { downloadText } from '@/lib/export/download';
+import { buildReportHTML } from '@/lib/export/pdfReport';
+import { printHTML } from '@/lib/export/print';
 import { getEffectiveTax } from '@/lib/tax';
 import { RecurrenceFrequency } from '@/types';
 import RecurringManager from '@/components/RecurringManager';
@@ -64,6 +69,18 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
   const [sortDir, setSortDir]   = useState<SortDir>('desc');
   const [filters, setFilters]   = useState<TransactionFilters>(EMPTY_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
+  const [exportOpen, setExportOpen]   = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  // Close the export dropdown on outside click
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [exportOpen]);
   const [recurringPickerId, setRecurringPickerId] = useState<string | null>(null);
 
   const updateFilter = (patch: Partial<TransactionFilters>) =>
@@ -245,23 +262,68 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
   // ── Export selected ───────────────────────────────────────────────────────
   const exportSelected = () => {
     const rows = sortedRows.filter(r => selected.has(r.id));
-    const csv = ['Date,Type,Description,Category,Amount,City',
-      ...rows.map(r => {
-        const rawDesc = r._type === 'expense' ? (r as ExpRow).description : (r as IncRow).source ?? '';
-        const rawCat  = r._type === 'expense' ? getCatName((r as ExpRow).category) : 'Income';
-        const rawCity = (r as ExpRow).city ?? '';
-        // Escape double-quotes per CSV standard (RFC 4180)
-        const desc = rawDesc.replace(/"/g, '""');
-        const cat  = rawCat.replace(/"/g, '""');
-        const city = rawCity.replace(/"/g, '""');
-        const sign = r._type === 'expense' ? -r.amount : r.amount;
-        return `${r.date},${r._type},"${desc}","${cat}",${sign},"${city}"`;
-      })
-    ].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a'); a.href = url; a.download = 'transactions.csv'; a.click();
-    URL.revokeObjectURL(url);
+    const csv = toCSV(
+      [
+        { key: 'date', header: 'Date' },
+        { key: 'type', header: 'Type' },
+        { key: 'description', header: 'Description' },
+        { key: 'category', header: 'Category' },
+        { key: 'amount', header: 'Amount' },
+        { key: 'city', header: 'City' },
+      ],
+      rows.map(r => ({
+        date: r.date,
+        type: r._type,
+        description: r._type === 'expense' ? (r as ExpRow).description : (r as IncRow).source ?? '',
+        category: r._type === 'expense' ? getCatName((r as ExpRow).category) : 'Income',
+        amount: r._type === 'expense' ? -r.amount : r.amount,
+        city: (r as ExpRow).city ?? '',
+      }))
+    );
+    downloadText(csv, 'transactions.csv', 'text/csv');
+  };
+
+  // ── Export ALL filtered+sorted rows (CSV / PDF) ──────────────────────────
+  const exportAllCsv = () => {
+    const ds = transactionsDataset(sortedRows, categories);
+    downloadText(toCSV(ds.columns, ds.rows, ds.totals), 'transactions.csv', 'text/csv');
+    setExportOpen(false);
+  };
+
+  const exportAllPdf = () => {
+    const catDs = categorySpendingDataset(sortedRows, categories);
+    const txnDs = transactionsDataset(sortedRows, categories);
+    const filterLines = describeFilters(filters, categories, sym, {
+      label: new Date(selectedYear, parseInt(selectedMonth, 10) - 1, 1)
+        .toLocaleString('en-IN', { month: 'short', year: 'numeric' }),
+      range: formatFinancialPeriodRange(selectedMonth, selectedYear, financialCycleStart),
+    });
+    const html = buildReportHTML({
+      title: 'Transactions Report',
+      subtitle: 'Spendwise · filtered transaction export',
+      dateRangeLabel: formatFinancialPeriodRange(selectedMonth, selectedYear, financialCycleStart),
+      filtersSummary: filterLines,
+      currency,
+      summary: [
+        { label: 'Money in', value: formatCurrency(totalIncAmt, currency) },
+        { label: 'Money out', value: formatCurrency(totalExpAmt, currency) },
+        { label: 'Net', value: formatCurrency(totalIncAmt - totalExpAmt, currency) },
+        { label: 'Transactions', value: String(sortedRows.length) },
+      ],
+      sections: [
+        {
+          kind: 'barChart', title: 'Spending by category',
+          categories: catDs.rows.map(r => String(r.category)),
+          series: [{ label: 'Spent', values: catDs.rows.map(r => Number(r.total)), color: '#ef4444' }],
+        },
+        {
+          kind: 'table', title: `Transactions (${sortedRows.length})`,
+          columns: txnDs.columns, rows: txnDs.rows, totalsRow: txnDs.totals,
+        },
+      ],
+    });
+    printHTML(html, 'spendwise-transactions');
+    setExportOpen(false);
   };
 
   // ── Date formatting ───────────────────────────────────────────────────────
@@ -509,6 +571,53 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                 {sortKey === k && (sortDir === 'desc' ? <ChevronDown size={11} /> : <ChevronUp size={11} />)}
               </button>
             ))}
+          </div>
+
+          {/* Export dropdown — exports the current filtered+sorted rows */}
+          <div ref={exportRef} style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              onClick={() => setExportOpen(v => !v)}
+              aria-expanded={exportOpen}
+              aria-haspopup="menu"
+              aria-label="Export transactions"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px',
+                borderRadius: 'var(--r-md)', fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer',
+                background: 'var(--bg-surface)', color: 'var(--text-600)',
+                border: '1.5px solid var(--border-default)',
+                fontFamily: 'inherit', transition: 'all 0.15s',
+              }}
+            >
+              <FileDown size={13} /> Export <ChevronDown size={11} />
+            </button>
+            {exportOpen && (
+              <div role="menu" style={{
+                position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 50, minWidth: 160,
+                background: 'var(--bg-surface)', border: '1px solid var(--border-default)',
+                borderRadius: 'var(--r-md)', boxShadow: '0 8px 24px rgba(15,23,42,0.12)',
+                overflow: 'hidden',
+              }}>
+                {([
+                  { label: 'CSV file', action: exportAllCsv },
+                  { label: 'PDF report', action: exportAllPdf },
+                ]).map(item => (
+                  <button
+                    key={item.label}
+                    role="menuitem"
+                    onClick={item.action}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-700)', fontFamily: 'inherit',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-subtle)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Reset button */}
