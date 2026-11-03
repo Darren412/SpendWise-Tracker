@@ -1,12 +1,18 @@
 import { Expense, Income, OpeningBalanceBaseline } from '@/types';
 import { getFinancialMonthRange } from '@/utils/financialCycle';
+import { fundingParts } from '@/lib/reserve';
+import type { ReserveTransfer } from '@/lib/reserve';
 
 export interface MonthBalance {
   month: string;            // '01'–'12' financial month label
   label: string;            // "Jan '26"
   opening: number | null;   // null for beforeBaseline months
   income: number;           // counted txns only (see counting rules)
-  expenses: number;
+  expenses: number;         // ALL actual expenses (full amounts, any funding)
+  regularExpenses: number;  // budget portions — monthly-budget performance
+  reserveExpenses: number;  // reserve portions — paid from the reserve
+  reserveIn: number;        // transfers in this month (informational — not in closing)
+  reserveOut: number;
   net: number;
   closing: number | null;
   beforeBaseline: boolean;
@@ -18,6 +24,10 @@ export interface YearBalance {
   opening: number;          // baseline amount (startYear) or previous year's closing
   income: number;
   expenses: number;
+  regularExpenses: number;
+  reserveExpenses: number;
+  reserveIn: number;
+  reserveOut: number;
   net: number;
   closing: number;          // December closing; invariant: opening + income − expenses
   months: MonthBalance[];
@@ -86,6 +96,7 @@ export function buildBalanceLedger(
   income: Income[],
   baseline: OpeningBalanceBaseline | null,
   opts: BalanceLedgerOptions,
+  transfers: ReserveTransfer[] = [],
 ): YearBalance[] {
   if (!baseline) return [];
   const { financialCycleStart, throughYear, today } = opts;
@@ -98,7 +109,7 @@ export function buildBalanceLedger(
   for (let year = startYear; year <= throughYear; year++) {
     const isStartYear = year === startYear;
     let yearOpening = 0;
-    let yIncome = 0, yExpenses = 0;
+    let yIncome = 0, yExpenses = 0, yRegular = 0, yReserve = 0, yIn = 0, yOut = 0;
     const months: MonthBalance[] = [];
     const excluded = { income: 0, expenses: 0, count: 0 };
     let yearOpeningSet = false;
@@ -115,10 +126,21 @@ export function buildBalanceLedger(
       const beforeBaseline = isStartYear && endISO < effectiveDate;
       const isFuture = startISO > today;
 
-      let inc = 0, exp = 0;
+      let inc = 0, exp = 0, regular = 0, reserve = 0, reserveIn = 0, reserveOut = 0;
       if (!beforeBaseline && !isFuture) {
         inc = monthIncome.reduce((s, i) => s + (i.date >= effectiveDate ? i.amount : 0), 0);
-        exp = monthExpenses.reduce((s, e) => s + (e.date >= effectiveDate ? e.amount : 0), 0);
+        exp = monthExpenses.reduce((s, e) => {
+          if (e.date < effectiveDate) return s;
+          const p = fundingParts(e);
+          regular += p.budget;
+          reserve += p.reserve;
+          return s + e.amount;
+        }, 0);
+        for (const t of transfers) {
+          if (t.date >= effectiveDate && t.date >= startISO && t.date <= endISO) {
+            if (t.direction === 'in') reserveIn += t.amount; else reserveOut += t.amount;
+          }
+        }
       }
       if (isStartYear) {
         // txns labelled in startYear but dated before the effective date
@@ -134,11 +156,16 @@ export function buildBalanceLedger(
       months.push({
         month: mm,
         label: `${MONTH_NAMES[m - 1]} '${String(year).slice(2)}`,
-        opening, income: inc, expenses: exp, net: inc - exp, closing,
+        opening, income: inc, expenses: exp,
+        regularExpenses: regular, reserveExpenses: reserve,
+        reserveIn, reserveOut,
+        net: inc - exp, closing,
         beforeBaseline, isFuture,
       });
       yIncome += inc;
       yExpenses += exp;
+      yRegular += regular; yReserve += reserve;
+      yIn += reserveIn; yOut += reserveOut;
     }
 
     // If every month were beforeBaseline (impossible per validation — the
@@ -148,6 +175,10 @@ export function buildBalanceLedger(
       opening: yearOpening,
       income: yIncome,
       expenses: yExpenses,
+      regularExpenses: yRegular,
+      reserveExpenses: yReserve,
+      reserveIn: yIn,
+      reserveOut: yOut,
       net: yIncome - yExpenses,
       closing: carried,
       months,
