@@ -9,7 +9,7 @@ import { generateDue, resumeRule, mergeRecurringRules } from '@/lib/recurring';
 import { moveById } from '@/lib/categoryOrder';
 import { validateThresholds, pruneKeys } from '@/lib/budgetAlerts';
 import { validateBaseline } from '@/lib/balance';
-import { reserveAvailableOn, buildReserveLedger } from '@/lib/reserve';
+import { reserveAvailableOn, buildReserveLedger, capReserveFunding } from '@/lib/reserve';
 import type { ReserveTransfer } from '@/lib/reserve';
 import {
   getStoredTheme, setStoredTheme, applyTheme, resolveTheme, ThemePreference,
@@ -59,6 +59,10 @@ interface BudgetStore {
   deleteRecurringRule: (id: string, deleteGenerated: boolean) => void;
   convertToRecurring: (txnId: string, type: 'expense' | 'income', frequency: RecurrenceFrequency, endDate?: string) => void;
   runRecurringGeneration: () => void;
+  // Transient toasts for reserve shortfalls during recurring generation —
+  // surfaced once by the page then cleared; never persisted or synced.
+  reserveNotices: string[];
+  clearReserveNotices: () => void;
   goals: SavingsGoal[];
   reserveTransfers: ReserveTransfer[];
   addReserveTransfer: (input: { date: string; amount: number; direction: 'in' | 'out'; note?: string }) => string | null;
@@ -913,6 +917,8 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   recurring: [],
   goals: [],
   reserveTransfers: [],
+  reserveNotices: [],
+  clearReserveNotices: () => set({ reserveNotices: [] }),
   // Alert settings — remote-backed only (no separate localStorage keys)
   categoryBudgets: {},
   alertThresholds: DEFAULT_ALERT_THRESHOLDS,
@@ -953,7 +959,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   // kept — a re-login of the same user still has its offline copy.
   resetForLogout: () => {
     clearPendingSyncWork();
-    set({ userId: null, expenses: [], income: [], categories: defaultCategories, recurring: [], goals: [], reserveTransfers: [], syncing: false, networkError: false });
+    set({ userId: null, expenses: [], income: [], categories: defaultCategories, recurring: [], goals: [], reserveTransfers: [], reserveNotices: [], syncing: false, networkError: false });
   },
 
   setCurrency: (currency: string) => {
@@ -1230,14 +1236,22 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
     const rulesChanged = due.rules.some((r, i) => r !== state.recurring[i]);
     if (due.expenses.length === 0 && due.income.length === 0 && !rulesChanged) return;
     const startDay = state.financialCycleStart;
+    // Generated reserve-funded occurrences must never take the reserve
+    // negative — cap the reserve portion against the evolving ledger and
+    // surface what was adjusted via a toast.
+    const capped = capReserveFunding(due.expenses, state.reserveTransfers, state.expenses);
     set({
-      expenses: due.expenses.length
-        ? [...state.expenses, ...due.expenses.map((e) => ({ ...e, ...getFinancialPeriod(e.date, startDay) }))]
+      expenses: capped.expenses.length
+        ? [...state.expenses, ...capped.expenses.map((e) => ({ ...e, ...getFinancialPeriod(e.date, startDay) }))]
         : state.expenses,
       income: due.income.length
         ? [...state.income, ...due.income.map((i) => ({ ...i, ...getFinancialPeriod(i.date, startDay) }))]
         : state.income,
       recurring: due.rules,
+      reserveNotices: capped.notices.length
+        ? [...state.reserveNotices, ...capped.notices.map(n =>
+            `Reserve was ${formatCurrency(n.shortBy, state.currency)} short for ${n.description} on ${n.date} — the remainder was charged to your monthly budget.`)]
+        : state.reserveNotices,
     });
     scheduleSyncToSupabase();
   },

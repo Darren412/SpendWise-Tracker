@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useBudgetStore } from '@/store/budgetStore';
+import { useRegularExpenses } from '@/hooks/useRegularExpenses';
 import { Expense, Category } from '@/types';
 import { formatCurrency, currencySymbol } from '@/utils/currency';
 import { getFinancialMonthRange } from '@/utils/financialCycle';
@@ -156,9 +157,11 @@ function WeekCategoryBreakdown({ expenses, categories, currency }: {
 
 export default function WeeklySpendTracker() {
   const {
-    expenses, categories, excludedCategoryIds,
+    categories, excludedCategoryIds,
     selectedMonth, selectedYear, selectedCity, currency, financialCycleStart,
   } = useBudgetStore();
+  // Weekly spend tracks REGULAR spend — reserve outflows aren't behaviour
+  const expenses = useRegularExpenses();
   const [expandedWeek, setExpandedWeek] = useState<number | null>(null);
 
   // Month + city filtered expenses

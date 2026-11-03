@@ -10,9 +10,11 @@ import { useBudgetStore } from '@/store/budgetStore';
 import { formatCurrencyShort, currencySymbol } from '@/utils/currency';
 import { getFinancialMonthRange, formatFinancialPeriodRange, getCurrentFinancialPeriod } from '@/utils/financialCycle';
 import { budgetTrackedSpend } from '@/lib/trends';
+import { useRegularExpenses } from '@/hooks/useRegularExpenses';
 import BudgetAlertsBanner from '@/components/BudgetAlertsBanner';
 import GoalsSummaryCard from '@/components/GoalsSummaryCard';
 import PotentialSavingsCard from '@/components/PotentialSavingsCard';
+import ReserveSummaryCard from '@/components/ReserveSummaryCard';
 
 interface OverviewWorkspaceProps {
   onNavigate: (workspace: string) => void;
@@ -33,12 +35,25 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
 
   const sym = currencySymbol(currency);
 
+  // Budget performance & behaviour use REGULAR spend (budget portions) —
+  // reserve-funded amounts are shown separately via the figures below.
+  const regularAll = useRegularExpenses();
+  const reserveThisPeriod = useMemo(() => {
+    const regular = regularAll
+      .filter(e => e.month === selectedMonth && e.year === selectedYear)
+      .reduce((s, e) => s + e.amount, 0);
+    const actual = allExpenses
+      .filter(e => e.month === selectedMonth && e.year === selectedYear)
+      .reduce((s, e) => s + e.amount, 0);
+    return Math.max(0, Math.round((actual - regular) * 100) / 100);
+  }, [allExpenses, regularAll, selectedMonth, selectedYear]);
+
   // ── Global (all-city) expenses for this period ────────────────────────────
   // Used for: Health Score, Savings Rate, Net Balance, Top Categories,
   //           Quick Insights, and MoM comparison baseline.
   const globalExpensesThisPeriod = useMemo(() =>
-    allExpenses.filter(e => e.month === selectedMonth && e.year === selectedYear),
-    [allExpenses, selectedMonth, selectedYear]);
+    regularAll.filter(e => e.month === selectedMonth && e.year === selectedYear),
+    [regularAll, selectedMonth, selectedYear]);
 
   const globalTotalExpenses = useMemo(() =>
     globalExpensesThisPeriod.reduce((sum, e) => sum + e.amount, 0),
@@ -46,7 +61,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
 
   // ── City-scoped expenses ── used ONLY for "Total Expenses" + "Daily Avg Spend"
   const cityTotalExpenses = useMemo(() => {
-    return allExpenses
+    return regularAll
       .filter(e => {
         const inPeriod = e.month === selectedMonth && e.year === selectedYear;
         const inCity   = selectedCity === 'Both' || (e.city ?? 'Bangalore') === selectedCity;
@@ -54,7 +69,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
         return inPeriod && inCity && inCat;
       })
       .reduce((sum, e) => sum + e.amount, 0);
-  }, [allExpenses, selectedMonth, selectedYear, selectedCity, excludedCategoryIds]);
+  }, [regularAll, selectedMonth, selectedYear, selectedCity, excludedCategoryIds]);
 
   // ── Income (always global — income records carry no city field) ───────────
   const totalIncome = getMonthlyIncome(selectedMonth, selectedYear);
@@ -82,10 +97,10 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
   }, [selectedMonth, selectedYear]);
 
   const prevExpenses = useMemo(() =>
-    allExpenses
+    regularAll
       .filter(e => e.month === prevM.month && e.year === prevM.year)
       .reduce((sum, e) => sum + e.amount, 0),
-    [allExpenses, prevM]);
+    [regularAll, prevM]);
 
   const prevIncome = getMonthlyIncome(prevM.month, prevM.year);
 
@@ -190,7 +205,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
     if (totalIncome > 0 && globalTotalExpenses > totalIncome)
       items.push({ icon: '⚠️', text: `Overspending by ${sym}${Math.round(globalTotalExpenses - totalIncome).toLocaleString('en-IN')} this period`, color: 'var(--red-600)', bg: 'var(--red-50)' });
     if (savingsRate >= savingsTarget)
-      items.push({ icon: '✅', text: `${savingsRate}% savings rate — healthy trajectory`, color: 'var(--green-700)', bg: 'var(--green-50)' });
+      items.push({ icon: '✅', text: `${savingsRate}% operating margin — healthy trajectory`, color: 'var(--green-700)', bg: 'var(--green-50)' });
     if (topCats[0])
       items.push({ icon: topCats[0].icon, text: `Top spend: ${topCats[0].name} at ${formatCurrencyShort(topCats[0].spent, currency)}`, color: 'var(--text-700)', bg: 'var(--bg-muted)' });
     if (Math.abs(expChangePct) >= 5)
@@ -245,7 +260,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
   const budgetCategoryBreakdown = useMemo(() => {
     if (budgetCategoryIds.length === 0) return [];
     const totals: Record<string, number> = {};
-    for (const e of allExpenses) {
+    for (const e of regularAll) {
       if (e.month === selectedMonth && e.year === selectedYear && budgetCategoryIds.includes(e.category)) {
         totals[e.category] = (totals[e.category] ?? 0) + e.amount;
       }
@@ -255,7 +270,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
       .map(c => ({ ...c, spent: totals[c.id] ?? 0 }))
       .filter(c => c.spent > 0)
       .sort((a, b) => b.spent - a.spent);
-  }, [allExpenses, selectedMonth, selectedYear, budgetCategoryIds, categories]);
+  }, [regularAll, selectedMonth, selectedYear, budgetCategoryIds, categories]);
 
   const budgetRemaining = currentMonthBudget - budgetTrackedSpending;
   const budgetUsedPct = currentMonthBudget > 0 ? Math.round((budgetTrackedSpending / currentMonthBudget) * 100) : 0;
@@ -334,7 +349,7 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
           </div>
           <div className="ws-kpi-body">
             <div className="ws-kpi-label">
-              Total Expenses
+              Regular expenses
               {selectedCity !== 'Both' && (
                 <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-400)', marginLeft: 5 }}>
                   · {selectedCity}
@@ -342,6 +357,11 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
               )}
             </div>
             <div className="ws-kpi-value">{formatCurrencyShort(cityTotalExpenses, currency)}</div>
+            {reserveThisPeriod > 0 && (
+              <div className="ws-kpi-delta" style={{ color: 'var(--warning-text)' }}>
+                + {formatCurrencyShort(reserveThisPeriod, currency)} paid from reserve
+              </div>
+            )}
             {prevExpenses > 0 && (
               <div className="ws-kpi-delta" style={{ color: expChangePct <= 0 ? 'var(--green-600)' : 'var(--red-500)', display: 'flex', alignItems: 'center', gap: 3 }}>
                 {expChangePct > 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
@@ -357,12 +377,12 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
             {netBalance >= 0 ? <TrendingUp size={19} /> : <TrendingDown size={19} />}
           </div>
           <div className="ws-kpi-body">
-            <div className="ws-kpi-label">Net Balance</div>
+            <div className="ws-kpi-label">Operating Surplus</div>
             <div className="ws-kpi-value" style={{ color: netBalance >= 0 ? 'var(--green-600)' : 'var(--red-500)' }}>
               {netBalance >= 0 ? '+' : '−'}{sym}{Math.abs(netBalance).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
             </div>
             <div className="ws-kpi-delta" style={{ color: netBalance >= 0 ? 'var(--green-500)' : 'var(--red-400)' }}>
-              {netBalance >= 0 ? 'Cash flow positive' : 'Overspending'}
+              Income − regular expenses
             </div>
           </div>
         </div>
@@ -708,6 +728,9 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
       {/* ── Potential savings ── */}
       <PotentialSavingsCard onNavigate={onNavigate} />
 
+      {/* ── Reserve / major expenses ── */}
+      <ReserveSummaryCard onNavigate={onNavigate} />
+
       {/* ── Savings goals summary ── */}
       <GoalsSummaryCard onNavigate={onNavigate} />
 
@@ -754,11 +777,11 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
           </div>
         </div>
 
-        {/* Savings rate — global */}
+        {/* Operating margin — income − regular expenses, global */}
         <div className="ws-panel">
           <div className="ws-panel-header">
             <span style={{ fontSize: '0.8rem' }}>💰</span>
-            <span>Savings Rate</span>
+            <span>Operating Margin</span>
           </div>
           <div style={{ textAlign: 'center', padding: '20px 0 12px' }}>
             <div style={{

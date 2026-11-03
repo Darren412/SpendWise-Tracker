@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   fundingSource, fundingParts, budgetPortionExpenses, validateFunding,
   buildReserveLedger, reserveBalance, reserveAvailableOn, reserveUsage,
-  reserveCoverage, essentialMonthlyAverage, ReserveTransfer,
+  reserveCoverage, essentialMonthlyAverage, capReserveFunding, buildPositionSummary,
+  ReserveTransfer,
 } from './reserve';
 import { Expense, Category } from '@/types';
 
@@ -151,5 +152,104 @@ describe('essential monthly average + coverage', () => {
     expect(reserveCoverage(300000, null).status).toBe('insufficient-data');
     expect(reserveCoverage(300000, 0).status).toBe('no-essential-spend');
     expect(reserveCoverage(166000, 20000).months).toBe(8.3); // 1 decimal
+  });
+});
+
+describe('capReserveFunding', () => {
+  const mkExp = (over: Partial<Expense> & { funding?: Expense['funding'] } = {}): Expense => ({
+    id: 'n1', category: 'c', description: 'd', amount: 1000, date: '2026-03-05',
+    month: '03', year: 2026, ...over,
+  });
+  const transfer = (amt: number, date = '2026-01-01'): ReserveTransfer => ({
+    id: `t-${amt}`, date, amount: amt, direction: 'in', createdAt: '',
+  });
+
+  it('keeps a fully covered reserve expense untouched', () => {
+    const { expenses, notices } = capReserveFunding(
+      [mkExp({ amount: 30000, funding: { source: 'reserve' } })], [transfer(60000)], []);
+    expect(expenses[0].funding).toEqual({ source: 'reserve' });
+    expect(notices).toEqual([]);
+  });
+
+  it('caps to split when reserve is short; converts to budget at 0', () => {
+    const { expenses, notices } = capReserveFunding(
+      [
+        mkExp({ id: 'n1', amount: 50000, date: '2026-03-05', funding: { source: 'reserve' }, recurringId: 'r1' }),
+        mkExp({ id: 'n2', amount: 10000, date: '2026-04-05', funding: { source: 'reserve' }, recurringId: 'r1' }),
+      ], [transfer(60000)], []);
+    // first fully covered (60k avail ≥ 50k); second's 10k reserve part is
+    // exactly what remains → still fully funded, no notice
+    expect(expenses[0].funding).toEqual({ source: 'reserve' });
+    expect(expenses[1].funding).toEqual({ source: 'reserve' });
+    expect(notices).toEqual([]);
+
+    // A second run: existing spend consumed all 60k → a new 30k reserve
+    // occurrence degrades to budget and notifies the full shortfall
+    const { expenses: e2, notices: n2 } = capReserveFunding(
+      [mkExp({ id: 'n3', amount: 30000, date: '2026-05-05', funding: { source: 'reserve' }, recurringId: 'r1' })],
+      [transfer(60000)], [...expenses as Expense[]]);
+    expect(e2[0].funding).toBeUndefined();
+    expect(n2).toHaveLength(1);
+    expect(n2[0].shortBy).toBe(30000);
+    expect(n2[0].ruleId).toBe('r1');
+  });
+
+  it('existing spend counts toward availability; zero reserve → budget', () => {
+    const existing = [mkExp({ id: 'old', amount: 60000, date: '2026-02-01', funding: { source: 'reserve' } })];
+    const { expenses, notices } = capReserveFunding(
+      [mkExp({ id: 'n1', amount: 5000, date: '2026-03-05', funding: { source: 'reserve' }, recurringId: 'r2' })],
+      [transfer(60000)], existing);
+    expect(expenses[0].funding).toBeUndefined();
+    expect(notices).toHaveLength(1);
+    expect(notices[0].shortBy).toBe(5000);
+  });
+
+  it('split occurrences keep their budget part and cap only the reserve part', () => {
+    const { expenses, notices } = capReserveFunding(
+      [mkExp({ id: 'n1', amount: 30000, date: '2026-03-05', funding: { source: 'split', reserveAmount: 25000 }, recurringId: 'r3' })],
+      [transfer(10000)], []);
+    expect(expenses[0].funding).toEqual({ source: 'split', reserveAmount: 10000 });
+    expect(notices[0].shortBy).toBe(15000);
+  });
+});
+
+describe('buildPositionSummary', () => {
+  const fmt = (v: number) => `₹${v.toLocaleString('en-IN')}`;
+
+  it('reproduces the spec test case sentences', () => {
+    const lines = buildPositionSummary({
+      monthlyBudget: 80000, operatingSurplus: 40000, regularSpend: 60000,
+      reserveUsed: 300000, majorCount: 1, reserveBalance: 300000,
+      overallBalance: 740000, format: fmt,
+    });
+    expect(lines).toEqual([
+      'Your normal monthly budget remains within plan with a ₹40,000 operating surplus.',
+      'You used ₹3,00,000 from your Reserve for a major expense. Your remaining Reserve is ₹3,00,000.',
+      'Your actual overall balance is now ₹7,40,000.',
+    ]);
+  });
+
+  it('over-plan and deficit variants', () => {
+    const over = buildPositionSummary({
+      monthlyBudget: 50000, operatingSurplus: -20000, regularSpend: 90000,
+      reserveUsed: 0, majorCount: 0, reserveBalance: 0, overallBalance: null, format: fmt,
+    });
+    expect(over).toEqual(['Your normal monthly budget is ₹40,000 over plan.']);
+
+    const deficit = buildPositionSummary({
+      monthlyBudget: null, operatingSurplus: -5000,
+      reserveUsed: 0, majorCount: 0, reserveBalance: 0, overallBalance: null, format: fmt,
+    });
+    expect(deficit).toEqual(['Your month shows a ₹5,000 operating deficit.']);
+  });
+
+  it('pluralises and omits inapplicable lines', () => {
+    const lines = buildPositionSummary({
+      monthlyBudget: null, operatingSurplus: 1000,
+      reserveUsed: 80000, majorCount: 3, reserveBalance: 20000,
+      overallBalance: null, format: fmt,
+    });
+    expect(lines[1]).toContain('for 3 major expenses');
+    expect(lines).toHaveLength(2); // no overall-balance line without a baseline
   });
 });

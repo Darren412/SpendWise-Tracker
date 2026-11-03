@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, X } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
+import { useRegularExpenses } from '@/hooks/useRegularExpenses';
 import { targetProgress, TargetPeriodHistory } from '@/lib/savingsTargets';
 import { getFinancialMonthRange, todayLocalISO } from '@/utils/financialCycle';
 import { formatCurrency } from '@/utils/currency';
@@ -22,10 +23,13 @@ const STATUS_UI = {
  */
 export default function TargetsPanel() {
   const {
-    spendingTargets, expenses, categories, currency,
+    spendingTargets, categories, currency,
     selectedMonth, selectedYear, financialCycleStart, alertThresholds,
     removeSpendingTarget, categoryBudgets,
   } = useBudgetStore();
+  // Target progress measures REGULAR spend — a reserve-funded expense must
+  // never worsen a target's status.
+  const expenses = useRegularExpenses();
   const [removeFor, setRemoveFor] = useState<string | null>(null);
   const [alsoBudget, setAlsoBudget] = useState(false);
 

@@ -15,12 +15,12 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // ── Funding decomposition ───────────────────────────────────────────────────
 
-export function fundingSource(e: Expense): FundingSource {
+export function fundingSource(e: Pick<Expense, 'funding'>): FundingSource {
   return e.funding?.source ?? 'budget';
 }
 
 /** budget + reserve === amount exactly; any rounding residue lands in budget. */
-export function fundingParts(e: Expense): { budget: number; reserve: number } {
+export function fundingParts(e: Pick<Expense, 'amount' | 'funding'>): { budget: number; reserve: number } {
   const source = fundingSource(e);
   if (source === 'reserve') return { budget: 0, reserve: e.amount };
   if (source === 'split') {
@@ -217,4 +217,88 @@ export function essentialMonthlyAverage(
     .filter(e => e.year === p.y && e.month === p.m && essentialIds.has(e.category))
     .reduce((x, e) => x + e.amount, 0), 0);
   return { avg: total / baseline.length, monthsUsed: baseline.length };
+}
+
+// ── Recurring-generation capping ────────────────────────────────────────────
+
+export interface ReserveShortfallNotice { ruleId: string; date: string; description: string; shortBy: number; }
+
+/**
+ * Caps reserve portions of newly generated recurring expenses so no occurrence
+ * drives the reserve negative. Processes txns in date order; each occurrence is
+ * checked against the ledger INCLUDING earlier generated items. A capped txn
+ * becomes a split (or budget when nothing is available) and yields a notice.
+ * Pure — the store applies the result.
+ */
+export function capReserveFunding<T extends Omit<Expense, 'month' | 'year'>>(
+  newTxns: T[],
+  transfers: ReserveTransfer[],
+  existingExpenses: Expense[],
+): { expenses: T[]; notices: ReserveShortfallNotice[] } {
+  const notices: ReserveShortfallNotice[] = [];
+  const processed: T[] = [];
+  const sorted = [...newTxns].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  for (const e of sorted) {
+    const part = fundingParts(e).reserve;
+    if (part <= 0) { processed.push(e); continue; }
+    const avail = reserveAvailableOn(transfers, [...existingExpenses, ...processed] as Expense[], e.date);
+    if (part <= avail) { processed.push(e); continue; }
+    const capped: T = {
+      ...e,
+      funding: avail <= 0 ? undefined : { source: 'split', reserveAmount: Math.round(avail * 100) / 100 },
+    };
+    notices.push({
+      ruleId: e.recurringId ?? '',
+      date: e.date,
+      description: e.description,
+      shortBy: Math.round((part - avail) * 100) / 100,
+    });
+    processed.push(capped);
+  }
+  return { expenses: processed, notices };
+}
+
+// ── Three-concept position summary ──────────────────────────────────────────
+
+export interface PositionSummaryInput {
+  monthlyBudget: number | null;          // this period's overall budget (null = none set)
+  operatingSurplus: number;              // income − regular expenses for the period
+  regularSpend?: number;                 // needed to compare vs monthlyBudget
+  reserveUsed: number;                   // reserve outflows this period
+  majorCount: number;                    // reserve-funded txns this period
+  reserveBalance: number;
+  overallBalance: number | null;         // current-period closing to date (null w/o baseline)
+  format: (v: number) => string;
+}
+
+/** One short sentence per accounting concept — only lines that apply. */
+export function buildPositionSummary(s: PositionSummaryInput): string[] {
+  const lines: string[] = [];
+
+  // 1 — monthly budget performance (regular spend only)
+  if (s.monthlyBudget != null && s.monthlyBudget > 0 && s.regularSpend !== undefined) {
+    if (s.regularSpend <= s.monthlyBudget) {
+      lines.push(`Your normal monthly budget remains within plan with a ${s.format(Math.max(0, s.operatingSurplus))} operating surplus.`);
+    } else {
+      lines.push(`Your normal monthly budget is ${s.format(s.regularSpend - s.monthlyBudget)} over plan.`);
+    }
+  } else {
+    if (s.operatingSurplus >= 0) {
+      lines.push(`Your month shows a ${s.format(s.operatingSurplus)} operating surplus.`);
+    } else {
+      lines.push(`Your month shows a ${s.format(Math.abs(s.operatingSurplus))} operating deficit.`);
+    }
+  }
+
+  // 2 — reserve outflows this period
+  if (s.reserveUsed > 0 && s.majorCount > 0) {
+    lines.push(`You used ${s.format(s.reserveUsed)} from your Reserve for ${s.majorCount === 1 ? 'a major expense' : `${s.majorCount} major expenses`}. Your remaining Reserve is ${s.format(s.reserveBalance)}.`);
+  }
+
+  // 3 — actual overall balance
+  if (s.overallBalance !== null) {
+    lines.push(`Your actual overall balance is now ${s.format(s.overallBalance)}.`);
+  }
+
+  return lines;
 }

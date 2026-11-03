@@ -140,6 +140,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
     [allFilteredRows, filters.type]);
 
   const totalExpAmt = filteredExpenses.reduce((s, e) => s + e.amount, 0);
+  const reserveExpAmt = filteredExpenses.reduce((s, e) => s + fundingParts(e).reserve, 0);
   const totalIncAmt = filteredIncome.reduce((s, i) => s + i.amount, 0);
   const netAmt      = totalIncAmt - totalExpAmt;
 
@@ -444,7 +445,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome, initi
         {[
           {
             label: 'Money Out', value: `${sym}${Math.round(totalExpAmt).toLocaleString('en-IN')}`,
-            sub: `${filteredExpenses.length} expense${filteredExpenses.length !== 1 ? 's' : ''}`,
+            sub: `${filteredExpenses.length} expense${filteredExpenses.length !== 1 ? 's' : ''}${reserveExpAmt > 0 ? ` · of which ${sym}${Math.round(reserveExpAmt).toLocaleString('en-IN')} from reserve` : ''}`,
             color: 'var(--red-500)', bg: 'var(--red-50)', border: 'var(--red-100)',
             Icon: ArrowUpRight,
           },

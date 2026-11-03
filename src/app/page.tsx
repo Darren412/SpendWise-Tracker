@@ -86,6 +86,18 @@ export default function Home() {
   const { newOnes } = useBudgetAlerts();
   const [alertToast, setAlertToast] = useState('');
   const toastedRef = useRef<Set<string>>(new Set());
+
+  // Reserve shortfall notices from recurring generation — surfaced once via
+  // toast, then cleared from the store.
+  const reserveNotices = useBudgetStore(s => s.reserveNotices);
+  const clearReserveNotices = useBudgetStore(s => s.clearReserveNotices);
+  const [reserveToast, setReserveToast] = useState('');
+  useEffect(() => {
+    if (reserveNotices.length === 0) return;
+    setReserveToast(reserveNotices.slice(0, 2).join(' ')
+      + (reserveNotices.length > 2 ? ` …and ${reserveNotices.length - 2} more.` : ''));
+    clearReserveNotices();
+  }, [reserveNotices, clearReserveNotices]);
   useEffect(() => {
     const fresh = newOnes.filter(a => !toastedRef.current.has(a.key));
     if (fresh.length === 0) return;
@@ -197,6 +209,14 @@ export default function Home() {
         message={alertToast}
         accent="var(--amber-500)"
         onClose={() => setAlertToast('')}
+      />
+
+      {/* Reserve shortfall toast (recurring occurrences capped to fit) */}
+      <Toast
+        open={!!reserveToast}
+        message={reserveToast}
+        accent="var(--amber-500)"
+        onClose={() => setReserveToast('')}
       />
     </>
   );

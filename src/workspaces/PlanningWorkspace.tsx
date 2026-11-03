@@ -14,6 +14,7 @@ import GoalCard from '@/components/goals/GoalCard';
 import GoalForm from '@/components/goals/GoalForm';
 import SavingsTab from '@/components/savings/SavingsTab';
 import ReserveTab from '@/components/reserve/ReserveTab';
+import { useRegularExpenses } from '@/hooks/useRegularExpenses';
 import { Landmark } from 'lucide-react';
 
 type Tab = 'save' | 'reserve' | 'goals' | 'budgets';
@@ -37,7 +38,7 @@ const sectionTitle: React.CSSProperties = {
 export default function PlanningWorkspace({ initialTab, onNavigate }: { initialTab?: Tab; onNavigate?: (workspace: string, subTab?: string) => void }) {
   const {
     goals, addGoal, updateGoal, deleteGoal,
-    expenses, categories,
+    categories,
     selectedMonth, selectedYear,
     budgetCategoryIds, setMonthlyBudget, getMonthlyBudget, setBudgetCategoryIds,
     categoryBudgets, setCategoryBudget,
@@ -61,7 +62,9 @@ export default function PlanningWorkspace({ initialTab, onNavigate }: { initialT
   const activeCount = goals.filter(g => !g.archived).length;
 
   // ── Budget status data (same period set as Overview / useBudgetAlerts) ────
-  const periodExpenses = expenses.filter(e => e.month === selectedMonth && e.year === selectedYear);
+  // Budget performance measures REGULAR spend only — reserve portions don't
+  // count against the monthly budget.
+  const periodExpenses = useRegularExpenses().filter(e => e.month === selectedMonth && e.year === selectedYear);
   const overallBudget = getMonthlyBudget(selectedMonth, selectedYear);
   const overallSpent = budgetTrackedSpend(periodExpenses, budgetCategoryIds);
   const expenseCategories = categories.filter(c => c.type !== 'income');

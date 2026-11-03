@@ -8,6 +8,7 @@
 
 import { Expense, Income, Category } from '@/types';
 import { getFinancialMonthRange } from './financialCycle';
+import { fundingParts } from '@/lib/reserve';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -802,11 +803,30 @@ interface ChatContext {
   behaviorProfile: BehaviorProfile;
   healthScore: HealthScore;
   sym: string;
+  /** Optional reserve context — answers "reserve"/"savings fund" questions */
+  reserveBalance?: number;
+  reserveUsed?: { total: number; count: number };
 }
 
 export function processChat(input: string, ctx: ChatContext): string {
   const q = input.toLowerCase().trim();
   const sym = ctx.sym;
+
+  // ── Reserve / savings fund ────────────────────────────────────────────────
+  if (q.includes('reserve') || q.includes('savings fund') || q.includes('major expense')) {
+    const bal = ctx.reserveBalance ?? 0;
+    const used = ctx.reserveUsed;
+    if (bal === 0 && (!used || used.total === 0)) {
+      return 'You haven\'t set aside a reserve yet. Use "Add to Reserve" in Planning → Reserve to allocate money for big expenses — reserve spend is then kept out of your monthly budget.';
+    }
+    const lines = [`Your reserve balance is ${sym}${Math.round(bal).toLocaleString('en-IN')}.`];
+    if (used && used.total > 0) {
+      lines.push(`You used ${sym}${Math.round(used.total).toLocaleString('en-IN')} from it this period across ${used.count} major expense${used.count === 1 ? '' : 's'} — that spend doesn't count against your monthly budget.`);
+    } else {
+      lines.push('No reserve-funded expenses this period.');
+    }
+    return lines.join(' ');
+  }
 
   // ── Overspend query ───────────────────────────────────────────────────────
   if (q.includes('oversp') || q.includes('over budget') || q.includes('too much')) {
@@ -1095,6 +1115,7 @@ export function buildYearlyNarrativeSummary(
   yearSummary: YearSummary,
   yearlyCategories: CategoryTrend[],
   sym: string,
+  reserve?: { total: number; count: number },
 ): string[] {
   const lines: string[] = [];
   const fmt = (n: number) => Math.round(n).toLocaleString('en-IN');
@@ -1170,6 +1191,13 @@ export function buildYearlyNarrativeSummary(
   lines.push(
     `Average monthly spending: ${sym}${fmt(yearSummary.avgMonthlyExpenses)}. Average monthly savings rate: ${avgMonthlySavingsRate}%.`
   );
+
+  // Reserve outflows (informational — kept out of behaviour metrics)
+  if (reserve && reserve.total > 0) {
+    lines.push(
+      `${sym}${fmt(reserve.total)} was paid from your reserve this year across ${reserve.count} major expense${reserve.count === 1 ? '' : 's'}.`
+    );
+  }
 
   return lines;
 }
@@ -1349,4 +1377,45 @@ export function generateYearlyInsightCards(
   }
 
   return cards;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reserve-funded spending (informational — not overspending)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Insight card describing reserve outflows inside a period expense list.
+ * `periodExpenses` must be the ACTUAL expense records (full amounts with
+ * funding fields) for the analysed period; the card reports reserve portions.
+ * Returns null when the period has no reserve outflows.
+ */
+export function buildReserveInsight(
+  periodExpenses: Expense[],
+  categories: Category[],
+  sym: string,
+): AIInsightCard | null {
+  const funded = periodExpenses
+    .map(e => ({ e, part: fundingParts(e).reserve }))
+    .filter(x => x.part > 0);
+  if (funded.length === 0) return null;
+
+  const total = funded.reduce((s, x) => s + x.part, 0);
+  const largest = funded.reduce((a, b) => (b.part > a.part ? b : a));
+  const catName = categories.find(c => c.id === largest.e.category)?.name ?? 'Unknown';
+  const others = funded.length - 1;
+  const fmt = (v: number) => `${sym}${Math.round(v).toLocaleString('en-IN')}`;
+
+  return {
+    id: 'reserve_outflow',
+    severity: 'info',
+    category: 'spending',
+    title: 'Paid from Reserve',
+    summary: `${fmt(total)} was used from your Reserve this month for ${largest.e.description} (${catName})${others > 0 ? ` and ${others} other major expense${others === 1 ? '' : 's'}` : ''}.`,
+    detail: `Major expenses paid from your reserve are not counted as overspending — they draw on money you set aside. ${funded.length} transaction${funded.length === 1 ? '' : 's'} used the reserve this period for a total of ${fmt(total)}.`,
+    metric: fmt(total),
+    metricDirection: 'neutral',
+    confidence: 100,
+    actionLabel: 'View reserve',
+    actionHint: 'planning:reserve',
+  };
 }
