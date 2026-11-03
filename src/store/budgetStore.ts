@@ -9,8 +9,7 @@ import { generateDue, resumeRule, mergeRecurringRules } from '@/lib/recurring';
 import { moveById } from '@/lib/categoryOrder';
 import { validateThresholds, pruneKeys } from '@/lib/budgetAlerts';
 import { validateBaseline } from '@/lib/balance';
-import { reserveAvailableOn, buildReserveLedger, capReserveFunding } from '@/lib/reserve';
-import type { ReserveTransfer } from '@/lib/reserve';
+import { capBalanceFunding } from '@/lib/funding';
 import {
   getStoredTheme, setStoredTheme, applyTheme, resolveTheme, ThemePreference,
 } from '@/lib/theme';
@@ -59,15 +58,11 @@ interface BudgetStore {
   deleteRecurringRule: (id: string, deleteGenerated: boolean) => void;
   convertToRecurring: (txnId: string, type: 'expense' | 'income', frequency: RecurrenceFrequency, endDate?: string) => void;
   runRecurringGeneration: () => void;
-  // Transient toasts for reserve shortfalls during recurring generation —
-  // surfaced once by the page then cleared; never persisted or synced.
-  reserveNotices: string[];
-  clearReserveNotices: () => void;
+  // Transient toasts for available-balance shortfalls during recurring
+  // generation — surfaced once by the page then cleared; never persisted.
+  fundingNotices: string[];
+  clearFundingNotices: () => void;
   goals: SavingsGoal[];
-  reserveTransfers: ReserveTransfer[];
-  addReserveTransfer: (input: { date: string; amount: number; direction: 'in' | 'out'; note?: string }) => string | null;
-  updateReserveTransfer: (id: string, patch: Partial<Pick<ReserveTransfer, 'date' | 'amount' | 'direction' | 'note'>>) => string | null;
-  deleteReserveTransfer: (id: string) => string | null;
   addGoal: (goal: SavingsGoal) => void;
   updateGoal: (id: string, patch: Partial<SavingsGoal>) => void;
   contributeToGoal: (id: string, amount: number) => void;
@@ -237,7 +232,6 @@ interface RemoteData {
   categories: Category[];
   recurring?: RecurringRule[];
   goals?: SavingsGoal[];
-  reserve_transfers?: ReserveTransfer[];   // DB column name (snake_case)
   settings?: UserSettings | null;
 }
 
@@ -251,7 +245,6 @@ function backupToLocalStorage(data: RemoteData) {
     localStorage.setItem(`${prefix}categories`, JSON.stringify(data.categories));
     localStorage.setItem(`${prefix}recurring`, JSON.stringify(data.recurring ?? []));
     localStorage.setItem(`${prefix}goals`, JSON.stringify(data.goals ?? []));
-    localStorage.setItem(`${prefix}reserve_transfers`, JSON.stringify(data.reserve_transfers ?? []));
     if (data.settings) {
       localStorage.setItem('spendwise_currency', data.settings.currency);
       localStorage.setItem('spendwise_cycle_start', String(data.settings.financialCycleStart));
@@ -261,8 +254,14 @@ function backupToLocalStorage(data: RemoteData) {
   } catch { /* quota exceeded — non-critical */ }
 }
 
-function getLocalBackup(userId: string | null): { expenses: string | null; income: string | null; categories: string | null; recurring: string | null; goals: string | null; reserve_transfers: string | null } {
-  if (typeof window === 'undefined') return { expenses: null, income: null, categories: null, recurring: null, goals: null, reserve_transfers: null };
+function getLocalBackup(userId: string | null): { expenses: string | null; income: string | null; categories: string | null; recurring: string | null; goals: string | null } {
+  if (typeof window === 'undefined') return { expenses: null, income: null, categories: null, recurring: null, goals: null };
+  // Deprecated reserve-transfers backups — the concept no longer exists.
+  const uidPrefix = userId ? `budget_${userId}_` : 'budget_';
+  try {
+    localStorage.removeItem('budget_reserve_transfers');
+    localStorage.removeItem(`${uidPrefix}reserve_transfers`);
+  } catch { /* ignore */ }
   const prefix = userId ? `budget_${userId}_` : 'budget_';
   return {
     expenses:   localStorage.getItem(`${prefix}expenses`) ?? localStorage.getItem('budget_expenses'),
@@ -270,7 +269,6 @@ function getLocalBackup(userId: string | null): { expenses: string | null; incom
     categories: localStorage.getItem(`${prefix}categories`) ?? localStorage.getItem('budget_categories'),
     recurring:  localStorage.getItem(`${prefix}recurring`) ?? localStorage.getItem('budget_recurring'),
     goals:      localStorage.getItem(`${prefix}goals`) ?? localStorage.getItem('budget_goals'),
-    reserve_transfers: localStorage.getItem(`${prefix}reserve_transfers`) ?? localStorage.getItem('budget_reserve_transfers'),
   };
 }
 
@@ -388,7 +386,7 @@ let loadRetryCount = 0;
 /** Read the latest state from the store and return the sync payload. */
 function getLatestSyncPayload(): RemoteData {
   const {
-    expenses, income, categories, recurring, goals, reserveTransfers,
+    expenses, income, categories, recurring, goals,
     currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
     selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
     acknowledgedAlerts, notifiedAlerts, dismissedOpportunities, mutedOpportunityCategories,
@@ -396,7 +394,6 @@ function getLatestSyncPayload(): RemoteData {
   } = useBudgetStore.getState();
   return {
     expenses, income, categories, recurring, goals,
-    reserve_transfers: reserveTransfers,
     settings: {
       currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
       selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
@@ -591,7 +588,7 @@ async function loadFromSupabase() {
 
   const { data, error } = await supabase
     .from('budget_data')
-    .select('expenses, income, categories, settings, recurring, goals, reserve_transfers')
+    .select('expenses, income, categories, settings, recurring, goals')
     .eq('user_id', userId)
     .single();
 
@@ -641,9 +638,6 @@ async function loadFromSupabase() {
     if (!Array.isArray(parsedRecurring)) parsedRecurring = [];
     try { parsedGoals = local.goals ? JSON.parse(local.goals) : []; } catch { parsedGoals = []; }
     if (!Array.isArray(parsedGoals)) parsedGoals = [];
-    let parsedTransfers: ReserveTransfer[] = [];
-    try { parsedTransfers = local.reserve_transfers ? JSON.parse(local.reserve_transfers) : []; } catch { parsedTransfers = []; }
-    if (!Array.isArray(parsedTransfers)) parsedTransfers = [];
     try { rawCategories  = local.categories ? JSON.parse(local.categories) : defaultCategories; } catch { rawCategories = defaultCategories; }
     try { parsedExpenses = local.expenses   ? JSON.parse(local.expenses)   : [];                } catch { parsedExpenses = []; }
     try { parsedIncome   = local.income     ? JSON.parse(local.income)     : [];                } catch { parsedIncome   = []; }
@@ -667,7 +661,6 @@ async function loadFromSupabase() {
       categories: migratedCats,
       recurring:  parsedRecurring,
       goals:      parsedGoals,
-      reserve_transfers: parsedTransfers,
       settings:   {
         currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
         selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
@@ -677,8 +670,8 @@ async function loadFromSupabase() {
     };
 
     if (thisLoad !== loadVersion || useBudgetStore.getState().userId !== uid) return;
-    const { settings: _ms, reserve_transfers: _rt, ...migratedData } = migrated;
-    useBudgetStore.setState({ ...migratedData, reserveTransfers: _rt ?? [] });
+    const { settings: _ms, ...migratedData } = migrated;
+    useBudgetStore.setState(migratedData);
     localHydrated = true;
 
     // Mark hydrated BEFORE the push — syncToSupabase is gated on it
@@ -688,7 +681,7 @@ async function loadFromSupabase() {
     useBudgetStore.setState({ networkError: false });
 
     // Push existing localStorage data up to Supabase (and if migration ran, persist it)
-    if (local.expenses || local.income || local.categories || local.recurring || local.goals || local.reserve_transfers || changed) {
+    if (local.expenses || local.income || local.categories || local.recurring || local.goals || changed) {
       await syncToSupabase(migrated);
     }
     // Materialise any recurring occurrences already due (hydration just finished)
@@ -702,7 +695,6 @@ async function loadFromSupabase() {
   const rawCats      = Array.isArray(data.categories)  ? data.categories : defaultCategories;
   const rawRecurring = Array.isArray(data.recurring)   ? (data.recurring as RecurringRule[]) : [];
   const rawGoals     = Array.isArray(data.goals)       ? (data.goals as SavingsGoal[])       : [];
-  const rawTransfers = Array.isArray(data.reserve_transfers) ? (data.reserve_transfers as ReserveTransfer[]) : [];
 
   const { categories: migratedRemoteCats, changed: remoteCatsChanged } = migrateCategories(rawCats);
 
@@ -717,7 +709,6 @@ async function loadFromSupabase() {
     categories: migratedRemoteCats,
     recurring:  rawRecurring,
     goals:      rawGoals,
-    reserve_transfers: rawTransfers,
     settings:   remoteSettings,
   };
 
@@ -824,19 +815,16 @@ async function loadFromSupabase() {
     let localCategories: Category[] = [];
     let localRecurring: RecurringRule[] = [];
     let localGoals: SavingsGoal[] = [];
-    let localTransfers: ReserveTransfer[] = [];
     try { localExpenses   = local.expenses   ? JSON.parse(local.expenses)   : []; } catch { /* corrupted */ }
     try { localIncome     = local.income     ? JSON.parse(local.income)     : []; } catch { /* corrupted */ }
     try { localCategories = local.categories ? JSON.parse(local.categories) : []; } catch { /* corrupted */ }
     try { localRecurring  = local.recurring  ? JSON.parse(local.recurring)  : []; } catch { /* corrupted */ }
     try { localGoals      = local.goals      ? JSON.parse(local.goals)      : []; } catch { /* corrupted */ }
-    try { localTransfers  = local.reserve_transfers ? JSON.parse(local.reserve_transfers) : []; } catch { /* corrupted */ }
     if (!Array.isArray(localExpenses))   localExpenses   = [];
     if (!Array.isArray(localIncome))     localIncome     = [];
     if (!Array.isArray(localCategories)) localCategories = [];
     if (!Array.isArray(localRecurring))  localRecurring  = [];
     if (!Array.isArray(localGoals))      localGoals      = [];
-    if (!Array.isArray(localTransfers))  localTransfers  = [];
 
     const mergeById = <T extends { id: string }>(remoteArr: T[], localArr: T[]): T[] => {
       const localById = new Map(localArr.map((x) => [x.id, x]));
@@ -853,7 +841,6 @@ async function loadFromSupabase() {
     // stale local bound can't resurrect occurrences deleted elsewhere
     remote.recurring  = mergeRecurringRules(remote.recurring ?? [], localRecurring);
     remote.goals      = mergeById(remote.goals ?? [], localGoals);
-    remote.reserve_transfers = mergeById(remote.reserve_transfers ?? [], localTransfers);
   }
 
   // Apply the financial-cycle mapping directly — migrateToFinancialCycle()
@@ -867,10 +854,9 @@ async function loadFromSupabase() {
   if (loadRetryTimer) { clearTimeout(loadRetryTimer); loadRetryTimer = null; }
   useBudgetStore.setState({ networkError: false });
 
-  // Apply data (settings already applied above, strip from setState to avoid stale key;
-  // reserve_transfers maps to the camelCase state field)
-  const { settings: _s, reserve_transfers: _rt, ...remoteData } = remote;
-  useBudgetStore.setState({ ...remoteData, reserveTransfers: _rt ?? [] });
+  // Apply data (settings already applied above, strip from setState to avoid stale key)
+  const { settings: _s, ...remoteData } = remote;
+  useBudgetStore.setState(remoteData);
   localHydrated = true;
   backupToLocalStorage(remote);
 
@@ -916,9 +902,8 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   selectedCategoryIds: [], // deprecated alias — mirrors excludedCategoryIds
   recurring: [],
   goals: [],
-  reserveTransfers: [],
-  reserveNotices: [],
-  clearReserveNotices: () => set({ reserveNotices: [] }),
+  fundingNotices: [],
+  clearFundingNotices: () => set({ fundingNotices: [] }),
   // Alert settings — remote-backed only (no separate localStorage keys)
   categoryBudgets: {},
   alertThresholds: DEFAULT_ALERT_THRESHOLDS,
@@ -959,7 +944,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   // kept — a re-login of the same user still has its offline copy.
   resetForLogout: () => {
     clearPendingSyncWork();
-    set({ userId: null, expenses: [], income: [], categories: defaultCategories, recurring: [], goals: [], reserveTransfers: [], reserveNotices: [], syncing: false, networkError: false });
+    set({ userId: null, expenses: [], income: [], categories: defaultCategories, recurring: [], goals: [], fundingNotices: [], syncing: false, networkError: false });
   },
 
   setCurrency: (currency: string) => {
@@ -1236,10 +1221,15 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
     const rulesChanged = due.rules.some((r, i) => r !== state.recurring[i]);
     if (due.expenses.length === 0 && due.income.length === 0 && !rulesChanged) return;
     const startDay = state.financialCycleStart;
-    // Generated reserve-funded occurrences must never take the reserve
-    // negative — cap the reserve portion against the evolving ledger and
-    // surface what was adjusted via a toast.
-    const capped = capReserveFunding(due.expenses, state.reserveTransfers, state.expenses);
+    // Generated balance-funded occurrences must never take the available
+    // balance below zero — cap the balance portion against the evolving
+    // overall balance and surface what was adjusted via a toast.
+    const capped = capBalanceFunding(due.expenses, {
+      baseline: state.openingBalance,
+      expenses: state.expenses,
+      income: state.income,
+      financialCycleStart: state.financialCycleStart,
+    });
     set({
       expenses: capped.expenses.length
         ? [...state.expenses, ...capped.expenses.map((e) => ({ ...e, ...getFinancialPeriod(e.date, startDay) }))]
@@ -1248,10 +1238,10 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
         ? [...state.income, ...due.income.map((i) => ({ ...i, ...getFinancialPeriod(i.date, startDay) }))]
         : state.income,
       recurring: due.rules,
-      reserveNotices: capped.notices.length
-        ? [...state.reserveNotices, ...capped.notices.map(n =>
-            `Reserve was ${formatCurrency(n.shortBy, state.currency)} short for ${n.description} on ${n.date} — the remainder was charged to your monthly budget.`)]
-        : state.reserveNotices,
+      fundingNotices: capped.notices.length
+        ? [...state.fundingNotices, ...capped.notices.map(n =>
+            `Your available balance was ${formatCurrency(n.shortBy, state.currency)} short for ${n.description} on ${n.date} — the remainder was charged to your monthly budget.`)]
+        : state.fundingNotices,
     });
     scheduleSyncToSupabase();
   },
@@ -1287,71 +1277,6 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   deleteGoal: (id: string) => {
     set((state) => ({ goals: state.goals.filter((g) => g.id !== id) }));
     scheduleSyncToSupabase();
-  },
-
-  // ── Reserve fund transfers ────────────────────────────────────────────────
-  // Return an error string when the change would make the reserve negative —
-  // the UI keeps the dialog open instead of silently saving bad data.
-  addReserveTransfer: (input) => {
-    if (!Number.isFinite(input.amount) || input.amount <= 0) {
-      return 'Enter an amount greater than 0.';
-    }
-    if (input.direction === 'out') {
-      const avail = reserveAvailableOn(get().reserveTransfers, get().expenses, input.date);
-      if (input.amount > avail) {
-        return `Only ${formatCurrency(avail, get().currency)} is available to release on that date.`;
-      }
-    }
-    set(state => ({
-      reserveTransfers: [...state.reserveTransfers, {
-        id: `rt-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-        date: input.date, amount: input.amount, direction: input.direction,
-        note: input.note?.trim() || undefined, createdAt: new Date().toISOString(),
-      }],
-    }));
-    scheduleSyncToSupabase();
-    return null;
-  },
-
-  updateReserveTransfer: (id, patch) => {
-    const current = get().reserveTransfers.find(t => t.id === id);
-    if (!current) return 'Transfer not found.';
-    const next = { ...current, ...patch };
-    if (!Number.isFinite(next.amount) || next.amount <= 0) {
-      return 'Enter an amount greater than 0.';
-    }
-    const avail = reserveAvailableOn(
-      get().reserveTransfers, get().expenses, next.date,
-      { excludeTransferId: id },
-    );
-    // releasing (or shrinking an 'in') draws on the reserve; check both
-    const draw = next.direction === 'out' ? next.amount
-      : current.direction === 'in' ? Math.max(0, current.amount - next.amount)
-      : 0;
-    if (draw > avail) {
-      return `Only ${formatCurrency(avail, get().currency)} is available to release on that date.`;
-    }
-    set(state => ({
-      reserveTransfers: state.reserveTransfers.map(t => (t.id === id ? next : t)),
-    }));
-    scheduleSyncToSupabase();
-    return null;
-  },
-
-  deleteReserveTransfer: (id) => {
-    const current = get().reserveTransfers.find(t => t.id === id);
-    if (!current) return 'Transfer not found.';
-    if (current.direction === 'in') {
-      // Removing a contribution can push a LATER balance negative — check the
-      // running balance without this transfer, not the floored availableOn
-      const ledger = buildReserveLedger(
-        get().reserveTransfers.filter(t => t.id !== id), get().expenses);
-      const minAfter = ledger.reduce((m, e) => e.date >= current.date ? Math.min(m, e.balanceAfter) : m, Infinity);
-      if (minAfter < 0) return 'Cannot remove — later reserve spending depends on this transfer.';
-    }
-    set(state => ({ reserveTransfers: state.reserveTransfers.filter(t => t.id !== id) }));
-    scheduleSyncToSupabase();
-    return null;
   },
 
   // ── Budget alert settings ─────────────────────────────────────────────────
