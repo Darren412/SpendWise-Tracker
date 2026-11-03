@@ -106,8 +106,15 @@ export default function YearlySummary() {
 
     const yearExpenses = expenses.filter((e) => e.year === year);
     const yearIncome = income.filter((i) => i.year === year);
-    const prevExpenses = expenses.filter((e) => e.year === year - 1);
-    const prevIncome = income.filter((i) => i.year === year - 1);
+
+    // Compare like-for-like: for an in-progress year, last year's figures only
+    // cover the same elapsed months; for past years the full year is used.
+    const compareMonths = year === currentYear ? elapsed : 12;
+    const compareLabel =
+      year === currentYear ? `Jan–${MONTH_NAMES[elapsed - 1]} ${year - 1}` : String(year - 1);
+    const inCompareWindow = (m: string) => parseInt(m, 10) <= compareMonths;
+    const prevExpenses = expenses.filter((e) => e.year === year - 1 && inCompareWindow(e.month));
+    const prevIncome = income.filter((i) => i.year === year - 1 && inCompareWindow(i.month));
 
     const totalSpent = yearExpenses.reduce((s, e) => s + e.amount, 0);
     const totalIncome = yearIncome.reduce((s, i) => s + i.amount, 0);
@@ -310,7 +317,7 @@ export default function YearlySummary() {
         bg: '#fef2f2',
         border: '#fecaca',
         color: '#dc2626',
-        text: `${biggestIncrease.icon} ${biggestIncrease.name} rose ${(biggestIncrease.yoyPct ?? 0).toFixed(1)}% vs ${year - 1} (+${formatCurrency(biggestIncrease.total - biggestIncrease.lastTotal, currency)}).`,
+        text: `${biggestIncrease.icon} ${biggestIncrease.name} rose ${(biggestIncrease.yoyPct ?? 0).toFixed(1)}% vs ${compareLabel} (+${formatCurrency(biggestIncrease.total - biggestIncrease.lastTotal, currency)}).`,
       });
     }
     if (biggestDecrease && (biggestDecrease.yoyPct ?? 0) < 0) {
@@ -319,7 +326,7 @@ export default function YearlySummary() {
         bg: '#f0fdf4',
         border: '#bbf7d0',
         color: '#16a34a',
-        text: `${biggestDecrease.icon} ${biggestDecrease.name} fell ${Math.abs(biggestDecrease.yoyPct ?? 0).toFixed(1)}% vs ${year - 1} (−${formatCurrency(biggestDecrease.lastTotal - biggestDecrease.total, currency)}).`,
+        text: `${biggestDecrease.icon} ${biggestDecrease.name} fell ${Math.abs(biggestDecrease.yoyPct ?? 0).toFixed(1)}% vs ${compareLabel} (−${formatCurrency(biggestDecrease.lastTotal - biggestDecrease.total, currency)}).`,
       });
     }
 
@@ -375,6 +382,7 @@ export default function YearlySummary() {
       prevIncomeTotal,
       prevSavings,
       prevRate,
+      compareLabel,
       monthlyData,
       activeExpenseMonths,
       activeIncomeMonths,
@@ -398,11 +406,12 @@ export default function YearlySummary() {
     const rows = [...data.categoryRows];
     if (sortKey === 'name') rows.sort((a, b) => a.name.localeCompare(b.name));
     else if (sortKey === 'yoy')
-      rows.sort(
-        (a, b) =>
-          (b.yoyPct === null ? Number.POSITIVE_INFINITY : b.yoyPct) -
-          (a.yoyPct === null ? Number.POSITIVE_INFINITY : a.yoyPct)
-      );
+      rows.sort((a, b) => {
+        if (a.yoyPct === null && b.yoyPct === null) return b.total - a.total;
+        if (a.yoyPct === null) return -1;
+        if (b.yoyPct === null) return 1;
+        return b.yoyPct - a.yoyPct;
+      });
     else rows.sort((a, b) => b.total - a.total);
     return rows;
   }, [data.categoryRows, sortKey]);
@@ -424,6 +433,7 @@ export default function YearlySummary() {
     prevIncomeTotal,
     prevSavings,
     prevRate,
+    compareLabel,
     monthlyData,
     activeExpenseMonths,
     activeIncomeMonths,
@@ -447,13 +457,13 @@ export default function YearlySummary() {
   const savingsYoY = prevSavings !== 0 ? ((totalSavings - prevSavings) / Math.abs(prevSavings)) * 100 : null;
   const rateDiff = prevIncomeTotal > 0 ? savingsRate - prevRate : null;
 
-  const YoYLine = ({ pct, goodWhenUp }: { pct: number | null; goodWhenUp: boolean }) => {
+  const renderYoY = (pct: number | null, goodWhenUp: boolean) => {
     if (pct === null) return null;
     const up = pct >= 0;
     const good = up === goodWhenUp;
     return (
       <p className="num-mono mt-1" style={{ fontSize: '0.6875rem', fontWeight: 700, color: good ? '#059669' : '#dc2626' }}>
-        {up ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}% vs {year - 1}
+        {up ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}% vs {compareLabel}
       </p>
     );
   };
@@ -535,7 +545,7 @@ export default function YearlySummary() {
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#059669' }}>Total Income</span>
           </div>
           <p className="text-xl font-bold num-mono" style={{ color: '#065f46' }}>{formatCurrency(totalIncome, currency)}</p>
-          <YoYLine pct={incomeYoY} goodWhenUp />
+          {renderYoY(incomeYoY, true)}
         </div>
         <div className="rounded-xl p-4" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
           <div className="flex items-center gap-2 mb-2">
@@ -543,7 +553,7 @@ export default function YearlySummary() {
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#dc2626' }}>Total Spent</span>
           </div>
           <p className="text-xl font-bold num-mono" style={{ color: '#991b1b' }}>{formatCurrency(totalSpent, currency)}</p>
-          <YoYLine pct={spentYoY} goodWhenUp={false} />
+          {renderYoY(spentYoY, false)}
         </div>
         <div
           className="rounded-xl p-4"
@@ -565,7 +575,7 @@ export default function YearlySummary() {
             {totalSavings >= 0 ? '+' : ''}
             {formatCurrency(totalSavings, currency)}
           </p>
-          <YoYLine pct={savingsYoY} goodWhenUp />
+          {renderYoY(savingsYoY, true)}
         </div>
         <div className="rounded-xl p-4" style={{ background: '#eef2ff', border: '1px solid #c7d2fe' }}>
           <div className="flex items-center gap-2 mb-2">
@@ -584,7 +594,7 @@ export default function YearlySummary() {
               style={{ fontSize: '0.6875rem', fontWeight: 700, color: rateDiff >= 0 ? '#059669' : '#dc2626' }}
             >
               {rateDiff >= 0 ? '+' : '−'}
-              {Math.abs(rateDiff).toFixed(1)} pts vs {year - 1}
+              {Math.abs(rateDiff).toFixed(1)} pts vs {compareLabel}
             </p>
           )}
         </div>
@@ -715,7 +725,7 @@ export default function YearlySummary() {
                   alignItems: 'center',
                 }}
               >
-                {['Category', 'Yearly Total', 'Share', 'Monthly Avg', 'Last Year', 'YoY', 'Txns', 'Peak'].map(
+                {['Category', 'Yearly Total', 'Share', 'Monthly Avg', isCurrentYear ? compareLabel : 'Last Year', 'YoY', 'Txns', 'Peak'].map(
                   (h, i) => (
                     <span
                       key={h}
