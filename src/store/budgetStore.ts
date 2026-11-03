@@ -274,10 +274,14 @@ let loadVersion = 0; // guards against concurrent loadFromSupabase calls
 // Hydration & dirty-tracking:
 //  - remoteHydrated gates every remote write so pre-hydration mutations
 //    (e.g. a city toggle while data is still loading) can't wipe remote data.
+//  - localHydrated means the in-memory store holds this user's loaded data —
+//    before it's true, backing up would overwrite the good localStorage copy
+//    with empty/default arrays.
 //  - mutationSeq bumps on each mutation so a resolved push can tell whether
 //    it flushed the latest state or something newer is still pending.
 //  - loadRetry* backs off and retries failed loads — remote stays the truth.
 let remoteHydrated = false;
+let localHydrated = false;
 let mutationSeq = 0;
 let loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let loadRetryCount = 0;
@@ -341,10 +345,16 @@ async function executeSyncToSupabase() {
  * - If a sync is already in-flight, we flag a re-sync for after it completes.
  */
 function scheduleSyncToSupabase() {
+  const uid = useBudgetStore.getState().userId;
+
+  // Pre-hydration for a signed-in user: the store still holds empty/default
+  // data — backing it up would clobber the good local backup, and marking
+  // dirty would make the next load's merge treat those defaults as truth.
+  if (uid && !localHydrated) return;
+
   // Immediate localStorage backup with latest state
   backupToLocalStorage(getLatestSyncPayload());
 
-  const uid = useBudgetStore.getState().userId;
   if (uid) {
     markDirty(uid);
     mutationSeq++;
@@ -400,8 +410,9 @@ export async function flushPendingSync(): Promise<void> {
 // Auto-register beforeunload handler (client-side only)
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
-    // Flush localStorage immediately (synchronous, guaranteed)
-    backupToLocalStorage(getLatestSyncPayload());
+    // Flush localStorage immediately (synchronous, guaranteed) — but not
+    // pre-hydration, which would overwrite the good backup with defaults
+    if (localHydrated) backupToLocalStorage(getLatestSyncPayload());
     // Attempt Supabase sync (may not complete, but localStorage is safe)
     void flushPendingSync();
   });
@@ -488,6 +499,7 @@ async function loadFromSupabase() {
     // schedule a sync and push this stale backup over fresher remote data.
     const cycled = applyCycle(parsedExpenses, parsedIncome, useBudgetStore.getState().financialCycleStart);
     useBudgetStore.setState({ expenses: cycled.expenses, income: cycled.income, categories: migratedCats });
+    localHydrated = true;
     useBudgetStore.setState({ networkError: true });
     // Retry the load with backoff — remote remains the source of truth
     loadRetryCount++;
@@ -524,6 +536,7 @@ async function loadFromSupabase() {
     if (thisLoad !== loadVersion || useBudgetStore.getState().userId !== uid) return;
     const { settings: _ms, ...migratedData } = migrated;
     useBudgetStore.setState(migratedData);
+    localHydrated = true;
 
     // Mark hydrated BEFORE the push — syncToSupabase is gated on it
     remoteHydrated = true;
@@ -630,6 +643,7 @@ async function loadFromSupabase() {
   // Apply data (settings already applied above, strip from setState to avoid stale key)
   const { settings: _s, ...remoteData } = remote;
   useBudgetStore.setState(remoteData);
+  localHydrated = true;
   backupToLocalStorage(remote);
 
   // Push merged/migrated data back to Supabase when anything changed.
@@ -652,6 +666,7 @@ function clearPendingSyncWork() {
   syncInFlight = false;
   syncPendingAfterFlight = false;
   remoteHydrated = false;
+  localHydrated = false;
   loadVersion++; // cancel any in-flight load
 }
 
