@@ -17,7 +17,6 @@ import { buildReportHTML } from '@/lib/export/pdfReport';
 import { downloadText } from '@/lib/export/download';
 import { printHTML } from '@/lib/export/print';
 import DateInput from '@/components/DateInput';
-import YearlySummary from '@/components/YearlySummary';
 import ExportModal from '@/components/ExportModal';
 import TaxSummaryPanel from '@/components/TaxSummaryPanel';
 
@@ -211,7 +210,7 @@ export default function ReportsWorkspace() {
             </div>
             Reports
           </h1>
-          <p className="ws-subtitle">Annual summaries · Data exports · Historical analytics</p>
+          <p className="ws-subtitle">Data exports · Tax summary · Historical analytics</p>
         </div>
         <button onClick={() => setShowExport(true)} className="ws-cta-btn" style={{ background: 'var(--green-600)', color: '#fff', borderColor: 'var(--green-700)', boxShadow: 'var(--shadow-green)' }}>
           <Download size={13} /> Export to Excel
@@ -363,9 +362,6 @@ export default function ReportsWorkspace() {
           </button>
         ))}
       </div>
-
-      {/* ── Annual summary ── */}
-      <YearlySummary />
 
       {/* ── Tax summary (deductible / non-deductible per tax year) ── */}
       <TaxSummaryPanel />
