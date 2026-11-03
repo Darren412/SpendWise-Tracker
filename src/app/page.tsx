@@ -11,12 +11,13 @@ import { Loader2, WifiOff } from 'lucide-react';
 
 const OverviewWorkspace     = lazy(() => import('@/workspaces/OverviewWorkspace'));
 const AnalyticsWorkspace    = lazy(() => import('@/workspaces/AnalyticsWorkspace'));
+const TrendsWorkspace       = lazy(() => import('@/workspaces/TrendsWorkspace'));
 const TransactionsWorkspace = lazy(() => import('@/workspaces/TransactionsWorkspace'));
 const InsightsWorkspace     = lazy(() => import('@/workspaces/InsightsWorkspace'));
 const ReportsWorkspace      = lazy(() => import('@/workspaces/ReportsWorkspace'));
 const SettingsWorkspace     = lazy(() => import('@/workspaces/SettingsWorkspace'));
 
-type Workspace = 'overview' | 'analytics' | 'transactions' | 'insights' | 'reports' | 'settings';
+type Workspace = 'overview' | 'analytics' | 'trends' | 'transactions' | 'insights' | 'reports' | 'settings';
 
 function WorkspaceSkeleton() {
   return (
@@ -136,6 +137,7 @@ export default function Home() {
               <Suspense fallback={<WorkspaceSkeleton />}>
                 {activeWorkspace === 'overview'     && <OverviewWorkspace     onNavigate={handleWorkspaceChange} />}
                 {activeWorkspace === 'analytics'    && <AnalyticsWorkspace    />}
+                {activeWorkspace === 'trends'       && <TrendsWorkspace       />}
                 {activeWorkspace === 'transactions' && <TransactionsWorkspace onAddExpense={() => setAddModal({ open: true, tab: 'expense' })} onAddIncome={() => setAddModal({ open: true, tab: 'income' })} />}
                 {activeWorkspace === 'insights'     && <InsightsWorkspace     />}
                 {activeWorkspace === 'reports'      && <ReportsWorkspace      />}
