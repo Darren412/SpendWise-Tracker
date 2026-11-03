@@ -81,3 +81,11 @@ export interface SpendingTarget {
   createdAt: string;            // ISO timestamp
   createdForPeriod: string;     // 'YYYY-MM' financial period it was created in
 }
+
+export interface OpeningBalanceBaseline {
+  startYear: number;        // financial year the balance starts at
+  amount: number;           // may be 0 or negative (deficit — UI warns)
+  effectiveDate: string;    // 'YYYY-MM-DD' — txns dated before this are ignored by balances
+  createdAt: string;        // ISO timestamp
+  updatedAt: string;        // ISO timestamp
+}
