@@ -132,22 +132,22 @@ export default function ExportModal({ isOpen, onClose }: Props) {
     >
       <div
         className="dark-card w-full max-w-md rounded-2xl shadow-2xl"
-        style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+        style={{ border: '1px solid var(--border-default)' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-white/8">
+        <div className="flex items-center justify-between px-6 py-5 border-b" style={{ borderColor: 'var(--border-default)' }}>
           <div className="flex items-center gap-2.5">
             <span className="flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: 'rgba(5,150,105,0.15)' }}>
-              <FileSpreadsheet size={17} color="#059669" />
+              <FileSpreadsheet size={17} color="var(--success-text)" />
             </span>
-            <span className="font-semibold text-[15px]" style={{ color: '#f0f0f0' }}>
+            <span className="font-semibold text-[15px]" style={{ color: 'var(--text-900)' }}>
               Export to Excel
             </span>
           </div>
           <button
             onClick={onClose}
             className="flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-white/10"
-            style={{ color: '#999' }}
+            style={{ color: 'var(--text-400)' }}
           >
             <X size={16} />
           </button>
@@ -155,7 +155,7 @@ export default function ExportModal({ isOpen, onClose }: Props) {
 
         {/* Body */}
         <div className="px-6 py-5 space-y-1.5">
-          <p className="text-xs mb-4" style={{ color: '#888' }}>
+          <p className="text-xs mb-4" style={{ color: 'var(--text-500)' }}>
             Choose what data to include in the export.
           </p>
 
@@ -179,7 +179,7 @@ export default function ExportModal({ isOpen, onClose }: Props) {
                 />
                 <span
                   className="flex items-center gap-2 text-sm font-medium"
-                  style={{ color: scope === opt.id ? '#34d399' : '#ccc' }}
+                  style={{ color: scope === opt.id ? 'var(--success-text)' : 'var(--text-300)' }}
                 >
                   {opt.icon}
                   {opt.label}
@@ -193,11 +193,11 @@ export default function ExportModal({ isOpen, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-white/8">
+        <div className="flex justify-end gap-3 px-6 py-4 border-t" style={{ borderColor: 'var(--border-default)' }}>
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-white/10"
-            style={{ color: '#999', border: '1px solid rgba(255,255,255,0.1)' }}
+            style={{ color: 'var(--text-600)', border: '1px solid var(--border-default)' }}
           >
             Cancel
           </button>

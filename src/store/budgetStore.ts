@@ -1,9 +1,25 @@
 'use client';
 
 import { create } from 'zustand';
-import { Expense, Income, Category } from '@/types';
+import { Expense, Income, Category, RecurringRule, RecurrenceFrequency, SavingsGoal, BudgetAlertThresholds } from '@/types';
 import { supabase } from '@/lib/supabase';
-import { getFinancialPeriod, getCurrentFinancialPeriod } from '@/utils/financialCycle';
+import { getFinancialPeriod, getCurrentFinancialPeriod, todayLocalISO } from '@/utils/financialCycle';
+import { generateDue, resumeRule, mergeRecurringRules } from '@/lib/recurring';
+import { moveById } from '@/lib/categoryOrder';
+import { validateThresholds, pruneKeys } from '@/lib/budgetAlerts';
+import {
+  getStoredTheme, setStoredTheme, applyTheme, resolveTheme, ThemePreference,
+} from '@/lib/theme';
+
+function prefersDarkNow(): boolean {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function isValidTheme(v: unknown): v is ThemePreference {
+  return v === 'light' || v === 'dark' || v === 'system';
+}
 
 interface BudgetStore {
   expenses: Expense[];
@@ -30,6 +46,34 @@ interface BudgetStore {
   updateCategory: (id: string, category: Partial<Category>) => void;
   deleteCategory: (id: string, reassignToId?: string) => void;
   reorderCategory: (fromIndex: number, toIndex: number) => void;
+  moveCategory: (fromId: string, toId: string) => void;
+  recurring: RecurringRule[];
+  addRecurringRule: (rule: RecurringRule) => void;
+  updateRecurringRule: (id: string, patch: Partial<RecurringRule>) => void;
+  pauseRecurringRule: (id: string) => void;
+  resumeRecurringRule: (id: string) => void;
+  deleteRecurringRule: (id: string, deleteGenerated: boolean) => void;
+  convertToRecurring: (txnId: string, type: 'expense' | 'income', frequency: RecurrenceFrequency, endDate?: string) => void;
+  runRecurringGeneration: () => void;
+  goals: SavingsGoal[];
+  addGoal: (goal: SavingsGoal) => void;
+  updateGoal: (id: string, patch: Partial<SavingsGoal>) => void;
+  contributeToGoal: (id: string, amount: number) => void;
+  archiveGoal: (id: string, archived: boolean) => void;
+  deleteGoal: (id: string) => void;
+  // Per-category monthly budgets + alert configuration (remote settings only)
+  categoryBudgets: Record<string, number>;
+  alertThresholds: BudgetAlertThresholds;
+  alertsEnabled: boolean;
+  acknowledgedAlerts: string[];
+  notifiedAlerts: string[];
+  setCategoryBudget: (catId: string, amount: number) => void;
+  setAlertThresholds: (t: BudgetAlertThresholds) => void;
+  setAlertsEnabled: (enabled: boolean) => void;
+  acknowledgeAlert: (key: string) => void;
+  markAlertsNotified: (keys: string[]) => void;
+  themePreference: ThemePreference;
+  setThemePreference: (p: ThemePreference) => void;
   selectedCategoryIds: string[];
   setSelectedCategoryIds: (ids: string[]) => void;
   excludedCategoryIds: string[];
@@ -147,12 +191,22 @@ interface UserSettings {
   excludedCategoryIds: string[];
   selectedCity: string;
   savingsTarget: number;
+  categoryBudgets?: Record<string, number>;
+  alertThresholds?: BudgetAlertThresholds;
+  alertsEnabled?: boolean;
+  acknowledgedAlerts?: string[];
+  notifiedAlerts?: string[];
+  themePreference?: ThemePreference;
 }
+
+const DEFAULT_ALERT_THRESHOLDS: BudgetAlertThresholds = { warning: 80, exceeded: 100 };
 
 interface RemoteData {
   expenses: Expense[];
   income: Income[];
   categories: Category[];
+  recurring?: RecurringRule[];
+  goals?: SavingsGoal[];
   settings?: UserSettings | null;
 }
 
@@ -164,6 +218,8 @@ function backupToLocalStorage(data: RemoteData) {
     localStorage.setItem(`${prefix}expenses`, JSON.stringify(data.expenses));
     localStorage.setItem(`${prefix}income`, JSON.stringify(data.income));
     localStorage.setItem(`${prefix}categories`, JSON.stringify(data.categories));
+    localStorage.setItem(`${prefix}recurring`, JSON.stringify(data.recurring ?? []));
+    localStorage.setItem(`${prefix}goals`, JSON.stringify(data.goals ?? []));
     if (data.settings) {
       localStorage.setItem('spendwise_currency', data.settings.currency);
       localStorage.setItem('spendwise_cycle_start', String(data.settings.financialCycleStart));
@@ -173,13 +229,15 @@ function backupToLocalStorage(data: RemoteData) {
   } catch { /* quota exceeded — non-critical */ }
 }
 
-function getLocalBackup(userId: string | null): { expenses: string | null; income: string | null; categories: string | null } {
-  if (typeof window === 'undefined') return { expenses: null, income: null, categories: null };
+function getLocalBackup(userId: string | null): { expenses: string | null; income: string | null; categories: string | null; recurring: string | null; goals: string | null } {
+  if (typeof window === 'undefined') return { expenses: null, income: null, categories: null, recurring: null, goals: null };
   const prefix = userId ? `budget_${userId}_` : 'budget_';
   return {
     expenses:   localStorage.getItem(`${prefix}expenses`) ?? localStorage.getItem('budget_expenses'),
     income:     localStorage.getItem(`${prefix}income`) ?? localStorage.getItem('budget_income'),
     categories: localStorage.getItem(`${prefix}categories`) ?? localStorage.getItem('budget_categories'),
+    recurring:  localStorage.getItem(`${prefix}recurring`) ?? localStorage.getItem('budget_recurring'),
+    goals:      localStorage.getItem(`${prefix}goals`) ?? localStorage.getItem('budget_goals'),
   };
 }
 
@@ -236,6 +294,14 @@ function applyCycle(
   return { expenses: newExpenses, income: newIncome, changed };
 }
 
+/** Periods whose alert keys stay live: the selected financial period + the previous one. */
+function alertKeepPeriods(state: { selectedMonth: string; selectedYear: number }): string[] {
+  let m = parseInt(state.selectedMonth, 10) - 1;
+  let y = state.selectedYear;
+  if (m < 1) { m = 12; y -= 1; }
+  return [`${state.selectedYear}-${state.selectedMonth}`, `${y}-${String(m).padStart(2, '0')}`];
+}
+
 
 // ── Financial cycle init (reads localStorage before store creation) ─────────
 function getSavedCycleStart(): number {
@@ -288,10 +354,19 @@ let loadRetryCount = 0;
 
 /** Read the latest state from the store and return the sync payload. */
 function getLatestSyncPayload(): RemoteData {
-  const { expenses, income, categories, currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity, savingsTarget } = useBudgetStore.getState();
+  const {
+    expenses, income, categories, recurring, goals,
+    currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
+    selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
+    acknowledgedAlerts, notifiedAlerts, themePreference,
+  } = useBudgetStore.getState();
   return {
-    expenses, income, categories,
-    settings: { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity, savingsTarget },
+    expenses, income, categories, recurring, goals,
+    settings: {
+      currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
+      selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
+      acknowledgedAlerts, notifiedAlerts, themePreference,
+    },
   };
 }
 
@@ -429,6 +504,16 @@ if (typeof window !== 'undefined') {
       loadFromSupabase();
     }
   });
+
+  // Daily rollover: returning to a visible tab materialises any recurring
+  // occurrences that came due while the app was hidden.
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && useBudgetStore.getState().userId) {
+        useBudgetStore.getState().runRecurringGeneration();
+      }
+    });
+  }
 }
 
 /** Legacy wrapper — kept for the one-off sync in loadFromSupabase. */
@@ -470,7 +555,7 @@ async function loadFromSupabase() {
 
   const { data, error } = await supabase
     .from('budget_data')
-    .select('expenses, income, categories, settings')
+    .select('expenses, income, categories, settings, recurring, goals')
     .eq('user_id', userId)
     .single();
 
@@ -514,6 +599,12 @@ async function loadFromSupabase() {
     let rawCategories: Category[];
     let parsedExpenses: Expense[];
     let parsedIncome: Income[];
+    let parsedRecurring: RecurringRule[];
+    let parsedGoals: SavingsGoal[];
+    try { parsedRecurring = local.recurring ? JSON.parse(local.recurring) : []; } catch { parsedRecurring = []; }
+    if (!Array.isArray(parsedRecurring)) parsedRecurring = [];
+    try { parsedGoals = local.goals ? JSON.parse(local.goals) : []; } catch { parsedGoals = []; }
+    if (!Array.isArray(parsedGoals)) parsedGoals = [];
     try { rawCategories  = local.categories ? JSON.parse(local.categories) : defaultCategories; } catch { rawCategories = defaultCategories; }
     try { parsedExpenses = local.expenses   ? JSON.parse(local.expenses)   : [];                } catch { parsedExpenses = []; }
     try { parsedIncome   = local.income     ? JSON.parse(local.income)     : [];                } catch { parsedIncome   = []; }
@@ -525,12 +616,22 @@ async function loadFromSupabase() {
     const cycled = applyCycle(parsedExpenses, parsedIncome, useBudgetStore.getState().financialCycleStart);
 
     // Include current local settings in the initial upload
-    const { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity, savingsTarget } = useBudgetStore.getState();
+    const {
+      currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
+      selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
+      acknowledgedAlerts, notifiedAlerts, themePreference,
+    } = useBudgetStore.getState();
     const migrated: RemoteData = {
       expenses:   cycled.expenses,
       income:     cycled.income,
       categories: migratedCats,
-      settings:   { currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds, selectedCity, savingsTarget },
+      recurring:  parsedRecurring,
+      goals:      parsedGoals,
+      settings:   {
+        currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
+        selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
+        acknowledgedAlerts, notifiedAlerts, themePreference,
+      },
     };
 
     if (thisLoad !== loadVersion || useBudgetStore.getState().userId !== uid) return;
@@ -545,9 +646,11 @@ async function loadFromSupabase() {
     useBudgetStore.setState({ networkError: false });
 
     // Push existing localStorage data up to Supabase (and if migration ran, persist it)
-    if (local.expenses || local.income || local.categories || changed) {
+    if (local.expenses || local.income || local.categories || local.recurring || local.goals || changed) {
       await syncToSupabase(migrated);
     }
+    // Materialise any recurring occurrences already due (hydration just finished)
+    useBudgetStore.getState().runRecurringGeneration();
     return;
   }
 
@@ -555,6 +658,8 @@ async function loadFromSupabase() {
   const rawExpenses  = Array.isArray(data.expenses)   ? data.expenses   : [];
   const rawIncome    = Array.isArray(data.income)      ? data.income     : [];
   const rawCats      = Array.isArray(data.categories)  ? data.categories : defaultCategories;
+  const rawRecurring = Array.isArray(data.recurring)   ? (data.recurring as RecurringRule[]) : [];
+  const rawGoals     = Array.isArray(data.goals)       ? (data.goals as SavingsGoal[])       : [];
 
   const { categories: migratedRemoteCats, changed: remoteCatsChanged } = migrateCategories(rawCats);
 
@@ -567,6 +672,8 @@ async function loadFromSupabase() {
     expenses:   rawExpenses,
     income:     rawIncome,
     categories: migratedRemoteCats,
+    recurring:  rawRecurring,
+    goals:      rawGoals,
     settings:   remoteSettings,
   };
 
@@ -595,6 +702,35 @@ async function loadFromSupabase() {
     if (typeof remoteSettings.savingsTarget === 'number' && remoteSettings.savingsTarget >= 0 && remoteSettings.savingsTarget <= 100) {
       settingsUpdate.savingsTarget = remoteSettings.savingsTarget;
     }
+    if (remoteSettings.categoryBudgets && typeof remoteSettings.categoryBudgets === 'object') {
+      // Keep only non-negative finite amounts
+      const clean: Record<string, number> = {};
+      for (const [k, v] of Object.entries(remoteSettings.categoryBudgets)) {
+        if (typeof v === 'number' && Number.isFinite(v) && v > 0) clean[k] = v;
+      }
+      settingsUpdate.categoryBudgets = clean;
+    }
+    if (remoteSettings.alertThresholds && typeof remoteSettings.alertThresholds === 'object'
+        && !validateThresholds(remoteSettings.alertThresholds)) {
+      settingsUpdate.alertThresholds = remoteSettings.alertThresholds;
+    }
+    if (typeof remoteSettings.alertsEnabled === 'boolean') {
+      settingsUpdate.alertsEnabled = remoteSettings.alertsEnabled;
+    }
+    if (Array.isArray(remoteSettings.acknowledgedAlerts)) {
+      settingsUpdate.acknowledgedAlerts = remoteSettings.acknowledgedAlerts.filter(k => typeof k === 'string');
+    }
+    if (Array.isArray(remoteSettings.notifiedAlerts)) {
+      settingsUpdate.notifiedAlerts = remoteSettings.notifiedAlerts.filter(k => typeof k === 'string');
+    }
+    if (isValidTheme(remoteSettings.themePreference)
+        && remoteSettings.themePreference !== useBudgetStore.getState().themePreference) {
+      // Remote preference wins — apply it and persist locally so the next
+      // boot (before hydration) resolves the same theme
+      settingsUpdate.themePreference = remoteSettings.themePreference;
+      setStoredTheme(remoteSettings.themePreference);
+      applyTheme(resolveTheme(remoteSettings.themePreference, prefersDarkNow()));
+    }
     useBudgetStore.setState(settingsUpdate);
   }
 
@@ -609,12 +745,18 @@ async function loadFromSupabase() {
     let localExpenses: Expense[] = [];
     let localIncome: Income[]    = [];
     let localCategories: Category[] = [];
+    let localRecurring: RecurringRule[] = [];
+    let localGoals: SavingsGoal[] = [];
     try { localExpenses   = local.expenses   ? JSON.parse(local.expenses)   : []; } catch { /* corrupted */ }
     try { localIncome     = local.income     ? JSON.parse(local.income)     : []; } catch { /* corrupted */ }
     try { localCategories = local.categories ? JSON.parse(local.categories) : []; } catch { /* corrupted */ }
+    try { localRecurring  = local.recurring  ? JSON.parse(local.recurring)  : []; } catch { /* corrupted */ }
+    try { localGoals      = local.goals      ? JSON.parse(local.goals)      : []; } catch { /* corrupted */ }
     if (!Array.isArray(localExpenses))   localExpenses   = [];
     if (!Array.isArray(localIncome))     localIncome     = [];
     if (!Array.isArray(localCategories)) localCategories = [];
+    if (!Array.isArray(localRecurring))  localRecurring  = [];
+    if (!Array.isArray(localGoals))      localGoals      = [];
 
     const mergeById = <T extends { id: string }>(remoteArr: T[], localArr: T[]): T[] => {
       const localById = new Map(localArr.map((x) => [x.id, x]));
@@ -627,6 +769,10 @@ async function loadFromSupabase() {
     remote.expenses   = mergeById(remote.expenses,   localExpenses);
     remote.income     = mergeById(remote.income,     localIncome);
     remote.categories = mergeById(remote.categories, localCategories);
+    // Rules use the dedicated merge — generatedThrough takes the max so a
+    // stale local bound can't resurrect occurrences deleted elsewhere
+    remote.recurring  = mergeRecurringRules(remote.recurring ?? [], localRecurring);
+    remote.goals      = mergeById(remote.goals ?? [], localGoals);
   }
 
   // Apply the financial-cycle mapping directly — migrateToFinancialCycle()
@@ -653,6 +799,9 @@ async function loadFromSupabase() {
     if (thisLoad !== loadVersion || useBudgetStore.getState().userId !== uid) return;
     await syncToSupabase(remote);
   }
+
+  // Materialise any recurring occurrences already due (hydration just finished)
+  useBudgetStore.getState().runRecurringGeneration();
 }
 
 /** Clear all pending sync/load timers and flags — used on logout and when
@@ -683,6 +832,15 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   currency: initCurrency,
   excludedCategoryIds: [],
   selectedCategoryIds: [], // deprecated alias — mirrors excludedCategoryIds
+  recurring: [],
+  goals: [],
+  // Alert settings — remote-backed only (no separate localStorage keys)
+  categoryBudgets: {},
+  alertThresholds: DEFAULT_ALERT_THRESHOLDS,
+  alertsEnabled: true,
+  acknowledgedAlerts: [],
+  notifiedAlerts: [],
+  themePreference: getStoredTheme(),
   financialCycleStart: initCycleStart,
   monthlyBudgets: typeof window !== 'undefined' ? (() => { try { const raw = localStorage.getItem('spendwise_monthly_budgets'); if (raw) return JSON.parse(raw); const legacy = parseFloat(localStorage.getItem('spendwise_monthly_budget') ?? '0'); return legacy > 0 ? { _default: legacy } : {}; } catch { return {}; } })() : {},
   budgetCategoryIds: typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('spendwise_budget_categories') ?? '[]'); } catch { return []; } })() : [],
@@ -701,6 +859,8 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
       localStorage.removeItem('budget_expenses');
       localStorage.removeItem('budget_income');
       localStorage.removeItem('budget_categories');
+      localStorage.removeItem('budget_recurring');
+      localStorage.removeItem('budget_goals');
     }
   },
 
@@ -709,7 +869,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   // kept — a re-login of the same user still has its offline copy.
   resetForLogout: () => {
     clearPendingSyncWork();
-    set({ userId: null, expenses: [], income: [], categories: defaultCategories, syncing: false, networkError: false });
+    set({ userId: null, expenses: [], income: [], categories: defaultCategories, recurring: [], goals: [], syncing: false, networkError: false });
   },
 
   setCurrency: (currency: string) => {
@@ -879,6 +1039,201 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
       newCategories.splice(toIndex, 0, removed);
       return { categories: newCategories };
     });
+    scheduleSyncToSupabase();
+  },
+
+  // Id-based reorder used by the Settings categories list (pure permutation)
+  moveCategory: (fromId: string, toId: string) => {
+    set((state) => ({ categories: moveById(state.categories, fromId, toId) }));
+    scheduleSyncToSupabase();
+  },
+
+  // ── Recurring rules ───────────────────────────────────────────────────────
+  // runRecurringGeneration materialises due occurrences (gated on
+  // remoteHydrated so pre-load mutation can't push half-initialised state).
+  // It schedules its own sync only when something actually changed; callers
+  // still scheduleSyncToSupabase() to persist the rule edit itself — the
+  // debounce consolidates both into one upsert.
+  addRecurringRule: (rule: RecurringRule) => {
+    set((state) => ({ recurring: [...state.recurring, rule] }));
+    get().runRecurringGeneration();
+    scheduleSyncToSupabase();
+  },
+
+  updateRecurringRule: (id: string, patch: Partial<RecurringRule>) => {
+    set((state) => ({
+      recurring: state.recurring.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    }));
+    get().runRecurringGeneration();
+    scheduleSyncToSupabase();
+  },
+
+  pauseRecurringRule: (id: string) => {
+    set((state) => ({
+      recurring: state.recurring.map((r) => (r.id === id ? { ...r, paused: true } : r)),
+    }));
+    scheduleSyncToSupabase();
+  },
+
+  resumeRecurringRule: (id: string) => {
+    const today = todayLocalISO();
+    set((state) => ({
+      // resumeRule fast-forwards generatedThrough to today → no backfill of
+      // occurrences skipped while the rule was paused
+      recurring: state.recurring.map((r) => (r.id === id ? resumeRule(r, today) : r)),
+    }));
+    get().runRecurringGeneration();
+    scheduleSyncToSupabase();
+  },
+
+  deleteRecurringRule: (id: string, deleteGenerated: boolean) => {
+    set((state) => ({
+      recurring: state.recurring.filter((r) => r.id !== id),
+      ...(deleteGenerated
+        ? {
+            expenses: state.expenses.filter((e) => e.recurringId !== id),
+            income: state.income.filter((i) => i.recurringId !== id),
+          }
+        : {}),
+    }));
+    scheduleSyncToSupabase();
+  },
+
+  // Turn an existing transaction into a rule anchored on its date. The txn
+  // keeps its own id and gains recurringId; generatedThrough = txn.date marks
+  // it as occurrence #1 so the generator never duplicates it.
+  convertToRecurring: (txnId: string, type: 'expense' | 'income', frequency: RecurrenceFrequency, endDate?: string) => {
+    const state = get();
+    const txn = type === 'expense'
+      ? state.expenses.find((e) => e.id === txnId)
+      : state.income.find((i) => i.id === txnId);
+    if (!txn) return;
+    const rule: RecurringRule = {
+      id: generateId('rec'),
+      type,
+      amount: txn.amount,
+      category: txn.category ?? '',
+      description: type === 'expense' ? (txn as Expense).description : (txn as Income).source,
+      city: type === 'expense' ? (txn as Expense).city : undefined,
+      frequency,
+      startDate: txn.date,
+      endDate,
+      paused: false,
+      generatedThrough: txn.date,
+      createdAt: new Date().toISOString(),
+      tax: txn.tax,
+    };
+    set((s) => ({
+      recurring: [...s.recurring, rule],
+      ...(type === 'expense'
+        ? { expenses: s.expenses.map((e) => (e.id === txnId ? { ...e, recurringId: rule.id } : e)) }
+        : { income: s.income.map((i) => (i.id === txnId ? { ...i, recurringId: rule.id } : i)) }),
+    }));
+    get().runRecurringGeneration();
+    scheduleSyncToSupabase();
+  },
+
+  runRecurringGeneration: () => {
+    // Never run before remote hydration — generated rows would be pushed
+    // against an unmerged store and could duplicate or clobber remote data.
+    if (!remoteHydrated) return;
+    const state = get();
+    const existingIds = new Set([
+      ...state.expenses.map((e) => e.id),
+      ...state.income.map((i) => i.id),
+    ]);
+    const due = generateDue(state.recurring, existingIds, todayLocalISO());
+    const rulesChanged = due.rules.some((r, i) => r !== state.recurring[i]);
+    if (due.expenses.length === 0 && due.income.length === 0 && !rulesChanged) return;
+    const startDay = state.financialCycleStart;
+    set({
+      expenses: due.expenses.length
+        ? [...state.expenses, ...due.expenses.map((e) => ({ ...e, ...getFinancialPeriod(e.date, startDay) }))]
+        : state.expenses,
+      income: due.income.length
+        ? [...state.income, ...due.income.map((i) => ({ ...i, ...getFinancialPeriod(i.date, startDay) }))]
+        : state.income,
+      recurring: due.rules,
+    });
+    scheduleSyncToSupabase();
+  },
+
+  // ── Savings goals ────────────────────────────────────────────────────────
+  addGoal: (goal: SavingsGoal) => {
+    set((state) => ({ goals: [...state.goals, goal] }));
+    scheduleSyncToSupabase();
+  },
+
+  updateGoal: (id: string, patch: Partial<SavingsGoal>) => {
+    set((state) => ({
+      goals: state.goals.map((g) => (g.id === id ? { ...g, ...patch, updatedAt: new Date().toISOString() } : g)),
+    }));
+    scheduleSyncToSupabase();
+  },
+
+  // Contributions can be negative (withdrawals); savedAmount never dips below 0
+  contributeToGoal: (id: string, amount: number) => {
+    if (!Number.isFinite(amount) || amount === 0) return;
+    set((state) => ({
+      goals: state.goals.map((g) => (g.id === id
+        ? { ...g, savedAmount: Math.max(0, Math.round((g.savedAmount + amount) * 100) / 100), updatedAt: new Date().toISOString() }
+        : g)),
+    }));
+    scheduleSyncToSupabase();
+  },
+
+  archiveGoal: (id: string, archived: boolean) => {
+    get().updateGoal(id, { archived });
+  },
+
+  deleteGoal: (id: string) => {
+    set((state) => ({ goals: state.goals.filter((g) => g.id !== id) }));
+    scheduleSyncToSupabase();
+  },
+
+  // ── Budget alert settings ─────────────────────────────────────────────────
+  setCategoryBudget: (catId: string, amount: number) => {
+    const safe = Math.max(0, amount);
+    set((state) => {
+      const updated = { ...state.categoryBudgets };
+      if (safe === 0) delete updated[catId]; // zero = remove the budget
+      else updated[catId] = safe;
+      return { categoryBudgets: updated };
+    });
+    scheduleSyncToSupabase();
+  },
+
+  setAlertThresholds: (t: BudgetAlertThresholds) => {
+    if (validateThresholds(t)) return; // invalid → reject silently, UI shows the message
+    set({ alertThresholds: t });
+    scheduleSyncToSupabase();
+  },
+
+  setAlertsEnabled: (enabled: boolean) => {
+    set({ alertsEnabled: enabled });
+    scheduleSyncToSupabase();
+  },
+
+  acknowledgeAlert: (key: string) => {
+    set((state) => ({
+      acknowledgedAlerts: pruneKeys([...state.acknowledgedAlerts, key], alertKeepPeriods(state)),
+    }));
+    scheduleSyncToSupabase();
+  },
+
+  markAlertsNotified: (keys: string[]) => {
+    set((state) => ({
+      notifiedAlerts: pruneKeys([...state.notifiedAlerts, ...keys], alertKeepPeriods(state)),
+    }));
+    scheduleSyncToSupabase();
+  },
+
+  // Theme: stored locally (instant on next boot) and synced via settings
+  setThemePreference: (p: ThemePreference) => {
+    if (!isValidTheme(p)) return;
+    set({ themePreference: p });
+    setStoredTheme(p);
+    applyTheme(resolveTheme(p, prefersDarkNow()));
     scheduleSyncToSupabase();
   },
 

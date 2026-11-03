@@ -221,9 +221,9 @@ export default function AnalyticsWorkspace() {
         {icon}
       </div>
       <div style={{ minWidth: 0 }}>
-        <p style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>{label}</p>
-        <p style={{ fontSize: 18, fontWeight: 800, color: '#111827', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{value}</p>
-        {sub && <p style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>{sub}</p>}
+        <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>{label}</p>
+        <p style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-900)', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{value}</p>
+        {sub && <p style={{ fontSize: 10, color: 'var(--text-400)', marginTop: 4 }}>{sub}</p>}
       </div>
     </div>
   );
@@ -253,21 +253,21 @@ export default function AnalyticsWorkspace() {
       {/* ── Summary Stats Row ──────────────────────────────────────────── */}
       <div className="stagger-fade" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
         {statCard(
-          <DollarSign size={16} color="#ef4444" />,
+          <DollarSign size={16} color="var(--danger-text)" />,
           'Total Spent',
           formatCurrencyShort(totalSpent, currency),
           `${txnCount} transactions · ${activeDays} active days`,
           '#ef4444',
         )}
         {statCard(
-          <Flame size={16} color="#f59e0b" />,
+          <Flame size={16} color="var(--warning-text)" />,
           'Daily Average',
           formatCurrency(avgDaily, currency),
           `over ${elapsedDays} elapsed days`,
           '#f59e0b',
         )}
         {statCard(
-          <Target size={16} color="#8b5cf6" />,
+          <Target size={16} color="var(--purple-text)" />,
           isCurrentPeriod ? 'Projected' : 'Final Total',
           formatCurrencyShort(projectedSpend, currency),
           isCurrentPeriod ? `${totalDays - elapsedDays} days remaining` : `${totalDays} day period`,
@@ -275,23 +275,23 @@ export default function AnalyticsWorkspace() {
         )}
         {statCard(
           momChange >= 0
-            ? <ArrowUpRight size={16} color="#ef4444" />
-            : <ArrowDownRight size={16} color="#10b981" />,
+            ? <ArrowUpRight size={16} color="var(--danger-text)" />
+            : <ArrowDownRight size={16} color="var(--success-text)" />,
           'vs Last Period',
           prevTotalSpent > 0 ? `${momChange >= 0 ? '+' : ''}${momChange.toFixed(1)}%` : '—',
           prevTotalSpent > 0
             ? `${formatCurrencyShort(prevTotalSpent, currency)} last period`
             : 'No previous data',
-          momChange >= 0 ? '#ef4444' : '#10b981',
+          momChange >= 0 ? 'var(--danger-text)' : 'var(--success-text)',
         )}
         {statCard(
-          <Zap size={16} color="#10b981" />,
+          <Zap size={16} color="var(--success-text)" />,
           'Net Balance',
           formatCurrencyShort(totalIncome - totalSpent, currency),
           totalIncome > 0
             ? `${Math.round(((totalIncome - totalSpent) / totalIncome) * 100)}% savings rate`
             : 'No income recorded',
-          totalIncome - totalSpent >= 0 ? '#10b981' : '#ef4444',
+          totalIncome - totalSpent >= 0 ? 'var(--success-text)' : 'var(--danger-text)',
         )}
       </div>
 
@@ -321,12 +321,12 @@ export default function AnalyticsWorkspace() {
       <div className="dark-card p-5" style={{ marginBottom: 16 }}>
         <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
           <div className="flex items-center gap-3">
-            <div style={{ width: 34, height: 34, borderRadius: 9, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <TrendingUp size={15} color="#10b981" />
+            <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--green-50)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <TrendingUp size={15} color="var(--success-text)" />
             </div>
             <div>
               <p className="card-header-label mb-0">Spending Pace</p>
-              <p className="text-xs" style={{ color: '#9ca3af' }}>
+              <p className="text-xs" style={{ color: 'var(--text-400)' }}>
                 Cumulative spend: current period vs previous
               </p>
             </div>
@@ -334,18 +334,18 @@ export default function AnalyticsWorkspace() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">
               <div style={{ width: 14, height: 3, borderRadius: 2, background: '#6366f1' }} />
-              <span style={{ fontSize: 10, color: '#9ca3af' }}>Current</span>
+              <span style={{ fontSize: 10, color: 'var(--text-400)' }}>Current</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div style={{ width: 14, height: 3, borderRadius: 2, background: '#d1d5db' }} />
-              <span style={{ fontSize: 10, color: '#9ca3af' }}>Previous</span>
+              <div style={{ width: 14, height: 3, borderRadius: 2, background: 'var(--bg-muted)' }} />
+              <span style={{ fontSize: 10, color: 'var(--text-400)' }}>Previous</span>
             </div>
           </div>
         </div>
 
         {totalSpent === 0 && prevTotalSpent === 0 ? (
           <div style={{ padding: '40px 0', textAlign: 'center' }}>
-            <p style={{ fontSize: 12, color: '#9ca3af' }}>No spending data to compare</p>
+            <p style={{ fontSize: 12, color: 'var(--text-400)' }}>No spending data to compare</p>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={200}>
@@ -356,15 +356,15 @@ export default function AnalyticsWorkspace() {
                   <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default)" vertical={false} />
               <XAxis
                 dataKey="day"
-                tick={{ fontSize: 10, fill: '#9ca3af' }}
+                tick={{ fontSize: 10, fill: 'var(--text-400)' }}
                 tickLine={false} axisLine={false}
                 tickFormatter={(v: number) => v % 5 === 0 || v === 1 ? `Day ${v}` : ''}
               />
               <YAxis
-                tick={{ fontSize: 10, fill: '#9ca3af' }}
+                tick={{ fontSize: 10, fill: 'var(--text-400)' }}
                 tickLine={false} axisLine={false} width={50}
                 tickFormatter={(v: number) => {
                   if (v === 0) return '';
@@ -378,16 +378,16 @@ export default function AnalyticsWorkspace() {
                   if (!active || !payload?.length) return null;
                   const d = payload[0]?.payload;
                   return (
-                    <div style={{ background: '#fff', border: '1px solid #e8ecf0', borderRadius: 10, padding: '10px 14px', fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.08)', minWidth: 160 }}>
-                      <p style={{ fontWeight: 700, color: '#374151', marginBottom: 6 }}>Day {d?.day}</p>
-                      <p style={{ color: '#6366f1', marginBottom: 2 }}>Current: {formatCurrency(d?.current ?? 0, currency)}</p>
-                      <p style={{ color: '#9ca3af' }}>Previous: {formatCurrency(d?.previous ?? 0, currency)}</p>
+                    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 10, padding: '10px 14px', fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.08)', minWidth: 160 }}>
+                      <p style={{ fontWeight: 700, color: 'var(--text-700)', marginBottom: 6 }}>Day {d?.day}</p>
+                      <p style={{ color: 'var(--brand-text)', marginBottom: 2 }}>Current: {formatCurrency(d?.current ?? 0, currency)}</p>
+                      <p style={{ color: 'var(--text-400)' }}>Previous: {formatCurrency(d?.previous ?? 0, currency)}</p>
                     </div>
                   );
                 }}
               />
-              <Area type="monotone" dataKey="previous" stroke="#d1d5db" strokeWidth={1.5} strokeDasharray="4 3" fill="none" />
-              <Area type="monotone" dataKey="current" stroke="#6366f1" strokeWidth={2} fill="url(#gradCurr)" />
+              <Area type="monotone" dataKey="previous" stroke="var(--text-300)" strokeWidth={1.5} strokeDasharray="4 3" fill="none" />
+              <Area type="monotone" dataKey="current" stroke="var(--brand-500)" strokeWidth={2} fill="url(#gradCurr)" />
             </AreaChart>
           </ResponsiveContainer>
         )}
@@ -399,26 +399,26 @@ export default function AnalyticsWorkspace() {
         {/* Category Spending Bar Chart */}
         <div className="dark-card p-5">
           <div className="flex items-center gap-3 mb-4">
-            <div style={{ width: 34, height: 34, borderRadius: 9, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <BarChart2 size={15} color="#6366f1" />
+            <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--brand-50)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <BarChart2 size={15} color="var(--brand-text)" />
             </div>
             <div>
               <p className="card-header-label mb-0">Category Spending</p>
-              <p className="text-xs" style={{ color: '#9ca3af' }}>Top categories by amount this period</p>
+              <p className="text-xs" style={{ color: 'var(--text-400)' }}>Top categories by amount this period</p>
             </div>
           </div>
 
           {barData.length === 0 ? (
             <div style={{ padding: '48px 0', textAlign: 'center' }}>
               <p style={{ fontSize: 24, marginBottom: 6 }}>📊</p>
-              <p style={{ fontSize: 12, color: '#9ca3af' }}>No spending data</p>
+              <p style={{ fontSize: 12, color: 'var(--text-400)' }}>No spending data</p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={barData.length * 40 + 20}>
               <BarChart data={barData} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }} barGap={2}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default)" horizontal={false} />
                 <XAxis
-                  type="number" tick={{ fontSize: 10, fill: '#9ca3af' }}
+                  type="number" tick={{ fontSize: 10, fill: 'var(--text-400)' }}
                   tickLine={false} axisLine={false}
                   tickFormatter={(v: number) => {
                     if (v >= 100000) return `${sym}${(v / 100000).toFixed(0)}L`;
@@ -427,7 +427,7 @@ export default function AnalyticsWorkspace() {
                   }}
                 />
                 <YAxis
-                  type="category" dataKey="name" tick={{ fontSize: 11, fill: '#374151', fontWeight: 600 }}
+                  type="category" dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-700)', fontWeight: 600 }}
                   tickLine={false} axisLine={false} width={90}
                 />
                 <Tooltip
@@ -438,12 +438,12 @@ export default function AnalyticsWorkspace() {
                     const prevAmt = d.prev ?? 0;
                     const chg = prevAmt > 0 ? (((d.spent - prevAmt) / prevAmt) * 100).toFixed(0) : null;
                     return (
-                      <div style={{ background: '#fff', border: '1px solid #e8ecf0', borderRadius: 10, padding: '10px 14px', fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.08)', minWidth: 170 }}>
-                        <p style={{ fontWeight: 700, color: '#111827', marginBottom: 4 }}>{d.icon} {d.fullName}</p>
-                        <p style={{ color: '#6366f1' }}>Spent: {formatCurrency(d.spent, currency)}</p>
-                        <p style={{ color: '#9ca3af' }}>{pct}% of total</p>
+                      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 10, padding: '10px 14px', fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.08)', minWidth: 170 }}>
+                        <p style={{ fontWeight: 700, color: 'var(--text-900)', marginBottom: 4 }}>{d.icon} {d.fullName}</p>
+                        <p style={{ color: 'var(--brand-text)' }}>Spent: {formatCurrency(d.spent, currency)}</p>
+                        <p style={{ color: 'var(--text-400)' }}>{pct}% of total</p>
                         {chg !== null && (
-                          <p style={{ color: parseFloat(chg) > 0 ? '#ef4444' : '#10b981', marginTop: 2, fontWeight: 600 }}>
+                          <p style={{ color: parseFloat(chg) > 0 ? 'var(--danger-text)' : 'var(--success-text)', marginTop: 2, fontWeight: 600 }}>
                             {parseFloat(chg) > 0 ? '+' : ''}{chg}% vs last period
                           </p>
                         )}
@@ -464,19 +464,19 @@ export default function AnalyticsWorkspace() {
         {/* Spending Distribution Donut */}
         <div className="dark-card p-5">
           <div className="flex items-center gap-3 mb-4">
-            <div style={{ width: 34, height: 34, borderRadius: 9, background: '#fdf2f8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Target size={15} color="#ec4899" />
+            <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--red-50)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Target size={15} color="var(--purple-text)" />
             </div>
             <div>
               <p className="card-header-label mb-0">Spending Distribution</p>
-              <p className="text-xs" style={{ color: '#9ca3af' }}>Proportional breakdown by category</p>
+              <p className="text-xs" style={{ color: 'var(--text-400)' }}>Proportional breakdown by category</p>
             </div>
           </div>
 
           {pieData.length === 0 ? (
             <div style={{ padding: '48px 0', textAlign: 'center' }}>
               <p style={{ fontSize: 24, marginBottom: 6 }}>📊</p>
-              <p style={{ fontSize: 12, color: '#9ca3af' }}>No spending data</p>
+              <p style={{ fontSize: 12, color: 'var(--text-400)' }}>No spending data</p>
             </div>
           ) : (
             <>
@@ -490,13 +490,13 @@ export default function AnalyticsWorkspace() {
                       formatter={(value: number, name: string) => [
                         `${formatCurrency(value, currency)} (${totalSpent > 0 ? ((value / totalSpent) * 100).toFixed(1) : '0.0'}%)`, name
                       ]}
-                      contentStyle={{ background: '#fff', border: '1px solid #e8ecf0', borderRadius: 10, fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
+                      contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 10, fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
                 <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total</p>
-                  <p style={{ fontSize: 18, fontWeight: 800, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>{formatCurrencyShort(totalSpent, currency)}</p>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total</p>
+                  <p style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-900)', fontVariantNumeric: 'tabular-nums' }}>{formatCurrencyShort(totalSpent, currency)}</p>
                 </div>
               </div>
 
@@ -507,12 +507,12 @@ export default function AnalyticsWorkspace() {
                   return (
                     <div key={item.id} className="flex items-center gap-3">
                       <span style={{ fontSize: 14, width: 20, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: '#374151', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
-                      <div style={{ width: 50, height: 5, borderRadius: 100, background: '#f3f4f6', flexShrink: 0 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-700)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+                      <div style={{ width: 50, height: 5, borderRadius: 100, background: 'var(--bg-muted)', flexShrink: 0 }}>
                         <div style={{ height: '100%', borderRadius: 100, background: item.color, width: `${Math.min(pct, 100)}%` }} />
                       </div>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', width: 30, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{pct.toFixed(0)}%</span>
-                      <span style={{ fontSize: 10, color: '#9ca3af', width: 55, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{formatCurrencyShort(item.value, currency)}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-500)', width: 30, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{pct.toFixed(0)}%</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-400)', width: 55, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{formatCurrencyShort(item.value, currency)}</span>
                     </div>
                   );
                 })}
@@ -528,13 +528,13 @@ export default function AnalyticsWorkspace() {
         {/* Day-of-Week Patterns */}
         <div className="dark-card p-5">
           <div className="flex items-center gap-3 mb-4">
-            <div style={{ width: 34, height: 34, borderRadius: 9, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Calendar size={15} color="#3b82f6" />
+            <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--blue-50)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Calendar size={15} color="var(--info-text)" />
             </div>
             <div>
               <p className="card-header-label mb-0">Day-of-Week Patterns</p>
-              <p className="text-xs" style={{ color: '#9ca3af' }}>
-                Peak: <span style={{ fontWeight: 700, color: '#374151' }}>{peakDow.day}</span>
+              <p className="text-xs" style={{ color: 'var(--text-400)' }}>
+                Peak: <span style={{ fontWeight: 700, color: 'var(--text-700)' }}>{peakDow.day}</span>
                 {peakDow.total > 0 && <> ({formatCurrencyShort(peakDow.total, currency)})</>}
               </p>
             </div>
@@ -545,17 +545,17 @@ export default function AnalyticsWorkspace() {
               <div key={d.day} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{
                   fontSize: 11, fontWeight: 700, width: 30, flexShrink: 0,
-                  color: d.day === peakDow.day && d.total > 0 ? DOW_COLORS[i] : '#9ca3af',
+                  color: d.day === peakDow.day && d.total > 0 ? DOW_COLORS[i] : 'var(--text-400)',
                 }}>{d.day}</span>
-                <div style={{ flex: 1, height: 8, borderRadius: 100, background: '#f3f4f6', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ flex: 1, height: 8, borderRadius: 100, background: 'var(--bg-muted)', position: 'relative', overflow: 'hidden' }}>
                   <div style={{
                     height: '100%', borderRadius: 100,
-                    background: d.day === peakDow.day && d.total > 0 ? DOW_COLORS[i] : '#c7d2fe',
+                    background: d.day === peakDow.day && d.total > 0 ? DOW_COLORS[i] : 'var(--brand-200)',
                     width: `${d.pct}%`,
                     transition: 'width 0.4s ease',
                   }} />
                 </div>
-                <span style={{ fontSize: 10, fontWeight: 600, color: '#6b7280', width: 52, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-500)', width: 52, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
                   {d.total > 0 ? formatCurrencyShort(d.total, currency) : '—'}
                 </span>
               </div>
@@ -566,18 +566,18 @@ export default function AnalyticsWorkspace() {
         {/* Top Expenses */}
         <div className="dark-card p-5">
           <div className="flex items-center gap-3 mb-4">
-            <div style={{ width: 34, height: 34, borderRadius: 9, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Flame size={15} color="#ef4444" />
+            <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--red-50)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Flame size={15} color="var(--danger-text)" />
             </div>
             <div>
               <p className="card-header-label mb-0">Top Expenses</p>
-              <p className="text-xs" style={{ color: '#9ca3af' }}>Biggest transactions this period</p>
+              <p className="text-xs" style={{ color: 'var(--text-400)' }}>Biggest transactions this period</p>
             </div>
           </div>
 
           {topExpenses.length === 0 ? (
             <div style={{ padding: '32px 0', textAlign: 'center' }}>
-              <p style={{ fontSize: 12, color: '#9ca3af' }}>No transactions yet</p>
+              <p style={{ fontSize: 12, color: 'var(--text-400)' }}>No transactions yet</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -587,30 +587,30 @@ export default function AnalyticsWorkspace() {
                   <div key={e.id} style={{
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '8px 10px', borderRadius: 10,
-                    background: i === 0 ? '#fef2f2' : 'transparent',
+                    background: i === 0 ? 'var(--red-50)' : 'transparent',
                   }}>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: i === 0 ? '#ef4444' : '#d1d5db', width: 18, textAlign: 'center', flexShrink: 0 }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: i === 0 ? 'var(--danger-text)' : 'var(--text-300)', width: 18, textAlign: 'center', flexShrink: 0 }}>
                       {i + 1}
                     </span>
                     <div style={{
                       width: 28, height: 28, borderRadius: 7,
-                      background: cat ? `${cat.color}1a` : '#f3f4f6',
+                      background: cat ? `${cat.color}1a` : 'var(--bg-muted)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 13, flexShrink: 0,
                     }}>
                       {cat?.icon ?? '📦'}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 11, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {e.description || 'Expense'}
                       </p>
-                      <p style={{ fontSize: 9, color: '#9ca3af', marginTop: 1 }}>
+                      <p style={{ fontSize: 9, color: 'var(--text-400)', marginTop: 1 }}>
                         {new Date(e.date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                         {' · '}{cat?.name ?? 'Other'}
                       </p>
                     </div>
                     <span style={{
-                      fontSize: 12, fontWeight: 700, color: i === 0 ? '#ef4444' : '#374151',
+                      fontSize: 12, fontWeight: 700, color: i === 0 ? 'var(--danger-text)' : 'var(--text-700)',
                       fontVariantNumeric: 'tabular-nums', flexShrink: 0,
                     }}>
                       {formatCurrency(e.amount, currency)}
@@ -625,18 +625,18 @@ export default function AnalyticsWorkspace() {
         {/* Category Momentum */}
         <div className="dark-card p-5">
           <div className="flex items-center gap-3 mb-4">
-            <div style={{ width: 34, height: 34, borderRadius: 9, background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Clock size={15} color="#8b5cf6" />
+            <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--purple-50)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Clock size={15} color="var(--purple-text)" />
             </div>
             <div>
               <p className="card-header-label mb-0">Category Momentum</p>
-              <p className="text-xs" style={{ color: '#9ca3af' }}>Change vs previous period</p>
+              <p className="text-xs" style={{ color: 'var(--text-400)' }}>Change vs previous period</p>
             </div>
           </div>
 
           {categoryMomentum.length === 0 ? (
             <div style={{ padding: '32px 0', textAlign: 'center' }}>
-              <p style={{ fontSize: 12, color: '#9ca3af' }}>No data to compare</p>
+              <p style={{ fontSize: 12, color: 'var(--text-400)' }}>No data to compare</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -645,14 +645,14 @@ export default function AnalyticsWorkspace() {
                 const isDown = c.change < 0;
                 const isNew = c.prev === 0 && c.curr > 0;
                 const Icon = isUp ? TrendingUp : isDown ? TrendingDown : Minus;
-                const color = isNew ? '#3b82f6' : isUp ? '#ef4444' : isDown ? '#10b981' : '#9ca3af';
+                const color = isNew ? 'var(--info-text)' : isUp ? 'var(--danger-text)' : isDown ? 'var(--success-text)' : 'var(--text-400)';
 
                 return (
                   <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 14, width: 20, textAlign: 'center', flexShrink: 0 }}>{c.icon}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 11, fontWeight: 600, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</p>
-                      <p style={{ fontSize: 9, color: '#9ca3af', fontVariantNumeric: 'tabular-nums' }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-700)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</p>
+                      <p style={{ fontSize: 9, color: 'var(--text-400)', fontVariantNumeric: 'tabular-nums' }}>
                         {formatCurrencyShort(c.curr, currency)}
                         {c.prev > 0 && <> from {formatCurrencyShort(c.prev, currency)}</>}
                       </p>

@@ -2,13 +2,15 @@
 
 import { useState } from 'react';
 import { useBudgetStore, generateId } from '@/store/budgetStore';
-import { Expense } from '@/types';
+import { Expense, RecurrenceFrequency, RecurringRule, TaxInfo } from '@/types';
 import CategorySelect from '@/components/CategorySelect';
 import DateInput from '@/components/DateInput';
+import TaxFields from '@/components/TaxFields';
 import { todayLocalISO } from '@/utils/financialCycle';
+import { ChevronDown } from 'lucide-react';
 
 export default function ExpenseForm() {
-  const { addExpense, categories, selectedCity } = useBudgetStore();
+  const { addExpense, addRecurringRule, categories, selectedCity } = useBudgetStore();
   const effectiveCity = selectedCity === 'Both' ? 'Bangalore' : selectedCity;
   const [formCity, setFormCity] = useState(effectiveCity);
 
@@ -22,31 +24,78 @@ export default function ExpenseForm() {
     date:        todayLocalISO(),
   });
 
+  // Collapsible "More details" — optional fields that don't clutter the main form
+  const [showMore, setShowMore] = useState(false);
+  const [payee, setPayee] = useState('');
+  const [notes, setNotes] = useState('');
+  const [repeat, setRepeat] = useState(false);
+  const [frequency, setFrequency] = useState<RecurrenceFrequency>('monthly');
+  const [hasEnd, setHasEnd] = useState(false);
+  const [endDate, setEndDate] = useState(todayLocalISO());
+  const [tax, setTax] = useState<TaxInfo | undefined>(undefined);
+  const [error, setError] = useState('');
+
+  const resetMore = () => {
+    setPayee(''); setNotes(''); setRepeat(false);
+    setFrequency('monthly'); setHasEnd(false); setTax(undefined); setError('');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const parsedAmount = parseFloat(formData.amount);
-    if (!formData.category || !formData.description || !formData.amount || isNaN(parsedAmount) || parsedAmount <= 0) {
-      alert('Please fill in all fields with valid values');
+    if (!formData.category || !formData.description.trim() || !formData.amount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      setError('Please fill in category, description and a positive amount.');
       return;
     }
-    const [yearStr, monthStr] = formData.date.split('-');
-    const expense: Expense = {
-      id:          generateId('exp'),
-      category:    formData.category,
-      description: formData.description,
-      amount:      parsedAmount,
-      date:        formData.date,
-      month:       monthStr,
-      year:        parseInt(yearStr, 10),
-      city:        selectedCity === 'Both' ? formCity : selectedCity,
-    };
-    addExpense(expense);
+    if (repeat && hasEnd && endDate < formData.date) {
+      setError('Repeat end date must be on or after the transaction date.');
+      return;
+    }
+    setError('');
+
+    if (repeat) {
+      // Create the rule — runRecurringGeneration (inside addRecurringRule)
+      // generates the first occurrence exactly once; do NOT also addExpense.
+      const rule: RecurringRule = {
+        id: generateId('rec'),
+        type: 'expense',
+        amount: parsedAmount,
+        category: formData.category,
+        description: formData.description.trim(),
+        city: selectedCity === 'Both' ? formCity : selectedCity,
+        frequency,
+        startDate: formData.date,
+        endDate: hasEnd ? endDate : undefined,
+        paused: false,
+        createdAt: new Date().toISOString(),
+        tax,
+      };
+      addRecurringRule(rule);
+    } else {
+      const [yearStr, monthStr] = formData.date.split('-');
+      const expense: Expense = {
+        id:          generateId('exp'),
+        category:    formData.category,
+        description: formData.description.trim(),
+        amount:      parsedAmount,
+        date:        formData.date,
+        month:       monthStr,
+        year:        parseInt(yearStr, 10),
+        city:        selectedCity === 'Both' ? formCity : selectedCity,
+        payee:       payee.trim() || undefined,
+        notes:       notes.trim() || undefined,
+        tax,
+      };
+      addExpense(expense);
+    }
+
     setFormData({
       category:    expenseCategories[0]?.id ?? '',
       description: '',
       amount:      '',
       date:        todayLocalISO(),
     });
+    resetMore();
   };
 
   const labelStyle: React.CSSProperties = {
@@ -73,7 +122,7 @@ export default function ExpenseForm() {
   };
 
   const focusInput = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.target.style.background = '#fff';
+    e.target.style.background = 'var(--bg-surface)';
     e.target.style.borderColor = 'var(--brand-500)';
     e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)';
   };
@@ -129,7 +178,7 @@ export default function ExpenseForm() {
       </div>
 
       {/* Amount + Date */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
         <div>
           <label style={labelStyle}>Amount</label>
           <input
@@ -167,6 +216,106 @@ export default function ExpenseForm() {
         />
       </div>
 
+      {/* ── More details (payee, notes, repeat, tax) ── */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowMore(v => !v)}
+          aria-expanded={showMore}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+            fontSize: '0.78rem', fontWeight: 700, color: 'var(--brand-600)',
+            fontFamily: 'inherit',
+          }}
+        >
+          <ChevronDown size={13} style={{ transform: showMore ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+          {showMore ? 'Fewer details' : 'More details'}
+        </button>
+
+        {showMore && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 14, paddingTop: 14, borderTop: '1px dashed var(--border-default)' }}>
+            {/* Payee */}
+            <div>
+              <label style={labelStyle}>Payee <span style={{ fontWeight: 400, color: 'var(--text-400)', textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
+              <input
+                type="text"
+                value={payee}
+                onChange={e => setPayee(e.target.value)}
+                placeholder="e.g., DMart, Landlord, Netflix"
+                style={inputStyle}
+                onFocus={focusInput}
+                onBlur={blurInput}
+              />
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label style={labelStyle}>Notes <span style={{ fontWeight: 400, color: 'var(--text-400)', textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
+              <input
+                type="text"
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Any extra detail…"
+                style={inputStyle}
+                onFocus={focusInput}
+                onBlur={blurInput}
+              />
+            </div>
+
+            {/* Repeat */}
+            <div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={repeat}
+                  onChange={e => setRepeat(e.target.checked)}
+                  style={{ width: 15, height: 15, accentColor: 'var(--brand-600)', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-700)' }}>
+                  Repeat this expense
+                </span>
+              </label>
+              {repeat && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginTop: 10 }}>
+                  <div>
+                    <label style={labelStyle} htmlFor="exp-freq">Repeats</label>
+                    <select
+                      id="exp-freq"
+                      value={frequency}
+                      onChange={e => setFrequency(e.target.value as RecurrenceFrequency)}
+                      style={inputStyle}
+                    >
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <input type="checkbox" checked={hasEnd} onChange={e => setHasEnd(e.target.checked)} style={{ accentColor: 'var(--brand-600)' }} />
+                      Ends on
+                    </label>
+                    {hasEnd && <DateInput value={endDate} onChange={setEndDate} style={inputStyle} />}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Tax */}
+            <TaxFields value={tax} onChange={setTax} defaultDate={formData.date} />
+          </div>
+        )}
+      </div>
+
+      {/* Inline validation message */}
+      {error && (
+        <div role="alert" style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--red-500)', marginTop: -4 }}>
+          {error}
+        </div>
+      )}
+
       <button
         type="submit"
         style={{
@@ -193,7 +342,7 @@ export default function ExpenseForm() {
           (e.currentTarget.style.transform = 'none');
         }}
       >
-        Add Expense
+        {repeat ? 'Add recurring expense' : 'Add Expense'}
       </button>
     </form>
   );

@@ -37,7 +37,7 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ConfidenceDot({ confidence }: { confidence: number }) {
-  const color = confidence >= 90 ? '#16a34a' : confidence >= 75 ? '#d97706' : '#6b7280';
+  const color = confidence >= 90 ? 'var(--success-text)' : confidence >= 75 ? 'var(--warning-text)' : 'var(--text-500)';
   return (
     <span title={`${confidence}% confidence`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.625rem', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
       <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, display: 'inline-block' }} />
@@ -47,7 +47,7 @@ function ConfidenceDot({ confidence }: { confidence: number }) {
 }
 
 function MetricPill({ metric, direction }: { metric: string; direction?: 'up' | 'down' | 'neutral' }) {
-  const color = direction === 'up' ? '#ef4444' : direction === 'down' ? '#16a34a' : '#6366f1';
+  const color = direction === 'up' ? 'var(--danger-text)' : direction === 'down' ? 'var(--success-text)' : 'var(--brand-text)';
   const Icon = direction === 'up' ? ArrowUpRight : direction === 'down' ? ArrowDownRight : Minus;
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 8px', borderRadius: 99, background: `${color}14`, color, fontSize: '0.75rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
@@ -58,11 +58,11 @@ function MetricPill({ metric, direction }: { metric: string; direction?: 'up' | 
 }
 
 const SEVERITY_CFG: Record<InsightSeverity, { border: string; iconBg: string; iconColor: string; bg: string; label: string }> = {
-  critical:    { bg: '#fef2f2', border: '#fecaca', iconBg: '#fee2e2', iconColor: '#dc2626', label: 'Critical' },
-  warning:     { bg: '#fffbeb', border: '#fde68a', iconBg: '#fef3c7', iconColor: '#d97706', label: 'Warning' },
-  positive:    { bg: '#f0fdf4', border: '#bbf7d0', iconBg: '#dcfce7', iconColor: '#16a34a', label: 'Positive' },
-  info:        { bg: '#eff6ff', border: '#bfdbfe', iconBg: '#dbeafe', iconColor: '#2563eb', label: 'Info' },
-  neutral:     { bg: '#f8fafc', border: '#e2e8f0', iconBg: '#f1f5f9', iconColor: '#64748b', label: 'Neutral' },
+  critical:    { bg: 'var(--red-50)', border: 'var(--red-200)', iconBg: 'var(--red-100)', iconColor: 'var(--danger-text)', label: 'Critical' },
+  warning:     { bg: 'var(--amber-50)', border: 'var(--amber-200)', iconBg: 'var(--amber-100)', iconColor: 'var(--warning-text)', label: 'Warning' },
+  positive:    { bg: 'var(--green-50)', border: 'var(--green-200)', iconBg: 'var(--green-100)', iconColor: 'var(--success-text)', label: 'Positive' },
+  info:        { bg: 'var(--blue-50)', border: 'var(--blue-200)', iconBg: 'var(--blue-100)', iconColor: 'var(--info-text)', label: 'Info' },
+  neutral:     { bg: 'var(--bg-subtle)', border: 'var(--border-default)', iconBg: 'var(--bg-muted)', iconColor: 'var(--text-500)', label: 'Neutral' },
 };
 
 const SEVERITY_ICON: Record<InsightSeverity, React.ElementType> = {
@@ -100,10 +100,10 @@ function InsightCardFull({ card, onOpenModal }: { card: AIInsightCard; onOpenMod
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-            <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0f172a' }}>{card.title}</span>
+            <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-900)' }}>{card.title}</span>
             {card.metric && <MetricPill metric={card.metric} direction={card.metricDirection} />}
           </div>
-          <p style={{ fontSize: '0.8125rem', color: '#475569', lineHeight: 1.5, margin: 0 }}>{card.summary}</p>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-600)', lineHeight: 1.5, margin: 0 }}>{card.summary}</p>
         </div>
         <span style={{ flexShrink: 0 }}><ConfidenceDot confidence={card.confidence} /></span>
       </div>
@@ -124,6 +124,7 @@ function InsightModal({ card, onClose }: { card: AIInsightCard; onClose: () => v
 
   return (
     <div
+      className="sw-overlay"
       style={{
         position: 'fixed', inset: 0, zIndex: 10000,
         background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)',
@@ -133,15 +134,15 @@ function InsightModal({ card, onClose }: { card: AIInsightCard; onClose: () => v
       }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{
-        background: '#fff', borderRadius: 20, maxWidth: 520, width: '100%',
+      <div className="sw-modal-box" style={{
+        background: 'var(--bg-surface)', borderRadius: 20, maxWidth: 520, width: '100%',
         boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
         overflow: 'hidden',
         animation: 'slideUp 0.2s ease',
       }}>
         {/* Modal header */}
         <div style={{
-          background: `linear-gradient(135deg, ${cfg.bg} 0%, #fff 100%)`,
+          background: `linear-gradient(135deg, ${cfg.bg} 0%, var(--bg-surface) 100%)`,
           padding: '24px 28px 20px',
           borderBottom: `1px solid ${cfg.border}`,
         }}>
@@ -156,7 +157,7 @@ function InsightModal({ card, onClose }: { card: AIInsightCard; onClose: () => v
               <Icon size={20} />
             </div>
             <div style={{ flex: 1 }}>
-              <h3 style={{ fontSize: '1.0625rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{card.title}</h3>
+              <h3 style={{ fontSize: '1.0625rem', fontWeight: 800, color: 'var(--text-900)', margin: 0 }}>{card.title}</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                 <span style={{
                   fontSize: '0.625rem', fontWeight: 700, color: cfg.iconColor,
@@ -172,10 +173,10 @@ function InsightModal({ card, onClose }: { card: AIInsightCard; onClose: () => v
             <button
               onClick={onClose}
               style={{
-                width: 32, height: 32, borderRadius: 8, background: '#f8fafc',
-                border: '1px solid #e2e8f0', cursor: 'pointer',
+                width: 32, height: 32, borderRadius: 8, background: 'var(--bg-subtle)',
+                border: '1px solid var(--border-default)', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#94a3b8', flexShrink: 0,
+                color: 'var(--text-400)', flexShrink: 0,
               }}
             >
               <X size={14} />
@@ -186,18 +187,18 @@ function InsightModal({ card, onClose }: { card: AIInsightCard; onClose: () => v
         {/* Modal body */}
         <div style={{ padding: '24px 28px' }}>
           <div style={{ marginBottom: 16 }}>
-            <p style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Summary</p>
-            <p style={{ fontSize: '0.9375rem', color: '#334155', lineHeight: 1.65 }}>{card.summary}</p>
+            <p style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Summary</p>
+            <p style={{ fontSize: '0.9375rem', color: 'var(--text-700)', lineHeight: 1.65 }}>{card.summary}</p>
           </div>
 
           {card.detail && (
             <div style={{
               padding: '16px 18px', borderRadius: 12,
-              background: 'linear-gradient(135deg, #f8fafc, #f0f4ff)',
-              border: '1px solid #e2e8f0',
+              background: 'linear-gradient(135deg, var(--bg-subtle), var(--brand-50))',
+              border: '1px solid var(--border-default)',
             }}>
-              <p style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Detailed Analysis</p>
-              <p style={{ fontSize: '0.875rem', color: '#334155', lineHeight: 1.65 }}>{card.detail}</p>
+              <p style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Detailed Analysis</p>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-700)', lineHeight: 1.65 }}>{card.detail}</p>
             </div>
           )}
 
@@ -356,7 +357,7 @@ export default function InsightsWorkspace() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {/* Scope toggle */}
-          <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1.5px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1.5px solid var(--border-default)' }}>
             {(['monthly', 'yearly'] as const).map(s => (
               <button
                 key={s}
@@ -364,8 +365,8 @@ export default function InsightsWorkspace() {
                 style={{
                   padding: '7px 16px', fontSize: '0.75rem', fontWeight: 700,
                   cursor: 'pointer', border: 'none', fontFamily: 'inherit',
-                  background: scope === s ? 'var(--brand-600)' : '#fff',
-                  color: scope === s ? '#fff' : '#64748b',
+                  background: scope === s ? 'var(--brand-600)' : 'var(--bg-surface)',
+                  color: scope === s ? '#fff' : 'var(--text-500)',
                   transition: 'all 0.15s',
                   textTransform: 'capitalize',
                 }}
@@ -380,15 +381,15 @@ export default function InsightsWorkspace() {
               <button
                 onClick={() => { const idx = availableYears.indexOf(yearlyYear); if (idx < availableYears.length - 1) setYearlyYear(availableYears[idx + 1]); }}
                 disabled={availableYears.indexOf(yearlyYear) >= availableYears.length - 1}
-                style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center' }}
+                style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-surface)', cursor: 'pointer', color: 'var(--text-500)', display: 'flex', alignItems: 'center' }}
               >
                 <ChevronLeft size={14} />
               </button>
-              <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#1e293b', minWidth: 44, textAlign: 'center' }}>{yearlyYear}</span>
+              <span style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-800)', minWidth: 44, textAlign: 'center' }}>{yearlyYear}</span>
               <button
                 onClick={() => { const idx = availableYears.indexOf(yearlyYear); if (idx > 0) setYearlyYear(availableYears[idx - 1]); }}
                 disabled={availableYears.indexOf(yearlyYear) <= 0}
-                style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center' }}
+                style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-surface)', cursor: 'pointer', color: 'var(--text-500)', display: 'flex', alignItems: 'center' }}
               >
                 <ChevronRight size={14} />
               </button>
@@ -412,7 +413,7 @@ export default function InsightsWorkspace() {
       {scope === 'monthly' && (<>
 
       {/* ── HERO KPI STRIP ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
         {/* Health Score — hero card */}
         <div
           onClick={() => setShowHealthDrilldown(v => !v)}
@@ -429,9 +430,9 @@ export default function InsightsWorkspace() {
               <span style={{ fontSize: '1.25rem', fontWeight: 900, color: healthScore.color, lineHeight: 1 }}>{healthScore.total}</span>
             </div>
             <div>
-              <div style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Health Score</div>
+              <div style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Health Score</div>
               <div style={{ fontSize: '0.875rem', fontWeight: 800, color: healthScore.color, marginTop: 2 }}>{healthScore.grade}</div>
-              <div style={{ fontSize: '0.6875rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
+              <div style={{ fontSize: '0.6875rem', color: 'var(--text-400)', display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
                 {showHealthDrilldown ? <ChevronUp size={10}/> : <ChevronDown size={10}/>} details
               </div>
             </div>
@@ -440,24 +441,24 @@ export default function InsightsWorkspace() {
 
         {/* KPI Cards */}
         {[
-          { label: 'Total Spent', value: `${sym}${Math.round(totalExpenses).toLocaleString('en-IN')}`, sub: `${periodExpenses.length} txns`, color: '#ef4444', Icon: TrendingUp },
-          { label: 'Income', value: totalIncome > 0 ? `${sym}${Math.round(totalIncome).toLocaleString('en-IN')}` : '—', sub: totalIncome > 0 ? 'this period' : 'not set', color: '#16a34a', Icon: ArrowUpRight },
-          { label: 'Savings Rate', value: totalIncome > 0 ? `${savingsRate}%` : '—', sub: savingsRate >= 20 ? 'Healthy' : savingsRate > 0 ? 'Below target' : '—', color: savingsRate >= 20 ? '#16a34a' : savingsRate > 0 ? '#d97706' : '#94a3b8', Icon: ShieldCheck },
-          { label: 'Daily Burn', value: `${sym}${Math.round(prediction.dailyBurnRate).toLocaleString('en-IN')}`, sub: `${prediction.daysRemaining}d remaining`, color: '#6366f1', Icon: Activity },
+          { label: 'Total Spent', value: `${sym}${Math.round(totalExpenses).toLocaleString('en-IN')}`, sub: `${periodExpenses.length} txns`, color: 'var(--danger-text)', Icon: TrendingUp },
+          { label: 'Income', value: totalIncome > 0 ? `${sym}${Math.round(totalIncome).toLocaleString('en-IN')}` : '—', sub: totalIncome > 0 ? 'this period' : 'not set', color: 'var(--success-text)', Icon: ArrowUpRight },
+          { label: 'Savings Rate', value: totalIncome > 0 ? `${savingsRate}%` : '—', sub: savingsRate >= 20 ? 'Healthy' : savingsRate > 0 ? 'Below target' : '—', color: savingsRate >= 20 ? 'var(--success-text)' : savingsRate > 0 ? 'var(--warning-text)' : 'var(--text-400)', Icon: ShieldCheck },
+          { label: 'Daily Burn', value: `${sym}${Math.round(prediction.dailyBurnRate).toLocaleString('en-IN')}`, sub: `${prediction.daysRemaining}d remaining`, color: 'var(--brand-text)', Icon: Activity },
         ].map(kpi => (
           <div key={kpi.label} style={{
             padding: '16px 18px', borderRadius: 16,
-            background: '#fff', border: '1.5px solid #e8ecf0',
+            background: 'var(--bg-surface)', border: '1.5px solid var(--border-default)',
             transition: 'all 0.2s ease',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{kpi.label}</span>
+              <span style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{kpi.label}</span>
               <div style={{ width: 26, height: 26, borderRadius: 7, background: `${kpi.color}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <kpi.Icon size={12} color={kpi.color} />
               </div>
             </div>
             <div style={{ fontSize: '1.125rem', fontWeight: 800, color: kpi.color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{kpi.value}</div>
-            <div style={{ fontSize: '0.6875rem', color: '#94a3b8', marginTop: 4 }}>{kpi.sub}</div>
+            <div style={{ fontSize: '0.6875rem', color: 'var(--text-400)', marginTop: 4 }}>{kpi.sub}</div>
           </div>
         ))}
       </div>
@@ -466,38 +467,38 @@ export default function InsightsWorkspace() {
       {showHealthDrilldown && (
         <div style={{
           marginBottom: 20, padding: '20px 24px', borderRadius: 16,
-          background: 'linear-gradient(135deg, #fafbff 0%, #f0f4ff 100%)',
-          border: '1.5px solid #e2e8f0',
+          background: 'linear-gradient(135deg, var(--bg-subtle) 0%, var(--brand-50) 100%)',
+          border: '1.5px solid var(--border-default)',
           animation: 'slideUp 0.2s ease',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
             <ShieldCheck size={16} color={healthScore.color} />
-            <span style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1e293b' }}>Health Score Breakdown</span>
-            <button onClick={() => setShowHealthDrilldown(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={14}/></button>
+            <span style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-800)' }}>Health Score Breakdown</span>
+            <button onClick={() => setShowHealthDrilldown(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-400)' }}><X size={14}/></button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
             {[
               { label: 'Savings',    score: healthScore.breakdown.savings,    max: 25, desc: 'Income saved this period' },
               { label: 'Discipline', score: healthScore.breakdown.discipline, max: 25, desc: 'Spending consistency' },
               { label: 'Stability',  score: healthScore.breakdown.volatility, max: 25, desc: 'Month-over-month variance' },
               { label: 'Recurring',  score: healthScore.breakdown.consistency, max: 25, desc: 'Predictable payments' },
             ].map(row => (
-              <div key={row.label} style={{ padding: '14px 16px', borderRadius: 12, background: '#fff', border: '1px solid #e8ecf0' }}>
+              <div key={row.label} style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--bg-surface)', border: '1px solid var(--border-default)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b' }}>{row.label}</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: 900, color: healthScore.color }}>{row.score}<span style={{ fontSize: '0.625rem', color: '#94a3b8', fontWeight: 600 }}>/{row.max}</span></span>
+                  <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-800)' }}>{row.label}</span>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 900, color: healthScore.color }}>{row.score}<span style={{ fontSize: '0.625rem', color: 'var(--text-400)', fontWeight: 600 }}>/{row.max}</span></span>
                 </div>
-                <div style={{ height: 6, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden', marginBottom: 6 }}>
+                <div style={{ height: 6, background: 'var(--bg-muted)', borderRadius: 99, overflow: 'hidden', marginBottom: 6 }}>
                   <div style={{ height: '100%', width: `${(row.score / row.max) * 100}%`, background: `linear-gradient(90deg, ${healthScore.color}, ${healthScore.color}aa)`, borderRadius: 99, transition: 'width 0.6s ease' }} />
                 </div>
-                <div style={{ fontSize: '0.6875rem', color: '#94a3b8' }}>{row.desc}</div>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>{row.desc}</div>
               </div>
             ))}
           </div>
           {healthScore.explanation.length > 0 && (
-            <div style={{ marginTop: 14, padding: '12px 16px', borderRadius: 10, background: '#fff', border: '1px solid #e8ecf0' }}>
+            <div style={{ marginTop: 14, padding: '12px 16px', borderRadius: 10, background: 'var(--bg-surface)', border: '1px solid var(--border-default)' }}>
               {healthScore.explanation.map((line, i) => (
-                <div key={i} style={{ fontSize: '0.8125rem', color: '#475569', lineHeight: 1.6, display: 'flex', gap: 8, padding: '2px 0' }}>
+                <div key={i} style={{ fontSize: '0.8125rem', color: 'var(--text-600)', lineHeight: 1.6, display: 'flex', gap: 8, padding: '2px 0' }}>
                   <span style={{ color: healthScore.color, flexShrink: 0, fontWeight: 700 }}>•</span>
                   <span>{line}</span>
                 </div>
@@ -513,15 +514,15 @@ export default function InsightsWorkspace() {
       <div className="ai-narrative-card" style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <div className="ai-icon-glow" style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0 }}><Brain size={13} /></div>
-          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b' }}>AI Financial Summary</span>
-          <span style={{ marginLeft: 'auto', fontSize: '0.625rem', color: '#16a34a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-800)' }}>AI Financial Summary</span>
+          <span style={{ marginLeft: 'auto', fontSize: '0.625rem', color: 'var(--success-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a', display: 'inline-block', animation: 'aiPulse 2s infinite' }} />
             Live
           </span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {narrativeLines.map((line, i) => (
-            <p key={i} style={{ fontSize: '0.875rem', color: i === 0 ? '#1e293b' : '#475569', lineHeight: 1.6, fontWeight: i === 0 ? 600 : 400 }}>
+            <p key={i} style={{ fontSize: '0.875rem', color: i === 0 ? 'var(--text-800)' : 'var(--text-600)', lineHeight: 1.6, fontWeight: i === 0 ? 600 : 400 }}>
               {line}
             </p>
           ))}
@@ -535,18 +536,18 @@ export default function InsightsWorkspace() {
         <div className="ai-chat-panel">
           <div className="ai-chat-header">
             <div className="ai-icon-glow" style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0 }}><MessageCircle size={12} /></div>
-            <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b' }}>AI Assistant</span>
-            <span style={{ fontSize: '0.6875rem', color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginLeft: 6 }}>
+            <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-800)' }}>AI Assistant</span>
+            <span style={{ fontSize: '0.6875rem', color: 'var(--success-text)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginLeft: 6 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a', display: 'inline-block', animation: 'aiPulse 2s infinite' }} />
               Online · Using real data
             </span>
-            <button onClick={() => setChatOpen(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}>
+            <button onClick={() => setChatOpen(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-400)', display: 'flex' }}>
               <X size={14} />
             </button>
           </div>
 
           {/* Suggested prompts */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '8px 14px', borderBottom: '1px solid #f1f5f9' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '8px 14px', borderBottom: '1px solid var(--bg-muted)' }}>
             {[
               'Where did I overspend?',
               'How can I save more?',
@@ -557,9 +558,9 @@ export default function InsightsWorkspace() {
               <button
                 key={prompt}
                 onClick={() => { setChatInput(prompt); }}
-                style={{ padding: '4px 10px', borderRadius: 99, fontSize: '0.6875rem', fontWeight: 600, cursor: 'pointer', background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', fontFamily: 'inherit', transition: 'all 0.15s', whiteSpace: 'nowrap' }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#eef2ff'; e.currentTarget.style.color = '#4f46e5'; e.currentTarget.style.borderColor = '#a5b4fc'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                style={{ padding: '4px 10px', borderRadius: 99, fontSize: '0.6875rem', fontWeight: 600, cursor: 'pointer', background: 'var(--bg-subtle)', color: 'var(--text-600)', border: '1px solid var(--border-default)', fontFamily: 'inherit', transition: 'all 0.15s', whiteSpace: 'nowrap' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--brand-50)'; e.currentTarget.style.color = 'var(--brand-text)'; e.currentTarget.style.borderColor = 'var(--brand-300)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-subtle)'; e.currentTarget.style.color = 'var(--text-600)'; e.currentTarget.style.borderColor = 'var(--border-default)'; }}
               >
                 {prompt}
               </button>
@@ -587,11 +588,11 @@ export default function InsightsWorkspace() {
                     maxWidth: '80%',
                     padding: '9px 13px',
                     borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '4px 14px 14px 14px',
-                    background: msg.role === 'user' ? 'var(--brand-600)' : '#f8fafc',
-                    color: msg.role === 'user' ? '#fff' : '#334155',
+                    background: msg.role === 'user' ? 'var(--brand-600)' : 'var(--bg-subtle)',
+                    color: msg.role === 'user' ? '#fff' : 'var(--text-700)',
                     fontSize: '0.8125rem',
                     lineHeight: 1.55,
-                    border: msg.role === 'assistant' ? '1px solid #e2e8f0' : 'none',
+                    border: msg.role === 'assistant' ? '1px solid var(--border-default)' : 'none',
                     whiteSpace: 'pre-line',
                   }}
                 >
@@ -666,24 +667,24 @@ export default function InsightsWorkspace() {
           {anomalies.length > 0 && (
             <div className="panel" style={{ marginTop: 16, padding: 0, overflow: 'hidden' }}>
               <div style={{ padding: '14px 18px 10px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <AlertTriangle size={14} style={{ color: '#d97706' }} />
-                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>Anomaly Detection</span>
+                <AlertTriangle size={14} style={{ color: 'var(--warning-text)' }} />
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-800)' }}>Anomaly Detection</span>
                 <span className="badge badge-amber" style={{ marginLeft: 'auto' }}>{anomalies.length} flagged</span>
               </div>
               {anomalies.map(a => (
-                <div key={a.expense.id} style={{ padding: '12px 18px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 8, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
+                <div key={a.expense.id} style={{ padding: '12px 18px', borderBottom: '1px solid var(--bg-muted)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--amber-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
                     {a.categoryIcon}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.expense.description}</div>
-                    <div style={{ fontSize: '0.6875rem', color: '#94a3b8', marginTop: 1 }}>{a.label}</div>
+                    <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-800)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.expense.description}</div>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-400)', marginTop: 1 }}>{a.label}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#ef4444', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--danger-text)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                       {sym}{a.expense.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                     </div>
-                    <div style={{ fontSize: '0.625rem', color: '#94a3b8', textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.625rem', color: 'var(--text-400)', textAlign: 'right' }}>
                       z={a.zscore.toFixed(1)}σ
                     </div>
                   </div>
@@ -696,22 +697,22 @@ export default function InsightsWorkspace() {
           {recurringItems.length > 0 && (
             <div className="panel" style={{ marginTop: 16, padding: 0, overflow: 'hidden' }}>
               <div style={{ padding: '14px 18px 10px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <RefreshCw size={13} style={{ color: '#6366f1' }} />
-                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>Recurring Payments Detected</span>
+                <RefreshCw size={13} style={{ color: 'var(--brand-text)' }} />
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-800)' }}>Recurring Payments Detected</span>
                 <span className="badge badge-blue" style={{ marginLeft: 'auto' }}>{recurringItems.length} found</span>
               </div>
               {recurringItems.map(item => (
-                <div key={item.desc} style={{ padding: '10px 18px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 8, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>🔁</div>
+                <div key={item.desc} style={{ padding: '10px 18px', borderBottom: '1px solid var(--bg-muted)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--brand-50)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>🔁</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e293b', textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.desc}</div>
-                    <div style={{ fontSize: '0.6875rem', color: '#94a3b8', marginTop: 1 }}>{item.count}× in history · last: {new Date(item.lastDate + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>
+                    <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-800)', textTransform: 'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.desc}</div>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-400)', marginTop: 1 }}>{item.count}× in history · last: {new Date(item.lastDate + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#ef4444', fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--danger-text)', fontVariantNumeric: 'tabular-nums' }}>
                       {sym}{item.lastAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                     </div>
-                    <div style={{ fontSize: '0.6875rem', color: '#94a3b8' }}>avg {sym}{Math.round(item.avgAmount).toLocaleString('en-IN')}</div>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>avg {sym}{Math.round(item.avgAmount).toLocaleString('en-IN')}</div>
                   </div>
                 </div>
               ))}
@@ -728,14 +729,14 @@ export default function InsightsWorkspace() {
           {/* 6-month bar chart */}
           <div className="panel" style={{ marginBottom: 16 }}>
             <div style={{ padding: '14px 18px 12px', borderBottom: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <BarChart2 size={14} style={{ color: '#6366f1' }} />
-              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>6-Period Spending vs Income</span>
+              <BarChart2 size={14} style={{ color: 'var(--brand-text)' }} />
+              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-800)' }}>6-Period Spending vs Income</span>
             </div>
             <div style={{ padding: '16px 18px 8px' }}>
               {/* Legend */}
               <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
-                {[{ label: 'Expenses', color: '#ef4444' }, { label: 'Income', color: '#16a34a' }].map(l => (
-                  <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.6875rem', fontWeight: 600, color: '#64748b' }}>
+                {[{ label: 'Expenses', color: 'var(--danger-text)' }, { label: 'Income', color: 'var(--success-text)' }].map(l => (
+                  <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-500)' }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: l.color, display: 'inline-block' }} />
                     {l.label}
                   </div>
@@ -760,9 +761,9 @@ export default function InsightsWorkspace() {
                           style={{ width: '42%', height: incH, background: isLatest ? '#16a34a' : '#86efac', borderRadius: '3px 3px 0 0', transition: 'height 0.4s ease', cursor: 'help' }}
                         />
                       </div>
-                      <div style={{ fontSize: '0.625rem', fontWeight: isLatest ? 700 : 400, color: isLatest ? '#6366f1' : '#94a3b8', whiteSpace: 'nowrap' }}>{m.label}</div>
+                      <div style={{ fontSize: '0.625rem', fontWeight: isLatest ? 700 : 400, color: isLatest ? 'var(--brand-text)' : 'var(--text-400)', whiteSpace: 'nowrap' }}>{m.label}</div>
                       {m.savings !== 0 && (
-                        <div style={{ fontSize: '0.5625rem', fontWeight: 700, color: m.savings >= 0 ? '#16a34a' : '#ef4444' }}>
+                        <div style={{ fontSize: '0.5625rem', fontWeight: 700, color: m.savings >= 0 ? 'var(--success-text)' : 'var(--danger-text)' }}>
                           {m.savings >= 0 ? '+' : '−'}{sym}{(Math.abs(m.savings)/1000).toFixed(0)}k
                         </div>
                       )}
@@ -776,52 +777,54 @@ export default function InsightsWorkspace() {
           {/* Category trend table */}
           <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '14px 18px 12px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <TrendingUp size={14} style={{ color: '#6366f1' }} />
-              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>Category Trends vs Last Period</span>
+              <TrendingUp size={14} style={{ color: 'var(--brand-text)' }} />
+              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-800)' }}>Category Trends vs Last Period</span>
             </div>
 
             {catTrends.length === 0 ? (
-              <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem' }}>No category data this period</div>
+              <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-400)', fontSize: '0.875rem' }}>No category data this period</div>
             ) : (
-              <>
+              <div style={{ overflowX: 'auto' }}>
+                <div style={{ minWidth: 440 }}>
                 {/* Table header */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px 80px 100px', padding: '8px 18px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px 80px 100px', padding: '8px 18px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-default)' }}>
                   {['Category', 'This Period', 'Last Period', 'Change', 'Share'].map(h => (
-                    <span key={h} style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: h === 'Change' || h === 'Share' ? 'right' : 'left' }}>{h}</span>
+                    <span key={h} style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: h === 'Change' || h === 'Share' ? 'right' : 'left' }}>{h}</span>
                   ))}
                 </div>
                 {catTrends.map(t => (
-                  <div key={t.catId} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px 80px 100px', padding: '10px 18px', borderBottom: '1px solid #f1f5f9', alignItems: 'center' }}>
+                  <div key={t.catId} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px 80px 100px', padding: '10px 18px', borderBottom: '1px solid var(--bg-muted)', alignItems: 'center' }}>
                     {/* Category */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 28, height: 28, borderRadius: 7, background: `${t.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>{t.icon}</div>
-                      <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</span>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-800)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</span>
                     </div>
                     {/* This period */}
-                    <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>{sym}{Math.round(t.currSpent).toLocaleString('en-IN')}</span>
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-800)', fontVariantNumeric: 'tabular-nums' }}>{sym}{Math.round(t.currSpent).toLocaleString('en-IN')}</span>
                     {/* Last period */}
-                    <span style={{ fontSize: '0.8125rem', color: '#64748b', fontVariantNumeric: 'tabular-nums' }}>{t.prevSpent > 0 ? `${sym}${Math.round(t.prevSpent).toLocaleString('en-IN')}` : '—'}</span>
+                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-500)', fontVariantNumeric: 'tabular-nums' }}>{t.prevSpent > 0 ? `${sym}${Math.round(t.prevSpent).toLocaleString('en-IN')}` : '—'}</span>
                     {/* Change */}
                     <div style={{ textAlign: 'right' }}>
                       {t.prevSpent > 0 ? (
-                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: t.changePct > 0 ? '#ef4444' : t.changePct < 0 ? '#16a34a' : '#6366f1', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: t.changePct > 0 ? 'var(--danger-text)' : t.changePct < 0 ? 'var(--success-text)' : 'var(--brand-text)', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
                           {t.changePct > 0 ? <ArrowUpRight size={11}/> : t.changePct < 0 ? <ArrowDownRight size={11}/> : <Minus size={11}/>}
                           {t.changePct > 0 ? '+' : ''}{t.changePct}%
                         </span>
-                      ) : <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>New</span>}
+                      ) : <span style={{ fontSize: '0.75rem', color: 'var(--text-400)' }}>New</span>}
                     </div>
                     {/* Bar + pct */}
                     <div style={{ paddingLeft: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{ flex: 1, height: 4, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+                        <div style={{ flex: 1, height: 4, background: 'var(--bg-muted)', borderRadius: 99, overflow: 'hidden' }}>
                           <div style={{ height: '100%', width: `${t.pctOfTotal}%`, background: t.color, borderRadius: 99 }} />
                         </div>
-                        <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', minWidth: 28, textAlign: 'right' }}>{t.pctOfTotal}%</span>
+                        <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-500)', minWidth: 28, textAlign: 'right' }}>{t.pctOfTotal}%</span>
                       </div>
                     </div>
                   </div>
                 ))}
-              </>
+                </div>
+              </div>
             )}
           </div>
 
@@ -833,26 +836,26 @@ export default function InsightsWorkspace() {
                 onClick={() => setShowCityComp(v => !v)}
               >
                 <span style={{ fontSize: '0.875rem' }}>📍</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>City Spending Comparison</span>
-                <span style={{ marginLeft: 'auto', color: '#94a3b8' }}>{showCityComp ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-800)' }}>City Spending Comparison</span>
+                <span style={{ marginLeft: 'auto', color: 'var(--text-400)' }}>{showCityComp ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</span>
               </div>
               {showCityComp && cityComparison.cities.map(city => {
                 const d = cityComparison.perCity[city];
                 const pct = (periodExpenses.reduce((s, e) => s + e.amount, 0)) > 0 ?
                   Math.round((d.total / periodExpenses.reduce((s, e) => s + e.amount, 0)) * 100) : 0;
                 return (
-                  <div key={city} style={{ padding: '12px 18px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>🏙️</div>
+                  <div key={city} style={{ padding: '12px 18px', borderBottom: '1px solid var(--bg-muted)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--brand-50)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>🏙️</div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b' }}>{city}</div>
-                      <div style={{ fontSize: '0.6875rem', color: '#94a3b8', marginTop: 1 }}>{d.txnCount} transactions · Top: {d.topCat}</div>
-                      <div style={{ marginTop: 5, height: 3, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden', width: '100%' }}>
+                      <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-800)' }}>{city}</div>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-400)', marginTop: 1 }}>{d.txnCount} transactions · Top: {d.topCat}</div>
+                      <div style={{ marginTop: 5, height: 3, background: 'var(--bg-muted)', borderRadius: 99, overflow: 'hidden', width: '100%' }}>
                         <div style={{ height: '100%', width: `${pct}%`, background: '#6366f1', borderRadius: 99 }} />
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>{sym}{Math.round(d.total).toLocaleString('en-IN')}</div>
-                      <div style={{ fontSize: '0.6875rem', color: '#94a3b8' }}>{pct}% of total</div>
+                      <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-800)', fontVariantNumeric: 'tabular-nums' }}>{sym}{Math.round(d.total).toLocaleString('en-IN')}</div>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>{pct}% of total</div>
                     </div>
                   </div>
                 );
@@ -871,22 +874,22 @@ export default function InsightsWorkspace() {
           <div
             className="ai-forecast-banner"
             style={{
-              background: prediction.riskLevel === 'high' ? '#fef2f2' : prediction.riskLevel === 'medium' ? '#fffbeb' : '#f0fdf4',
-              borderColor: prediction.riskLevel === 'high' ? '#fecaca' : prediction.riskLevel === 'medium' ? '#fde68a' : '#bbf7d0',
+              background: prediction.riskLevel === 'high' ? 'var(--red-50)' : prediction.riskLevel === 'medium' ? 'var(--amber-50)' : 'var(--green-50)',
+              borderColor: prediction.riskLevel === 'high' ? 'var(--red-200)' : prediction.riskLevel === 'medium' ? 'var(--amber-200)' : 'var(--green-200)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <div style={{
                 width: 36, height: 36, borderRadius: 10,
-                background: prediction.riskLevel === 'high' ? '#fee2e2' : prediction.riskLevel === 'medium' ? '#fef3c7' : '#dcfce7',
-                color: prediction.riskLevel === 'high' ? '#dc2626' : prediction.riskLevel === 'medium' ? '#d97706' : '#16a34a',
+                background: prediction.riskLevel === 'high' ? 'var(--red-100)' : prediction.riskLevel === 'medium' ? 'var(--amber-100)' : 'var(--green-100)',
+                color: prediction.riskLevel === 'high' ? 'var(--danger-text)' : prediction.riskLevel === 'medium' ? 'var(--warning-text)' : 'var(--success-text)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <Activity size={16} />
               </div>
               <div>
-                <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#1e293b' }}>Spend Projection — {selectedMonthLabel}</div>
-                <div style={{ fontSize: '0.75rem', color: prediction.riskLevel === 'high' ? '#dc2626' : prediction.riskLevel === 'medium' ? '#d97706' : '#16a34a', fontWeight: 600 }}>
+                <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-800)' }}>Spend Projection — {selectedMonthLabel}</div>
+                <div style={{ fontSize: '0.75rem', color: prediction.riskLevel === 'high' ? 'var(--danger-text)' : prediction.riskLevel === 'medium' ? 'var(--warning-text)' : 'var(--success-text)', fontWeight: 600 }}>
                   Risk: {prediction.riskLevel.charAt(0).toUpperCase() + prediction.riskLevel.slice(1)} · {prediction.riskReason}
                 </div>
               </div>
@@ -901,9 +904,9 @@ export default function InsightsWorkspace() {
                 { label: 'Historical Avg',    value: prediction.previousAvgMonthly > 0 ? `${sym}${Math.round(prediction.previousAvgMonthly).toLocaleString('en-IN')}` : '—', note: 'past periods' },
               ].map(item => (
                 <div key={item.label} style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.7)', borderRadius: 10, border: '1px solid rgba(0,0,0,0.06)' }}>
-                  <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{item.label}</div>
-                  <div style={{ fontSize: item.bold ? '1.0625rem' : '0.9375rem', fontWeight: 800, color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>{item.value}</div>
-                  <div style={{ fontSize: '0.625rem', color: '#94a3b8', marginTop: 2 }}>{item.note}</div>
+                  <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{item.label}</div>
+                  <div style={{ fontSize: item.bold ? '1.0625rem' : '0.9375rem', fontWeight: 800, color: 'var(--text-800)', fontVariantNumeric: 'tabular-nums' }}>{item.value}</div>
+                  <div style={{ fontSize: '0.625rem', color: 'var(--text-400)', marginTop: 2 }}>{item.note}</div>
                 </div>
               ))}
             </div>
@@ -912,12 +915,12 @@ export default function InsightsWorkspace() {
             {totalIncome > 0 && (
               <div style={{ marginTop: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                  <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b' }}>Budget Progress</span>
-                  <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b' }}>
+                  <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-500)' }}>Budget Progress</span>
+                  <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-500)' }}>
                     {Math.round((periodExpenses.reduce((s,e)=>s+e.amount,0) / totalIncome) * 100)}% of income used
                   </span>
                 </div>
-                <div style={{ height: 8, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden', position: 'relative' }}>
+                <div style={{ height: 8, background: 'var(--border-default)', borderRadius: 99, overflow: 'hidden', position: 'relative' }}>
                   {/* Spent */}
                   <div style={{
                     position: 'absolute', left: 0, top: 0, height: '100%',
@@ -934,9 +937,9 @@ export default function InsightsWorkspace() {
                   )}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
-                  <span style={{ fontSize: '0.5625rem', color: '#94a3b8' }}>{sym}0</span>
-                  <span style={{ fontSize: '0.5625rem', color: '#ef4444', fontWeight: 700 }}>Projected: {Math.min(100, Math.round((prediction.projectedMonthEnd / totalIncome) * 100))}%</span>
-                  <span style={{ fontSize: '0.5625rem', color: '#94a3b8' }}>Income {sym}{Math.round(totalIncome).toLocaleString('en-IN')}</span>
+                  <span style={{ fontSize: '0.5625rem', color: 'var(--text-400)' }}>{sym}0</span>
+                  <span style={{ fontSize: '0.5625rem', color: 'var(--danger-text)', fontWeight: 700 }}>Projected: {Math.min(100, Math.round((prediction.projectedMonthEnd / totalIncome) * 100))}%</span>
+                  <span style={{ fontSize: '0.5625rem', color: 'var(--text-400)' }}>Income {sym}{Math.round(totalIncome).toLocaleString('en-IN')}</span>
                 </div>
               </div>
             )}
@@ -945,8 +948,8 @@ export default function InsightsWorkspace() {
           {/* Savings rate history */}
           <div className="panel" style={{ marginTop: 16 }}>
             <div style={{ padding: '14px 18px 12px', borderBottom: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <ShieldCheck size={14} style={{ color: '#16a34a' }} />
-              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>Savings Rate History</span>
+              <ShieldCheck size={14} style={{ color: 'var(--success-text)' }} />
+              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-800)' }}>Savings Rate History</span>
             </div>
             <div style={{ padding: '16px 18px' }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', height: 80 }}>
@@ -954,23 +957,23 @@ export default function InsightsWorkspace() {
                   const isLatest = i === monthHistory.length - 1;
                   const rate = m.income > 0 ? Math.max(0, m.savingsRate) : 0;
                   const h = rate > 0 ? Math.max(6, Math.round((rate / 100) * 68)) : 4;
-                  const color = rate >= 20 ? '#16a34a' : rate > 0 ? '#d97706' : '#e2e8f0';
+                  const color = rate >= 20 ? 'var(--success-text)' : rate > 0 ? 'var(--warning-text)' : 'var(--text-300)';
                   return (
                     <div key={m.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                       <div
                         title={`${m.label}: ${rate}% savings rate`}
                         style={{ width: '70%', height: h, background: isLatest ? color : `${color}80`, borderRadius: '3px 3px 0 0', transition: 'height 0.4s ease', cursor: 'help', position: 'relative' }}
                       />
-                      <div style={{ fontSize: '0.625rem', fontWeight: isLatest ? 700 : 400, color: isLatest ? '#6366f1' : '#94a3b8', whiteSpace: 'nowrap' }}>{m.label}</div>
+                      <div style={{ fontSize: '0.625rem', fontWeight: isLatest ? 700 : 400, color: isLatest ? 'var(--brand-text)' : 'var(--text-400)', whiteSpace: 'nowrap' }}>{m.label}</div>
                       <div style={{ fontSize: '0.5625rem', fontWeight: 700, color }}>{rate}%</div>
                     </div>
                   );
                 })}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                <div style={{ flex: 1, height: 1, borderTop: '1px dashed #e2e8f0' }} />
-                <span style={{ fontSize: '0.625rem', fontWeight: 700, color: '#16a34a', whiteSpace: 'nowrap' }}>20% target</span>
-                <div style={{ flex: 1, height: 1, borderTop: '1px dashed #e2e8f0' }} />
+                <div style={{ flex: 1, height: 1, borderTop: '1px dashed var(--border-default)' }} />
+                <span style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--success-text)', whiteSpace: 'nowrap' }}>20% target</span>
+                <div style={{ flex: 1, height: 1, borderTop: '1px dashed var(--border-default)' }} />
               </div>
             </div>
           </div>
@@ -987,32 +990,32 @@ export default function InsightsWorkspace() {
             {/* Weekday vs Weekend */}
             <div className="panel">
               <div style={{ padding: '14px 18px 12px', borderBottom: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Clock size={14} style={{ color: '#6366f1' }} />
-                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>Weekday vs Weekend</span>
+                <Clock size={14} style={{ color: 'var(--brand-text)' }} />
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-800)' }}>Weekday vs Weekend</span>
               </div>
               <div style={{ padding: '16px 18px' }}>
                 {behaviorProfile.weekdayVsWeekend.weekday + behaviorProfile.weekdayVsWeekend.weekend === 0 ? (
-                  <p style={{ fontSize: '0.8125rem', color: '#94a3b8' }}>No data yet</p>
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-400)' }}>No data yet</p>
                 ) : (
                   <>
                     <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
                       {[
-                        { label: 'Weekdays', value: behaviorProfile.weekdayVsWeekend.weekday, pct: behaviorProfile.weekdayVsWeekend.weekdayPct, color: '#6366f1' },
-                        { label: 'Weekends', value: behaviorProfile.weekdayVsWeekend.weekend, pct: 100 - behaviorProfile.weekdayVsWeekend.weekdayPct, color: '#8b5cf6' },
+                        { label: 'Weekdays', value: behaviorProfile.weekdayVsWeekend.weekday, pct: behaviorProfile.weekdayVsWeekend.weekdayPct, color: 'var(--brand-text)' },
+                        { label: 'Weekends', value: behaviorProfile.weekdayVsWeekend.weekend, pct: 100 - behaviorProfile.weekdayVsWeekend.weekdayPct, color: 'var(--purple-text)' },
                       ].map(item => (
                         <div key={item.label} style={{ flex: 1, padding: '12px', borderRadius: 10, background: `${item.color}0a`, border: `1px solid ${item.color}22` }}>
-                          <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{item.label}</div>
+                          <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{item.label}</div>
                           <div style={{ fontSize: '1rem', fontWeight: 800, color: item.color, fontVariantNumeric: 'tabular-nums' }}>{sym}{Math.round(item.value).toLocaleString('en-IN')}</div>
-                          <div style={{ fontSize: '0.6875rem', color: '#94a3b8', marginTop: 2 }}>{item.pct}% of spend</div>
+                          <div style={{ fontSize: '0.6875rem', color: 'var(--text-400)', marginTop: 2 }}>{item.pct}% of spend</div>
                         </div>
                       ))}
                     </div>
-                    <div style={{ height: 8, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ height: 8, background: 'var(--bg-muted)', borderRadius: 99, overflow: 'hidden' }}>
                       <div style={{ height: '100%', width: `${behaviorProfile.weekdayVsWeekend.weekdayPct}%`, background: 'linear-gradient(90deg, #6366f1, #8b5cf6)', borderRadius: 99 }} />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                      <span style={{ fontSize: '0.5625rem', color: '#6366f1', fontWeight: 700 }}>Weekday {behaviorProfile.weekdayVsWeekend.weekdayPct}%</span>
-                      <span style={{ fontSize: '0.5625rem', color: '#8b5cf6', fontWeight: 700 }}>Weekend {100 - behaviorProfile.weekdayVsWeekend.weekdayPct}%</span>
+                      <span style={{ fontSize: '0.5625rem', color: 'var(--brand-text)', fontWeight: 700 }}>Weekday {behaviorProfile.weekdayVsWeekend.weekdayPct}%</span>
+                      <span style={{ fontSize: '0.5625rem', color: 'var(--purple-text)', fontWeight: 700 }}>Weekend {100 - behaviorProfile.weekdayVsWeekend.weekdayPct}%</span>
                     </div>
                   </>
                 )}
@@ -1022,8 +1025,8 @@ export default function InsightsWorkspace() {
             {/* Transaction profile */}
             <div className="panel">
               <div style={{ padding: '14px 18px 12px', borderBottom: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Zap size={14} style={{ color: '#d97706' }} />
-                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>Transaction Profile</span>
+                <Zap size={14} style={{ color: 'var(--warning-text)' }} />
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-800)' }}>Transaction Profile</span>
               </div>
               <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {[
@@ -1032,11 +1035,11 @@ export default function InsightsWorkspace() {
                   { label: 'Total Transactions', value: `${periodExpenses.length}`, sub: `${Math.round(periodExpenses.length / 30 * 7)} per week avg` },
                   { label: 'Category Dependency', value: '', sub: behaviorProfile.categoryDependency },
                 ].map(item => (
-                  <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f8fafc' }}>
-                    <span style={{ fontSize: '0.8125rem', color: '#64748b', fontWeight: 500 }}>{item.label}</span>
+                  <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--bg-subtle)' }}>
+                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-500)', fontWeight: 500 }}>{item.label}</span>
                     <div style={{ textAlign: 'right' }}>
-                      {item.value && <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>{item.value}</div>}
-                      <div style={{ fontSize: '0.6875rem', color: '#94a3b8' }}>{item.sub}</div>
+                      {item.value && <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-800)', fontVariantNumeric: 'tabular-nums' }}>{item.value}</div>}
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>{item.sub}</div>
                     </div>
                   </div>
                 ))}
@@ -1046,27 +1049,27 @@ export default function InsightsWorkspace() {
             {/* Big ticket items */}
             <div className="panel">
               <div style={{ padding: '14px 18px 12px', borderBottom: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <ArrowUpRight size={14} style={{ color: '#ef4444' }} />
-                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>Biggest Purchases</span>
+                <ArrowUpRight size={14} style={{ color: 'var(--danger-text)' }} />
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-800)' }}>Biggest Purchases</span>
               </div>
               <div style={{ padding: '8px 0 4px' }}>
                 {behaviorProfile.bigTicketItems.length === 0 ? (
-                  <p style={{ padding: '12px 18px', fontSize: '0.8125rem', color: '#94a3b8' }}>No expenses this period</p>
+                  <p style={{ padding: '12px 18px', fontSize: '0.8125rem', color: 'var(--text-400)' }}>No expenses this period</p>
                 ) : behaviorProfile.bigTicketItems.map((exp, i) => {
                   const cat = categories.find(c => c.id === exp.category);
                   return (
-                    <div key={exp.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', borderBottom: '1px solid #f8fafc' }}>
-                      <span style={{ width: 20, height: 20, borderRadius: '50%', background: i === 0 ? '#fef2f2' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.625rem', fontWeight: 900, color: i === 0 ? '#ef4444' : '#94a3b8', flexShrink: 0 }}>
+                    <div key={exp.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', borderBottom: '1px solid var(--bg-subtle)' }}>
+                      <span style={{ width: 20, height: 20, borderRadius: '50%', background: i === 0 ? 'var(--red-50)' : 'var(--bg-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.625rem', fontWeight: 900, color: i === 0 ? 'var(--danger-text)' : 'var(--text-400)', flexShrink: 0 }}>
                         {i + 1}
                       </span>
-                      <div style={{ width: 28, height: 28, borderRadius: 7, background: cat ? `${cat.color}18` : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 7, background: cat ? `${cat.color}18` : 'var(--bg-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>
                         {cat?.icon ?? '📦'}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{exp.description}</div>
-                        <div style={{ fontSize: '0.6875rem', color: '#94a3b8', marginTop: 1 }}>{cat?.name ?? '—'} · {new Date(exp.date + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>
+                        <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-800)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{exp.description}</div>
+                        <div style={{ fontSize: '0.6875rem', color: 'var(--text-400)', marginTop: 1 }}>{cat?.name ?? '—'} · {new Date(exp.date + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>
                       </div>
-                      <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: '#ef4444', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                      <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--danger-text)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                         {sym}{exp.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                       </div>
                     </div>
@@ -1090,27 +1093,27 @@ export default function InsightsWorkspace() {
       {scope === 'yearly' && (<>
 
       {/* ── YEARLY KPI STRIP ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Total Spent', value: `${sym}${Math.round(yearSummary.totalExpenses).toLocaleString('en-IN')}`, sub: `${yearSummary.txnCount} txns · ${yearSummary.activeMonths} months`, color: '#ef4444', Icon: TrendingUp },
-          { label: 'Total Income', value: yearSummary.totalIncome > 0 ? `${sym}${Math.round(yearSummary.totalIncome).toLocaleString('en-IN')}` : '—', sub: `${yearlyYear} total`, color: '#16a34a', Icon: ArrowUpRight },
-          { label: 'Net Savings', value: yearSummary.totalIncome > 0 ? `${sym}${Math.round(yearSummary.totalSavings).toLocaleString('en-IN')}` : '—', sub: yearSummary.totalSavings >= 0 ? 'Surplus' : 'Deficit', color: yearSummary.totalSavings >= 0 ? '#16a34a' : '#ef4444', Icon: ShieldCheck },
-          { label: 'Savings Rate', value: yearSummary.totalIncome > 0 ? `${yearlySavingsRate}%` : '—', sub: yearlySavingsRate >= 20 ? 'Healthy' : yearlySavingsRate > 0 ? 'Below target' : '—', color: yearlySavingsRate >= 20 ? '#16a34a' : yearlySavingsRate > 0 ? '#d97706' : '#94a3b8', Icon: Target },
-          { label: 'Avg Monthly', value: `${sym}${yearSummary.avgMonthlyExpenses.toLocaleString('en-IN')}`, sub: 'per active month', color: '#6366f1', Icon: Activity },
+          { label: 'Total Spent', value: `${sym}${Math.round(yearSummary.totalExpenses).toLocaleString('en-IN')}`, sub: `${yearSummary.txnCount} txns · ${yearSummary.activeMonths} months`, color: 'var(--danger-text)', Icon: TrendingUp },
+          { label: 'Total Income', value: yearSummary.totalIncome > 0 ? `${sym}${Math.round(yearSummary.totalIncome).toLocaleString('en-IN')}` : '—', sub: `${yearlyYear} total`, color: 'var(--success-text)', Icon: ArrowUpRight },
+          { label: 'Net Savings', value: yearSummary.totalIncome > 0 ? `${sym}${Math.round(yearSummary.totalSavings).toLocaleString('en-IN')}` : '—', sub: yearSummary.totalSavings >= 0 ? 'Surplus' : 'Deficit', color: yearSummary.totalSavings >= 0 ? 'var(--success-text)' : 'var(--danger-text)', Icon: ShieldCheck },
+          { label: 'Savings Rate', value: yearSummary.totalIncome > 0 ? `${yearlySavingsRate}%` : '—', sub: yearlySavingsRate >= 20 ? 'Healthy' : yearlySavingsRate > 0 ? 'Below target' : '—', color: yearlySavingsRate >= 20 ? 'var(--success-text)' : yearlySavingsRate > 0 ? 'var(--warning-text)' : 'var(--text-400)', Icon: Target },
+          { label: 'Avg Monthly', value: `${sym}${yearSummary.avgMonthlyExpenses.toLocaleString('en-IN')}`, sub: 'per active month', color: 'var(--brand-text)', Icon: Activity },
         ].map(kpi => (
           <div key={kpi.label} style={{
             padding: '16px 18px', borderRadius: 16,
-            background: '#fff', border: '1.5px solid #e8ecf0',
+            background: 'var(--bg-surface)', border: '1.5px solid var(--border-default)',
             transition: 'all 0.2s ease',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{kpi.label}</span>
+              <span style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{kpi.label}</span>
               <div style={{ width: 26, height: 26, borderRadius: 7, background: `${kpi.color}0d`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <kpi.Icon size={12} color={kpi.color} />
               </div>
             </div>
             <div style={{ fontSize: '1.125rem', fontWeight: 800, color: kpi.color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{kpi.value}</div>
-            <div style={{ fontSize: '0.6875rem', color: '#94a3b8', marginTop: 4 }}>{kpi.sub}</div>
+            <div style={{ fontSize: '0.6875rem', color: 'var(--text-400)', marginTop: 4 }}>{kpi.sub}</div>
           </div>
         ))}
       </div>
@@ -1119,15 +1122,15 @@ export default function InsightsWorkspace() {
       <div className="ai-narrative-card" style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <div className="ai-icon-glow" style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0 }}><CalendarRange size={13} /></div>
-          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b' }}>{yearlyYear} Year in Review</span>
-          <span style={{ marginLeft: 'auto', fontSize: '0.625rem', color: '#16a34a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-800)' }}>{yearlyYear} Year in Review</span>
+          <span style={{ marginLeft: 'auto', fontSize: '0.625rem', color: 'var(--success-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#16a34a', display: 'inline-block', animation: 'aiPulse 2s infinite' }} />
             Live
           </span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {yearlyNarrative.map((line, i) => (
-            <p key={i} style={{ fontSize: '0.875rem', color: i === 0 ? '#1e293b' : '#475569', lineHeight: 1.6, fontWeight: i === 0 ? 600 : 400 }}>
+            <p key={i} style={{ fontSize: '0.875rem', color: i === 0 ? 'var(--text-800)' : 'var(--text-600)', lineHeight: 1.6, fontWeight: i === 0 ? 600 : 400 }}>
               {line}
             </p>
           ))}
@@ -1178,13 +1181,13 @@ export default function InsightsWorkspace() {
           {/* 12-month bar chart */}
           <div className="panel" style={{ marginBottom: 16 }}>
             <div style={{ padding: '14px 18px 12px', borderBottom: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <BarChart2 size={14} style={{ color: '#6366f1' }} />
-              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>{yearlyYear} — Monthly Spending vs Income</span>
+              <BarChart2 size={14} style={{ color: 'var(--brand-text)' }} />
+              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-800)' }}>{yearlyYear} — Monthly Spending vs Income</span>
             </div>
             <div style={{ padding: '16px 18px 8px' }}>
               <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
-                {[{ label: 'Expenses', color: '#ef4444' }, { label: 'Income', color: '#16a34a' }].map(l => (
-                  <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.6875rem', fontWeight: 600, color: '#64748b' }}>
+                {[{ label: 'Expenses', color: 'var(--danger-text)' }, { label: 'Income', color: 'var(--success-text)' }].map(l => (
+                  <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-500)' }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: l.color, display: 'inline-block' }} />
                     {l.label}
                   </div>
@@ -1201,16 +1204,16 @@ export default function InsightsWorkspace() {
                       <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', width: '100%', justifyContent: 'center' }}>
                         <div
                           title={`Expenses: ${sym}${Math.round(m.expenses).toLocaleString('en-IN')}`}
-                          style={{ width: '42%', height: expH, background: hasData ? '#ef4444' : '#f1f5f9', borderRadius: '3px 3px 0 0', transition: 'height 0.4s ease', cursor: 'help' }}
+                          style={{ width: '42%', height: expH, background: hasData ? '#ef4444' : 'var(--bg-muted)', borderRadius: '3px 3px 0 0', transition: 'height 0.4s ease', cursor: 'help' }}
                         />
                         <div
                           title={`Income: ${sym}${Math.round(m.income).toLocaleString('en-IN')}`}
-                          style={{ width: '42%', height: incH, background: hasData ? '#16a34a' : '#f1f5f9', borderRadius: '3px 3px 0 0', transition: 'height 0.4s ease', cursor: 'help' }}
+                          style={{ width: '42%', height: incH, background: hasData ? '#16a34a' : 'var(--bg-muted)', borderRadius: '3px 3px 0 0', transition: 'height 0.4s ease', cursor: 'help' }}
                         />
                       </div>
-                      <div style={{ fontSize: '0.5625rem', fontWeight: hasData ? 600 : 400, color: hasData ? '#1e293b' : '#cbd5e1', whiteSpace: 'nowrap' }}>{MONTH_NAMES[i]}</div>
+                      <div style={{ fontSize: '0.5625rem', fontWeight: hasData ? 600 : 400, color: hasData ? 'var(--text-800)' : 'var(--text-300)', whiteSpace: 'nowrap' }}>{MONTH_NAMES[i]}</div>
                       {m.savings !== 0 && hasData && (
-                        <div style={{ fontSize: '0.5rem', fontWeight: 700, color: m.savings >= 0 ? '#16a34a' : '#ef4444' }}>
+                        <div style={{ fontSize: '0.5rem', fontWeight: 700, color: m.savings >= 0 ? 'var(--success-text)' : 'var(--danger-text)' }}>
                           {m.savings >= 0 ? '+' : '−'}{sym}{(Math.abs(m.savings)/1000).toFixed(0)}k
                         </div>
                       )}
@@ -1224,23 +1227,23 @@ export default function InsightsWorkspace() {
           {/* Savings rate across 12 months */}
           <div className="panel" style={{ marginBottom: 16 }}>
             <div style={{ padding: '14px 18px 12px', borderBottom: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <ShieldCheck size={14} style={{ color: '#16a34a' }} />
-              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>{yearlyYear} Savings Rate by Month</span>
+              <ShieldCheck size={14} style={{ color: 'var(--success-text)' }} />
+              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-800)' }}>{yearlyYear} Savings Rate by Month</span>
             </div>
             <div style={{ padding: '16px 18px' }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 80 }}>
                 {yearSummary.months.map((m, i) => {
                   const rate = m.income > 0 ? Math.max(0, m.savingsRate) : 0;
                   const h = rate > 0 ? Math.max(6, Math.round((rate / 100) * 68)) : 4;
-                  const color = rate >= 20 ? '#16a34a' : rate > 0 ? '#d97706' : '#e2e8f0';
+                  const color = rate >= 20 ? 'var(--success-text)' : rate > 0 ? 'var(--warning-text)' : 'var(--text-300)';
                   const hasData = m.txnCount > 0;
                   return (
                     <div key={m.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                       <div
                         title={`${MONTH_NAMES[i]}: ${rate}% savings rate`}
-                        style={{ width: '70%', height: h, background: hasData ? color : '#f1f5f9', borderRadius: '3px 3px 0 0', transition: 'height 0.4s ease', cursor: 'help' }}
+                        style={{ width: '70%', height: h, background: hasData ? color : 'var(--bg-muted)', borderRadius: '3px 3px 0 0', transition: 'height 0.4s ease', cursor: 'help' }}
                       />
-                      <div style={{ fontSize: '0.5625rem', fontWeight: hasData ? 600 : 400, color: hasData ? '#1e293b' : '#cbd5e1' }}>{MONTH_NAMES[i]}</div>
+                      <div style={{ fontSize: '0.5625rem', fontWeight: hasData ? 600 : 400, color: hasData ? 'var(--text-800)' : 'var(--text-300)' }}>{MONTH_NAMES[i]}</div>
                       {hasData && <div style={{ fontSize: '0.5rem', fontWeight: 700, color }}>{rate}%</div>}
                     </div>
                   );
@@ -1252,65 +1255,67 @@ export default function InsightsWorkspace() {
           {/* Yearly category breakdown */}
           <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '14px 18px 12px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <TrendingUp size={14} style={{ color: '#6366f1' }} />
-              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e293b' }}>Category Breakdown — {yearlyYear} vs {yearlyYear - 1}</span>
+              <TrendingUp size={14} style={{ color: 'var(--brand-text)' }} />
+              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-800)' }}>Category Breakdown — {yearlyYear} vs {yearlyYear - 1}</span>
             </div>
             {yearlyCatTrends.length === 0 ? (
-              <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem' }}>No category data for {yearlyYear}</div>
+              <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-400)', fontSize: '0.875rem' }}>No category data for {yearlyYear}</div>
             ) : (
-              <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px 80px 100px', padding: '8px 18px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <div style={{ minWidth: 440 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px 80px 100px', padding: '8px 18px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-default)' }}>
                   {['Category', String(yearlyYear), String(yearlyYear - 1), 'Change', 'Share'].map(h => (
-                    <span key={h} style={{ fontSize: '0.625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: h === 'Change' || h === 'Share' ? 'right' : 'left' }}>{h}</span>
+                    <span key={h} style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: h === 'Change' || h === 'Share' ? 'right' : 'left' }}>{h}</span>
                   ))}
                 </div>
                 {yearlyCatTrends.map(t => (
-                  <div key={t.catId} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px 80px 100px', padding: '10px 18px', borderBottom: '1px solid #f1f5f9', alignItems: 'center' }}>
+                  <div key={t.catId} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px 80px 100px', padding: '10px 18px', borderBottom: '1px solid var(--bg-muted)', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 28, height: 28, borderRadius: 7, background: `${t.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>{t.icon}</div>
-                      <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</span>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-800)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</span>
                     </div>
-                    <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>{sym}{Math.round(t.currSpent).toLocaleString('en-IN')}</span>
-                    <span style={{ fontSize: '0.8125rem', color: '#64748b', fontVariantNumeric: 'tabular-nums' }}>{t.prevSpent > 0 ? `${sym}${Math.round(t.prevSpent).toLocaleString('en-IN')}` : '—'}</span>
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-800)', fontVariantNumeric: 'tabular-nums' }}>{sym}{Math.round(t.currSpent).toLocaleString('en-IN')}</span>
+                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-500)', fontVariantNumeric: 'tabular-nums' }}>{t.prevSpent > 0 ? `${sym}${Math.round(t.prevSpent).toLocaleString('en-IN')}` : '—'}</span>
                     <div style={{ textAlign: 'right' }}>
                       {t.prevSpent > 0 ? (
-                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: t.changePct > 0 ? '#ef4444' : t.changePct < 0 ? '#16a34a' : '#6366f1', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: t.changePct > 0 ? 'var(--danger-text)' : t.changePct < 0 ? 'var(--success-text)' : 'var(--brand-text)', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
                           {t.changePct > 0 ? <ArrowUpRight size={11}/> : t.changePct < 0 ? <ArrowDownRight size={11}/> : <Minus size={11}/>}
                           {t.changePct > 0 ? '+' : ''}{t.changePct}%
                         </span>
-                      ) : <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>New</span>}
+                      ) : <span style={{ fontSize: '0.75rem', color: 'var(--text-400)' }}>New</span>}
                     </div>
                     <div style={{ paddingLeft: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{ flex: 1, height: 4, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+                        <div style={{ flex: 1, height: 4, background: 'var(--bg-muted)', borderRadius: 99, overflow: 'hidden' }}>
                           <div style={{ height: '100%', width: `${t.pctOfTotal}%`, background: t.color, borderRadius: 99 }} />
                         </div>
-                        <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', minWidth: 28, textAlign: 'right' }}>{t.pctOfTotal}%</span>
+                        <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-500)', minWidth: 28, textAlign: 'right' }}>{t.pctOfTotal}%</span>
                       </div>
                     </div>
                   </div>
                 ))}
-              </>
+                </div>
+              </div>
             )}
           </div>
 
           {/* Best / worst month highlight */}
           {(yearSummary.bestMonth || yearSummary.worstMonth) && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 16 }}>
               {yearSummary.bestMonth && (
-                <div style={{ padding: '16px 18px', borderRadius: 14, background: '#f0fdf4', border: '1.5px solid #bbf7d0' }}>
-                  <div style={{ fontSize: '0.625rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Best Month</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#16a34a' }}>{yearSummary.bestMonth.label}</div>
-                  <div style={{ fontSize: '0.8125rem', color: '#475569', marginTop: 2 }}>
+                <div style={{ padding: '16px 18px', borderRadius: 14, background: 'var(--green-50)', border: '1.5px solid var(--green-200)' }}>
+                  <div style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--success-text)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Best Month</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--success-text)' }}>{yearSummary.bestMonth.label}</div>
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-600)', marginTop: 2 }}>
                     {yearSummary.bestMonth.savingsRate}% savings · {sym}{Math.round(yearSummary.bestMonth.savings).toLocaleString('en-IN')} saved
                   </div>
                 </div>
               )}
               {yearSummary.worstMonth && (
-                <div style={{ padding: '16px 18px', borderRadius: 14, background: '#fef2f2', border: '1.5px solid #fecaca' }}>
-                  <div style={{ fontSize: '0.625rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Highest Spend Month</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ef4444' }}>{yearSummary.worstMonth.label}</div>
-                  <div style={{ fontSize: '0.8125rem', color: '#475569', marginTop: 2 }}>
+                <div style={{ padding: '16px 18px', borderRadius: 14, background: 'var(--red-50)', border: '1.5px solid var(--red-200)' }}>
+                  <div style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--danger-text)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Highest Spend Month</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--danger-text)' }}>{yearSummary.worstMonth.label}</div>
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-600)', marginTop: 2 }}>
                     {yearSummary.worstMonth.savingsRate}% savings · {sym}{Math.round(yearSummary.worstMonth.expenses).toLocaleString('en-IN')} spent
                   </div>
                 </div>

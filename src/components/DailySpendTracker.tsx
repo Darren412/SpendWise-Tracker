@@ -14,7 +14,7 @@ import { Activity, Filter, X } from 'lucide-react';
 // ── Spend intensity color ─────────────────────────────────────────────────
 
 function spendColor(total: number, avg: number): string {
-  if (total === 0) return '#f3f4f6';
+  if (total === 0) return 'var(--bg-muted)';
   const ratio = avg > 0 ? total / avg : 1;
   if (ratio > 2.2) return '#ef4444';   // Very high
   if (ratio > 1.5) return '#f59e0b';   // High
@@ -59,8 +59,8 @@ function DayTooltip({ active, payload, categories, currency, avgDaily }: DayTool
 
   return (
     <div style={{
-      background: '#fff',
-      border: '1px solid #e8ecf0',
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border-default)',
       borderRadius: 14,
       boxShadow: '0 8px 28px rgba(0,0,0,0.12)',
       minWidth: 200,
@@ -72,22 +72,22 @@ function DayTooltip({ active, payload, categories, currency, avgDaily }: DayTool
       {/* Header */}
       <div style={{
         background: isHigh
-          ? 'linear-gradient(135deg, #fef2f2 0%, #fff7f7 100%)'
-          : 'linear-gradient(135deg, #eff6ff 0%, #f8faff 100%)',
+          ? 'linear-gradient(135deg, var(--red-50) 0%, var(--red-50) 100%)'
+          : 'linear-gradient(135deg, var(--blue-50) 0%, var(--blue-50) 100%)',
         padding: '10px 14px 8px',
-        borderBottom: '1px solid #f3f4f6',
+        borderBottom: '1px solid var(--border-default)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
-          <p style={{ fontSize: 10, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             {dateLabel}
           </p>
           {isHigh && (
-            <span style={{ fontSize: 8, fontWeight: 700, color: '#dc2626', background: '#fef2f2', padding: '1px 6px', borderRadius: 100, border: '1px solid #fecaca' }}>
+            <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--danger-text)', background: 'var(--red-50)', padding: '1px 6px', borderRadius: 100, border: '1px solid var(--red-200)' }}>
               High
             </span>
           )}
         </div>
-        <p style={{ fontSize: 18, fontWeight: 800, color: isHigh ? '#ef4444' : '#111827', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+        <p style={{ fontSize: 18, fontWeight: 800, color: isHigh ? 'var(--danger-text)' : 'var(--text-900)', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
           {sym}{total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
         </p>
       </div>
@@ -100,10 +100,10 @@ function DayTooltip({ active, payload, categories, currency, avgDaily }: DayTool
             return (
               <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 12px' }}>
                 <span style={{ fontSize: 12, flexShrink: 0 }}>{cat?.icon ?? '📦'}</span>
-                <span style={{ fontSize: 11, fontWeight: 500, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-700)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {e.description || 'Expense'}
                 </span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#374151', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-700)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                   {sym}{e.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                 </span>
               </div>
@@ -115,14 +115,14 @@ function DayTooltip({ active, payload, categories, currency, avgDaily }: DayTool
       {/* Footer with click hint */}
       <div style={{
         padding: '6px 12px',
-        background: '#f8fafc',
-        borderTop: '1px solid #f3f4f6',
+        background: 'var(--bg-subtle)',
+        borderTop: '1px solid var(--border-default)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <span style={{ fontSize: 10, color: '#9ca3af' }}>
+        <span style={{ fontSize: 10, color: 'var(--text-400)' }}>
           {expenses.length} txn{expenses.length !== 1 ? 's' : ''}
         </span>
-        <span style={{ fontSize: 9, fontWeight: 600, color: '#6366f1' }}>
+        <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--brand-text)' }}>
           Click to pin details ↓
         </span>
       </div>
@@ -232,8 +232,8 @@ export default function DailySpendTracker() {
       {/* ── Header ── */}
       <div className="flex items-start justify-between mb-5 flex-wrap gap-4">
         <div className="flex items-center gap-3">
-          <div className="icon-pill" style={{ background: isFiltered ? '#eff6ff' : '#eff6ff' }}>
-            <Activity size={15} color={isFiltered ? '#4f46e5' : '#3b82f6'} />
+          <div className="icon-pill" style={{ background: isFiltered ? 'var(--blue-50)' : 'var(--blue-50)' }}>
+            <Activity size={15} color={isFiltered ? 'var(--brand-text)' : 'var(--info-text)'} />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -241,15 +241,15 @@ export default function DailySpendTracker() {
               {isFiltered && (
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 9, fontWeight: 700, color: '#4f46e5',
-                  background: '#eef2ff', padding: '2px 8px', borderRadius: 100,
-                  border: '1px solid #c7d2fe', textTransform: 'uppercase', letterSpacing: '0.04em',
+                  fontSize: 9, fontWeight: 700, color: 'var(--brand-text)',
+                  background: 'var(--brand-50)', padding: '2px 8px', borderRadius: 100,
+                  border: '1px solid var(--brand-200)', textTransform: 'uppercase', letterSpacing: '0.04em',
                 }}>
                   <Filter size={8} /> Filtered
                 </span>
               )}
             </div>
-            <p className="text-xs" style={{ color: '#9ca3af' }}>
+            <p className="text-xs" style={{ color: 'var(--text-400)' }}>
               {filteredExpenses.length} transaction{filteredExpenses.length !== 1 ? 's' : ''} · {activeDays} active day{activeDays !== 1 ? 's' : ''}
             </p>
           </div>
@@ -258,18 +258,18 @@ export default function DailySpendTracker() {
         {/* Summary stats */}
         <div className="flex items-center gap-5 flex-wrap">
           <div className="text-right">
-            <p className="text-xs" style={{ color: '#9ca3af' }}>Avg / day</p>
-            <p className="text-sm font-bold num-mono" style={{ color: '#10b981' }}>{formatCurrency(avgDaily, currency)}</p>
+            <p className="text-xs" style={{ color: 'var(--text-400)' }}>Avg / day</p>
+            <p className="text-sm font-bold num-mono" style={{ color: 'var(--success-text)' }}>{formatCurrency(avgDaily, currency)}</p>
           </div>
           <div className="text-right">
-            <p className="text-xs" style={{ color: '#9ca3af' }}>Peak day</p>
-            <p className="text-sm font-bold num-mono" style={{ color: '#ef4444' }}>
+            <p className="text-xs" style={{ color: 'var(--text-400)' }}>Peak day</p>
+            <p className="text-sm font-bold num-mono" style={{ color: 'var(--danger-text)' }}>
               {peakDay && peakDay.total > 0 ? peakDay.label : '—'}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs" style={{ color: '#9ca3af' }}>Total spent</p>
-            <p className="text-sm font-bold num-mono" style={{ color: '#111827' }}>{formatCurrency(totalSpent, currency)}</p>
+            <p className="text-xs" style={{ color: 'var(--text-400)' }}>Total spent</p>
+            <p className="text-sm font-bold num-mono" style={{ color: 'var(--text-900)' }}>{formatCurrency(totalSpent, currency)}</p>
           </div>
         </div>
       </div>
@@ -282,8 +282,8 @@ export default function DailySpendTracker() {
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
               fontSize: 11, fontWeight: 600, padding: '3px 10px 3px 8px',
-              borderRadius: 100, border: '1px solid #6366f140',
-              background: '#6366f112', color: '#4f46e5',
+              borderRadius: 100, border: '1px solid var(--border-strong)',
+              background: 'var(--brand-50)', color: 'var(--brand-text)',
             }}>
               📍 {selectedCity}
             </span>
@@ -305,8 +305,8 @@ export default function DailySpendTracker() {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
                 fontSize: 11, fontWeight: 600, padding: '3px 10px',
-                borderRadius: 100, border: '1px solid #e8ecf0',
-                background: '#f4f6f9', color: '#6b7280', cursor: 'pointer',
+                borderRadius: 100, border: '1px solid var(--border-default)',
+                background: 'var(--bg-muted)', color: 'var(--text-500)', cursor: 'pointer',
               }}
             >
               <X size={10} /> Clear categories
@@ -320,19 +320,19 @@ export default function DailySpendTracker() {
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           justifyContent: 'center', padding: '48px 24px', gap: 12,
-          background: '#f8fafc', borderRadius: 16, border: '1.5px dashed #e8ecf0',
+          background: 'var(--bg-subtle)', borderRadius: 16, border: '1.5px dashed var(--border-default)',
         }}>
           <div style={{
             width: 52, height: 52, borderRadius: '50%',
-            background: '#eff6ff', display: 'flex', alignItems: 'center',
+            background: 'var(--blue-50)', display: 'flex', alignItems: 'center',
             justifyContent: 'center',
           }}>
-            <Filter size={22} color="#93c5fd" />
+            <Filter size={22} color="var(--info-text)" />
           </div>
-          <p style={{ fontSize: 14, fontWeight: 700, color: '#374151', textAlign: 'center' }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-700)', textAlign: 'center' }}>
             No spending activity found
           </p>
-          <p style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', maxWidth: 280 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-400)', textAlign: 'center', maxWidth: 280 }}>
             {[isCityFiltered && selectedCity, ...activeFilterCats.map(c => c.name)].filter(Boolean).join(' · ')} — no transactions this period.
           </p>
           {activeFilterCats.length > 0 && (
@@ -371,13 +371,14 @@ export default function DailySpendTracker() {
             </filter>
           </defs>
 
-          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default)" vertical={false} />
 
           <XAxis
             dataKey="day"
-            tick={{ fontSize: 10, fill: '#9ca3af' }}
+            tick={{ fontSize: 10, fill: 'var(--text-400)' }}
             tickLine={false}
             axisLine={false}
+            interval="preserveStartEnd"
             tickFormatter={(v: number) => {
               const entry = dailyData[v - 1];
               if (!entry) return '';
@@ -393,7 +394,7 @@ export default function DailySpendTracker() {
           />
 
           <YAxis
-            tick={{ fontSize: 10, fill: '#9ca3af' }}
+            tick={{ fontSize: 10, fill: 'var(--text-400)' }}
             tickLine={false}
             axisLine={false}
             width={46}
@@ -408,10 +409,10 @@ export default function DailySpendTracker() {
           {avgDaily > 0 && (
             <ReferenceLine
               y={avgDaily}
-              stroke="#10b981"
+              stroke="var(--green-500)"
               strokeDasharray="6 4"
               strokeWidth={1.5}
-              label={{ value: 'avg', position: 'insideTopRight', fill: '#10b981', fontSize: 9 }}
+              label={{ value: 'avg', position: 'insideTopRight', fill: 'var(--success-text)', fontSize: 9 }}
             />
           )}
 
@@ -424,7 +425,7 @@ export default function DailySpendTracker() {
             {dailyData.map((entry, i) => (
               <Cell
                 key={i}
-                fill={pinnedDay === entry.day ? '#111827' : spendColor(entry.total, avgDaily)}
+                fill={pinnedDay === entry.day ? 'var(--text-900)' : spendColor(entry.total, avgDaily)}
                 opacity={pinnedDay !== null && pinnedDay !== entry.day ? 0.35 : 1}
               />
             ))}
@@ -435,22 +436,22 @@ export default function DailySpendTracker() {
       {/* ── Color legend ── */}
       <div className="flex items-center gap-4 mt-3 mb-1 flex-wrap">
         {[
-          { color: '#a5b4fc', label: 'Low' },
-          { color: '#4f46e5', label: 'Normal' },
-          { color: '#f59e0b', label: 'High' },
-          { color: '#ef4444', label: 'Very high' },
+          { color: 'var(--brand-300)', label: 'Low' },
+          { color: 'var(--brand-text)', label: 'Normal' },
+          { color: 'var(--warning-text)', label: 'High' },
+          { color: 'var(--danger-text)', label: 'Very high' },
         ].map(({ color, label }) => (
           <div key={label} className="flex items-center gap-1.5">
             <div style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
-            <span style={{ fontSize: 10, color: '#9ca3af' }}>{label}</span>
+            <span style={{ fontSize: 10, color: 'var(--text-400)' }}>{label}</span>
           </div>
         ))}
         <div className="flex items-center gap-1.5">
-          <svg width="16" height="8"><line x1="0" y1="4" x2="16" y2="4" stroke="#10b981" strokeWidth="1.5" strokeDasharray="5 3" /></svg>
-          <span style={{ fontSize: 10, color: '#9ca3af' }}>Avg line</span>
+          <svg width="16" height="8"><line x1="0" y1="4" x2="16" y2="4" stroke="var(--green-500)" strokeWidth="1.5" strokeDasharray="5 3" /></svg>
+          <span style={{ fontSize: 10, color: 'var(--text-400)' }}>Avg line</span>
         </div>
         {!pinnedDay && (
-          <span style={{ fontSize: 10, color: '#c4c9d4', marginLeft: 'auto' }}>Click any bar to pin details ↓</span>
+          <span style={{ fontSize: 10, color: 'var(--text-300)', marginLeft: 'auto' }}>Click any bar to pin details ↓</span>
         )}
       </div>
 
@@ -458,24 +459,24 @@ export default function DailySpendTracker() {
       {pinnedData && (
         <div
           className="mt-5 rounded-2xl overflow-hidden"
-          style={{ border: '1px solid #e8ecf0', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}
+          style={{ border: '1px solid var(--border-default)', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}
         >
           {/* Panel header */}
           <div style={{
             background: pinnedData.total > avgDaily * 1.5
-              ? 'linear-gradient(135deg, #fef2f2 0%, #fff7f7 100%)'
-              : 'linear-gradient(135deg, #eff6ff 0%, #f8faff 100%)',
+              ? 'linear-gradient(135deg, var(--red-50) 0%, var(--red-50) 100%)'
+              : 'linear-gradient(135deg, var(--blue-50) 0%, var(--blue-50) 100%)',
             padding: '14px 18px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            borderBottom: '1px solid #f0f2f5',
+            borderBottom: '1px solid var(--border-default)',
           }}>
             <div>
-              <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+              <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
                 {pinnedData.label}
               </p>
               <p style={{
                 fontSize: 22, fontWeight: 800,
-                color: pinnedData.total > avgDaily * 1.5 ? '#ef4444' : '#111827',
+                color: pinnedData.total > avgDaily * 1.5 ? 'var(--danger-text)' : 'var(--text-900)',
                 fontVariantNumeric: 'tabular-nums', lineHeight: 1,
               }}>
                 {sym}{pinnedData.total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
@@ -484,18 +485,18 @@ export default function DailySpendTracker() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               {pinnedData.total > avgDaily * 1.5 && (
                 <span style={{
-                  fontSize: 10, fontWeight: 700, color: '#dc2626',
-                  background: '#fef2f2', padding: '4px 12px', borderRadius: 100,
-                  border: '1px solid #fecaca',
+                  fontSize: 10, fontWeight: 700, color: 'var(--danger-text)',
+                  background: 'var(--red-50)', padding: '4px 12px', borderRadius: 100,
+                  border: '1px solid var(--red-200)',
                 }}>
                   ↑ High Spend Day
                 </span>
               )}
               {pinnedData.total > 0 && pinnedData.total < avgDaily * 0.5 && (
                 <span style={{
-                  fontSize: 10, fontWeight: 700, color: '#059669',
-                  background: '#ecfdf5', padding: '4px 12px', borderRadius: 100,
-                  border: '1px solid #a7f3d0',
+                  fontSize: 10, fontWeight: 700, color: 'var(--success-text)',
+                  background: 'var(--green-50)', padding: '4px 12px', borderRadius: 100,
+                  border: '1px solid var(--green-200)',
                 }}>
                   ↓ Low Spend Day
                 </span>
@@ -503,8 +504,8 @@ export default function DailySpendTracker() {
               <button
                 onClick={() => setPinnedDay(null)}
                 style={{
-                  fontSize: 11, color: '#9ca3af', background: '#f4f6f9',
-                  border: '1px solid #e8ecf0', padding: '5px 12px',
+                  fontSize: 11, color: 'var(--text-400)', background: 'var(--bg-muted)',
+                  border: '1px solid var(--border-default)', padding: '5px 12px',
                   borderRadius: 8, cursor: 'pointer', fontWeight: 600,
                 }}
               >
@@ -517,8 +518,8 @@ export default function DailySpendTracker() {
           {pinnedData.expenses.length === 0 ? (
             <div style={{ padding: 28, textAlign: 'center' }}>
               <p style={{ fontSize: 28, marginBottom: 8 }}>✨</p>
-              <p style={{ fontSize: 13, fontWeight: 600, color: '#6b7280' }}>No spending on this day</p>
-              <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 3 }}>A great day for your wallet!</p>
+              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-500)' }}>No spending on this day</p>
+              <p style={{ fontSize: 11, color: 'var(--text-400)', marginTop: 3 }}>A great day for your wallet!</p>
             </div>
           ) : (
             <>
@@ -530,26 +531,26 @@ export default function DailySpendTracker() {
                     style={{
                       display: 'flex', alignItems: 'center', gap: 14,
                       padding: '13px 18px',
-                      borderBottom: idx < pinnedData.expenses.length - 1 ? '1px solid #f9fafb' : 'none',
-                      background: '#fff',
+                      borderBottom: idx < pinnedData.expenses.length - 1 ? '1px solid var(--bg-subtle)' : 'none',
+                      background: 'var(--bg-surface)',
                     }}
                   >
                     <div style={{
                       width: 40, height: 40, borderRadius: 11,
-                      background: cat ? `${cat.color}1a` : '#f3f4f6',
+                      background: cat ? `${cat.color}1a` : 'var(--bg-muted)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 18, flexShrink: 0,
                     }}>
                       {cat?.icon ?? '📦'}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-900)' }}>
                         {e.description || 'Expense'}
                       </p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
                         <span style={{
-                          fontSize: 10, fontWeight: 600, color: cat?.color ?? '#6b7280',
-                          background: cat ? `${cat.color}15` : '#f3f4f6',
+                          fontSize: 10, fontWeight: 600, color: cat?.color ?? 'var(--text-500)',
+                          background: cat ? `${cat.color}15` : 'var(--bg-muted)',
                           padding: '1px 7px', borderRadius: 100,
                         }}>
                           {cat?.name ?? 'Uncategorised'}
@@ -558,7 +559,7 @@ export default function DailySpendTracker() {
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <p style={{
-                        fontSize: 14, fontWeight: 700, color: '#111827',
+                        fontSize: 14, fontWeight: 700, color: 'var(--text-900)',
                         fontVariantNumeric: 'tabular-nums',
                       }}>
                         {formatCurrency(e.amount, currency)}
@@ -572,17 +573,17 @@ export default function DailySpendTracker() {
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '12px 18px',
-                background: '#f8fafc', borderTop: '1px solid #f0f2f5',
+                background: 'var(--bg-subtle)', borderTop: '1px solid var(--border-default)',
               }}>
-                <span style={{ fontSize: 12, color: '#6b7280' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-500)' }}>
                   {pinnedData.expenses.length} transaction{pinnedData.expenses.length !== 1 ? 's' : ''}
                 </span>
                 <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: 10, color: '#9ca3af', marginRight: 8 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-400)', marginRight: 8 }}>
                     vs avg {sym}{Math.round(avgDaily).toLocaleString('en-IN')}
                   </span>
                   <span style={{
-                    fontSize: 15, fontWeight: 800, color: '#111827',
+                    fontSize: 15, fontWeight: 800, color: 'var(--text-900)',
                     fontVariantNumeric: 'tabular-nums',
                   }}>
                     {formatCurrency(pinnedData.total, currency)}

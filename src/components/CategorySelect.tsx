@@ -56,10 +56,10 @@ export default function CategorySelect({ categories, value, onChange, placeholde
         className="w-full flex items-center gap-2.5 text-sm text-left transition-all"
         style={{
           padding: '10px 12px',
-          background: '#f8fafc',
-          border: `1.5px solid ${isOpen ? '#4f46e5' : '#e8ecf0'}`,
+          background: 'var(--bg-subtle)',
+          border: `1.5px solid ${isOpen ? 'var(--brand-600)' : 'var(--border-default)'}`,
           borderRadius: 10,
-          color: '#111827',
+          color: 'var(--text-900)',
           fontFamily: 'inherit',
           cursor: 'pointer',
           boxShadow: isOpen ? '0 0 0 3px rgba(79,70,229,0.08)' : 'none',
@@ -75,15 +75,15 @@ export default function CategorySelect({ categories, value, onChange, placeholde
             }}>
               {selected.icon}
             </div>
-            <span style={{ flex: 1, fontWeight: 600, color: '#111827' }}>{selected.name}</span>
+            <span style={{ flex: 1, fontWeight: 600, color: 'var(--text-900)' }}>{selected.name}</span>
           </>
         ) : (
-          <span style={{ flex: 1, color: '#9ca3af', fontWeight: 400 }}>{placeholder}</span>
+          <span style={{ flex: 1, color: 'var(--text-400)', fontWeight: 400 }}>{placeholder}</span>
         )}
         <ChevronDown
           size={14}
           style={{
-            color: '#9ca3af', flexShrink: 0,
+            color: 'var(--text-400)', flexShrink: 0,
             transform: isOpen ? 'rotate(180deg)' : 'none',
             transition: 'transform 0.2s',
           }}
@@ -95,17 +95,17 @@ export default function CategorySelect({ categories, value, onChange, placeholde
         <div
           className="absolute left-0 right-0 mt-1.5 z-50"
           style={{
-            background: '#fff',
-            border: '1px solid #e8ecf0',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-default)',
             borderRadius: 14,
             boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
             overflow: 'hidden',
           }}
         >
           {/* Search */}
-          <div style={{ padding: '10px 10px 6px', borderBottom: '1px solid #f3f4f6' }}>
+          <div style={{ padding: '10px 10px 6px', borderBottom: '1px solid var(--border-default)' }}>
             <div style={{ position: 'relative' }}>
-              <Search size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+              <Search size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-400)' }} />
               <input
                 ref={searchRef}
                 type="text"
@@ -114,8 +114,8 @@ export default function CategorySelect({ categories, value, onChange, placeholde
                 placeholder="Search categories…"
                 style={{
                   width: '100%', padding: '7px 10px 7px 28px', borderRadius: 8,
-                  background: '#f4f6f9', border: '1px solid #e8ecf0', fontSize: 12,
-                  color: '#111827', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+                  background: 'var(--bg-muted)', border: '1px solid var(--border-default)', fontSize: 12,
+                  color: 'var(--text-900)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
                 }}
               />
             </div>
@@ -124,7 +124,7 @@ export default function CategorySelect({ categories, value, onChange, placeholde
           {/* Category list */}
           <div style={{ maxHeight: 230, overflowY: 'auto', padding: '4px 0' }}>
             {visible.length === 0 ? (
-              <p style={{ textAlign: 'center', fontSize: 11, color: '#9ca3af', padding: '14px 0' }}>
+              <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-400)', padding: '14px 0' }}>
                 No categories found
               </p>
             ) : (
@@ -150,7 +150,7 @@ export default function CategorySelect({ categories, value, onChange, placeholde
                       {cat.icon}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 12, fontWeight: isSelected ? 700 : 500, color: '#111827' }}>
+                      <p style={{ fontSize: 12, fontWeight: isSelected ? 700 : 500, color: 'var(--text-900)' }}>
                         {cat.name}
                       </p>
                     </div>

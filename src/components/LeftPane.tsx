@@ -4,7 +4,7 @@ import { useState } from 'react';
 import {
   TrendingUp, LayoutDashboard, BarChart2,
   ArrowUpDown, FileBarChart, Settings,
-  ChevronLeft, ChevronRight, LogOut, Sparkles,
+  ChevronLeft, ChevronRight, LogOut, Sparkles, LineChart, Target,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 
@@ -14,6 +14,8 @@ const NAV_ITEMS = [
     items: [
       { id: 'overview',     label: 'Overview',      Icon: LayoutDashboard, desc: 'Dashboard summary' },
       { id: 'analytics',    label: 'Analytics',     Icon: BarChart2,       desc: 'Charts & trends' },
+      { id: 'trends',       label: 'Trends',        Icon: LineChart,       desc: 'Monthly & forecast' },
+      { id: 'planning',     label: 'Planning',      Icon: Target,          desc: 'Goals & budgets' },
       { id: 'transactions', label: 'Transactions',  Icon: ArrowUpDown,     desc: 'All transactions' },
     ],
   },
@@ -32,7 +34,7 @@ const NAV_ITEMS = [
   },
 ] as const;
 
-type WorkspaceId = 'overview' | 'analytics' | 'transactions' | 'insights' | 'reports' | 'settings';
+type WorkspaceId = 'overview' | 'analytics' | 'trends' | 'planning' | 'transactions' | 'insights' | 'reports' | 'settings';
 
 interface LeftPaneProps {
   activeWorkspace?: string;

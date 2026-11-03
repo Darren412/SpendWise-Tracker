@@ -4,15 +4,25 @@ import { useState, useRef, useEffect } from 'react';
 import {
   ChevronLeft, ChevronRight, Plus,
   FileSpreadsheet, ChevronDown, RotateCcw, Cloud, Loader2,
+  Sun, Moon, Monitor, MoreHorizontal,
 } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { useAuth } from '@/components/AuthProvider';
+import { useTheme } from '@/hooks/useTheme';
 import { currencies } from '@/utils/currency';
 import {
   formatFinancialPeriodRange,
   getCurrentFinancialPeriod,
 } from '@/utils/financialCycle';
 import CategoryFilterBar from '@/components/CategoryFilterBar';
+import type { ThemePreference } from '@/lib/theme';
+
+const THEME_ORDER: ThemePreference[] = ['light', 'dark', 'system'];
+const nextTheme = (p: ThemePreference): ThemePreference =>
+  THEME_ORDER[(THEME_ORDER.indexOf(p) + 1) % THEME_ORDER.length];
+
+const ThemeIcon = ({ preference, resolved }: { preference: ThemePreference; resolved: 'light' | 'dark' }) =>
+  preference === 'system' ? <Monitor size={13} /> : resolved === 'dark' ? <Moon size={13} /> : <Sun size={13} />;
 
 interface TopToolbarProps {
   onAddExpense: () => void;
@@ -30,9 +40,16 @@ export default function TopToolbar({ onAddExpense, onAddIncome, onExport }: TopT
     syncing,
   } = useBudgetStore();
   const { user } = useAuth();
+  const { preference: themePreference, resolved: resolvedTheme, setPreference: setThemePreference } = useTheme();
 
   const [showCurrency, setShowCurrency] = useState(false);
   const currencyRef = useRef<HTMLDivElement>(null);
+  const [showOverflow, setShowOverflow] = useState(false);
+  const overflowRef = useRef<HTMLDivElement>(null);
+
+  const themeLabel = themePreference === 'system' ? 'System' : themePreference === 'dark' ? 'Dark' : 'Light';
+  const themeAriaLabel = `Theme: ${themeLabel}. Change theme`;
+  const cycleTheme = () => setThemePreference(nextTheme(themePreference));
 
   const isDarren = user?.email === 'darren412@gmail.com';
   const cities   = ['Bangalore', 'Mangalore', 'Both'];
@@ -64,10 +81,19 @@ export default function TopToolbar({ onAddExpense, onAddIncome, onExport }: TopT
     const h = (e: MouseEvent) => {
       if (currencyRef.current && !currencyRef.current.contains(e.target as Node))
         setShowCurrency(false);
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node))
+        setShowOverflow(false);
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
+
+  useEffect(() => {
+    if (!showOverflow) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowOverflow(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showOverflow]);
 
   const currConfig = currencies.find(c => c.code === currency) ?? currencies[0];
 
@@ -109,12 +135,12 @@ export default function TopToolbar({ onAddExpense, onAddIncome, onExport }: TopT
         )}
       </div>
 
-      <div className="sw-toolbar-sep" />
+      <div className="sw-toolbar-sep sw-desktop-only" />
 
       {/* ── City toggle (Darren only) ── */}
       {isDarren && (
         <>
-          <div className="sw-tb-toggle">
+          <div className="sw-tb-toggle sw-desktop-only">
             {cities.map(c => (
               <button
                 key={c}
@@ -125,17 +151,19 @@ export default function TopToolbar({ onAddExpense, onAddIncome, onExport }: TopT
               </button>
             ))}
           </div>
-          <div className="sw-toolbar-sep" />
+          <div className="sw-toolbar-sep sw-desktop-only" />
         </>
       )}
 
       {/* ── Category filter ── */}
-      <CategoryFilterBar />
+      <div className="sw-desktop-only" style={{ display: 'contents' }}>
+        <CategoryFilterBar />
+      </div>
 
-      <div className="sw-toolbar-sep" />
+      <div className="sw-toolbar-sep sw-desktop-only" />
 
       {/* ── Currency picker ── */}
-      <div style={{ position: 'relative', flexShrink: 0 }} ref={currencyRef}>
+      <div style={{ position: 'relative', flexShrink: 0 }} ref={currencyRef} className="sw-desktop-only">
         <button
           className="sw-tb-btn"
           onClick={() => setShowCurrency(v => !v)}
@@ -219,11 +247,11 @@ export default function TopToolbar({ onAddExpense, onAddIncome, onExport }: TopT
         </div>
       )}
 
-      <div className="sw-toolbar-sep" />
+      <div className="sw-toolbar-sep sw-desktop-only" />
 
       {/* ── Reset filters ── */}
       <button
-        className="sw-tb-btn"
+        className="sw-tb-btn sw-desktop-only"
         onClick={() => setExcludedCategoryIds([])}
         title="Reset all filters"
       >
@@ -232,16 +260,99 @@ export default function TopToolbar({ onAddExpense, onAddIncome, onExport }: TopT
       </button>
 
       {/* ── Quick actions ── */}
-      <button className="sw-tb-btn primary" onClick={onAddExpense}>
-        <Plus size={12} /> Expense
+      <button className="sw-tb-btn primary" onClick={onAddExpense} aria-label="Add expense">
+        <Plus size={12} /> <span className="sw-tb-btn-label">Expense</span>
       </button>
-      <button className="sw-tb-btn green" onClick={onAddIncome}>
-        <Plus size={12} /> Income
+      <button className="sw-tb-btn green" onClick={onAddIncome} aria-label="Add income">
+        <Plus size={12} /> <span className="sw-tb-btn-label">Income</span>
       </button>
-      <button className="sw-tb-btn" onClick={onExport}>
+      <button className="sw-tb-btn sw-desktop-only" onClick={onExport}>
         <FileSpreadsheet size={12} style={{ color: 'var(--green-500)' }} />
         <span className="hidden sm:inline">Export</span>
       </button>
+
+      {/* ── Theme toggle ── */}
+      <button
+        className="sw-tb-btn sw-desktop-only"
+        onClick={cycleTheme}
+        aria-label={themeAriaLabel}
+        title={themeAriaLabel}
+      >
+        <ThemeIcon preference={themePreference} resolved={resolvedTheme} />
+      </button>
+
+      {/* ── Mobile overflow menu ── */}
+      <div className="sw-tb-overflow sw-mobile-only" ref={overflowRef}>
+        <button
+          className="sw-tb-overflow-btn"
+          onClick={() => setShowOverflow(v => !v)}
+          aria-label="More toolbar options"
+          aria-expanded={showOverflow}
+        >
+          <MoreHorizontal size={15} />
+        </button>
+
+        {showOverflow && (
+          <div className="sw-tb-overflow-menu" role="menu">
+            <div className="sw-tb-menu-label">Period scope</div>
+            {isDarren && (
+              <div className="sw-tb-toggle" style={{ margin: '2px 10px 6px' }}>
+                {cities.map(c => (
+                  <button
+                    key={c}
+                    className={`sw-tb-toggle-btn${selectedCity === c ? ' active' : ''}`}
+                    onClick={() => setSelectedCity(c)}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+            <CategoryFilterBar />
+            <button
+              className="sw-tb-menu-item"
+              role="menuitem"
+              onClick={() => { setExcludedCategoryIds([]); setShowOverflow(false); }}
+            >
+              <RotateCcw size={13} style={{ color: 'var(--text-400)' }} />
+              Reset filters
+            </button>
+
+            <div className="sw-tb-menu-sep" />
+            <div className="sw-tb-menu-label">Currency</div>
+            {currencies.map(c => (
+              <button
+                key={c.code}
+                className={`sw-tb-menu-item${c.code === currency ? ' active' : ''}`}
+                role="menuitem"
+                onClick={() => setCurrency(c.code)}
+              >
+                <span style={{ width: 18, fontWeight: 700, opacity: 0.6 }}>{c.symbol}</span>
+                {c.code}
+              </button>
+            ))}
+
+            <div className="sw-tb-menu-sep" />
+            <button
+              className="sw-tb-menu-item"
+              role="menuitem"
+              onClick={cycleTheme}
+              aria-label={themeAriaLabel}
+            >
+              <ThemeIcon preference={themePreference} resolved={resolvedTheme} />
+              Theme: {themeLabel}
+            </button>
+            <button
+              className="sw-tb-menu-item"
+              role="menuitem"
+              onClick={() => { setShowOverflow(false); onExport(); }}
+            >
+              <FileSpreadsheet size={13} style={{ color: 'var(--green-500)' }} />
+              Export
+            </button>
+          </div>
+        )}
+      </div>
 
     </div>
   );

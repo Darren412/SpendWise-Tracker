@@ -1,22 +1,27 @@
 ﻿'use client';
 
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import LeftPane from '@/components/LeftPane';
+import MobileNav from '@/components/MobileNav';
 import TopToolbar from '@/components/TopToolbar';
 import AddTransactionModal from '@/components/AddTransactionModal';
 import LoginPage from '@/components/LoginPage';
+import Toast from '@/components/Toast';
 import { useBudgetStore } from '@/store/budgetStore';
 import { useAuth } from '@/components/AuthProvider';
+import { useBudgetAlerts } from '@/hooks/useBudgetAlerts';
 import { Loader2, WifiOff } from 'lucide-react';
 
 const OverviewWorkspace     = lazy(() => import('@/workspaces/OverviewWorkspace'));
 const AnalyticsWorkspace    = lazy(() => import('@/workspaces/AnalyticsWorkspace'));
+const TrendsWorkspace       = lazy(() => import('@/workspaces/TrendsWorkspace'));
+const PlanningWorkspace     = lazy(() => import('@/workspaces/PlanningWorkspace'));
 const TransactionsWorkspace = lazy(() => import('@/workspaces/TransactionsWorkspace'));
 const InsightsWorkspace     = lazy(() => import('@/workspaces/InsightsWorkspace'));
 const ReportsWorkspace      = lazy(() => import('@/workspaces/ReportsWorkspace'));
 const SettingsWorkspace     = lazy(() => import('@/workspaces/SettingsWorkspace'));
 
-type Workspace = 'overview' | 'analytics' | 'transactions' | 'insights' | 'reports' | 'settings';
+type Workspace = 'overview' | 'analytics' | 'trends' | 'planning' | 'transactions' | 'insights' | 'reports' | 'settings';
 
 function WorkspaceSkeleton() {
   return (
@@ -30,7 +35,7 @@ function WorkspaceSkeleton() {
         <div className="skeleton" style={{ width: 320, height: 14, borderRadius: 6 }} />
       </div>
       {/* KPI skeleton */}
-      <div className="stagger-fade" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div className="stagger-fade" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 24 }}>
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="skeleton" style={{ height: 110, borderRadius: 16 }} />
         ))}
@@ -68,6 +73,23 @@ export default function Home() {
   const handleWorkspaceChange = (id: string) => {
     setActiveWorkspace(id as Workspace);
   };
+
+  // One-time budget-alert toast: fires for newly breached thresholds on any
+  // workspace, then records the keys so reloads don't repeat it.
+  const { newOnes } = useBudgetAlerts();
+  const [alertToast, setAlertToast] = useState('');
+  const toastedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const fresh = newOnes.filter(a => !toastedRef.current.has(a.key));
+    if (fresh.length === 0) return;
+    fresh.forEach(a => toastedRef.current.add(a.key));
+    const first = fresh[0];
+    const msg = fresh.length === 1
+      ? `${first.name}: ${first.pct}% of budget used`
+      : `${fresh.length} budget alerts — ${first.name} at ${first.pct}% and ${fresh.length - 1} more`;
+    setAlertToast(msg);
+    useBudgetStore.getState().markAlertsNotified(fresh.map(a => a.key));
+  }, [newOnes]);
 
   /* ── Auth loading ── */
   if (authLoading) {
@@ -112,6 +134,12 @@ export default function Home() {
           onWorkspaceChange={handleWorkspaceChange}
         />
 
+        {/* ── Mobile bottom nav (<768px) ── */}
+        <MobileNav
+          activeWorkspace={activeWorkspace}
+          onWorkspaceChange={handleWorkspaceChange}
+        />
+
         {/* ── Main column: toolbar + viewport ── */}
         <div className="sw-workspace-container">
 
@@ -136,6 +164,8 @@ export default function Home() {
               <Suspense fallback={<WorkspaceSkeleton />}>
                 {activeWorkspace === 'overview'     && <OverviewWorkspace     onNavigate={handleWorkspaceChange} />}
                 {activeWorkspace === 'analytics'    && <AnalyticsWorkspace    />}
+                {activeWorkspace === 'trends'       && <TrendsWorkspace       />}
+                {activeWorkspace === 'planning'     && <PlanningWorkspace     />}
                 {activeWorkspace === 'transactions' && <TransactionsWorkspace onAddExpense={() => setAddModal({ open: true, tab: 'expense' })} onAddIncome={() => setAddModal({ open: true, tab: 'income' })} />}
                 {activeWorkspace === 'insights'     && <InsightsWorkspace     />}
                 {activeWorkspace === 'reports'      && <ReportsWorkspace      />}
@@ -152,6 +182,14 @@ export default function Home() {
         open={addModal.open}
         defaultTab={addModal.tab}
         onClose={() => setAddModal(v => ({ ...v, open: false }))}
+      />
+
+      {/* Budget-alert toast (one-time per newly breached threshold) */}
+      <Toast
+        open={!!alertToast}
+        message={alertToast}
+        accent="var(--amber-500)"
+        onClose={() => setAlertToast('')}
       />
     </>
   );

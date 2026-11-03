@@ -28,7 +28,7 @@ import type { LucideIcon } from 'lucide-react';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const UNCATEGORIZED = { id: '__uncategorized__', name: 'Uncategorized', color: '#94a3b8', icon: '📦' };
+const UNCATEGORIZED = { id: '__uncategorized__', name: 'Uncategorized', color: 'var(--text-400)', icon: '📦' };
 
 // Category | Yearly Total | Share | Monthly Avg | Last Year | YoY | Txns | Peak
 const BREAKDOWN_GRID =
@@ -249,36 +249,36 @@ export default function YearlySummary() {
     if (highestMonth) {
       insights.push({
         Icon: Flame,
-        bg: '#fef2f2',
-        border: '#fecaca',
-        color: '#dc2626',
+        bg: 'var(--red-50)',
+        border: 'var(--red-200)',
+        color: 'var(--danger-text)',
         text: `${highestMonth.name} was your most expensive month — ${formatCurrency(highestMonth.expense, currency)} spent.`,
       });
     }
     if (lowestMonth && highestMonth && lowestMonth.name !== highestMonth.name) {
       insights.push({
         Icon: ArrowDownRight,
-        bg: '#f0fdf4',
-        border: '#bbf7d0',
-        color: '#16a34a',
+        bg: 'var(--green-50)',
+        border: 'var(--green-200)',
+        color: 'var(--success-text)',
         text: `${lowestMonth.name} was your lightest month — ${formatCurrency(lowestMonth.expense, currency)} spent.`,
       });
     }
     if (bestSavingsMonth) {
       insights.push({
         Icon: Award,
-        bg: '#eef2ff',
-        border: '#c7d2fe',
-        color: '#4f46e5',
+        bg: 'var(--brand-50)',
+        border: 'var(--brand-200)',
+        color: 'var(--brand-text)',
         text: `${bestSavingsMonth.name} had your best savings rate — ${((bestSavingsMonth.savings / bestSavingsMonth.income) * 100).toFixed(1)}% of income saved.`,
       });
     }
     if (incomeMonths.length > 0) {
       insights.push({
         Icon: Target,
-        bg: '#eef2ff',
-        border: '#c7d2fe',
-        color: '#4f46e5',
+        bg: 'var(--brand-50)',
+        border: 'var(--brand-200)',
+        color: 'var(--brand-text)',
         text: `${targetHitCount} of ${incomeMonths.length} months hit your ${savingsTarget}% savings target.`,
       });
     }
@@ -286,9 +286,9 @@ export default function YearlySummary() {
       const top = spendRows[0];
       insights.push({
         Icon: PieChart,
-        bg: '#fffbeb',
-        border: '#fde68a',
-        color: '#d97706',
+        bg: 'var(--amber-50)',
+        border: 'var(--amber-200)',
+        color: 'var(--warning-text)',
         text: `${top.icon} ${top.name} was ${top.share.toFixed(1)}% of your spending.`,
       });
     }
@@ -297,9 +297,9 @@ export default function YearlySummary() {
       const combined = spendRows.slice(0, n).reduce((s, r) => s + r.share, 0);
       insights.push({
         Icon: Layers,
-        bg: '#faf5ff',
-        border: '#e9d5ff',
-        color: '#9333ea',
+        bg: 'var(--purple-50)',
+        border: 'var(--purple-200)',
+        color: 'var(--purple-text)',
         text: `Your top ${n} categories combined were ${combined.toFixed(1)}% of spending.`,
       });
     }
@@ -314,18 +314,18 @@ export default function YearlySummary() {
     if (biggestIncrease && (biggestIncrease.yoyPct ?? 0) > 0) {
       insights.push({
         Icon: TrendingUp,
-        bg: '#fef2f2',
-        border: '#fecaca',
-        color: '#dc2626',
+        bg: 'var(--red-50)',
+        border: 'var(--red-200)',
+        color: 'var(--danger-text)',
         text: `${biggestIncrease.icon} ${biggestIncrease.name} rose ${(biggestIncrease.yoyPct ?? 0).toFixed(1)}% vs ${compareLabel} (+${formatCurrency(biggestIncrease.total - biggestIncrease.lastTotal, currency)}).`,
       });
     }
     if (biggestDecrease && (biggestDecrease.yoyPct ?? 0) < 0) {
       insights.push({
         Icon: TrendingDown,
-        bg: '#f0fdf4',
-        border: '#bbf7d0',
-        color: '#16a34a',
+        bg: 'var(--green-50)',
+        border: 'var(--green-200)',
+        color: 'var(--success-text)',
         text: `${biggestDecrease.icon} ${biggestDecrease.name} fell ${Math.abs(biggestDecrease.yoyPct ?? 0).toFixed(1)}% vs ${compareLabel} (−${formatCurrency(biggestDecrease.lastTotal - biggestDecrease.total, currency)}).`,
       });
     }
@@ -345,9 +345,9 @@ export default function YearlySummary() {
         const rising = pct >= 0;
         insights.push({
           Icon: Activity,
-          bg: rising ? '#fff7ed' : '#f0fdf4',
-          border: rising ? '#fed7aa' : '#bbf7d0',
-          color: rising ? '#ea580c' : '#16a34a',
+          bg: rising ? 'var(--amber-50)' : 'var(--green-50)',
+          border: rising ? 'var(--amber-200)' : 'var(--green-200)',
+          color: rising ? 'var(--warning-text)' : 'var(--success-text)',
           text: `Spending is ${rising ? 'rising' : 'falling'} — recent active months average ${Math.abs(pct).toFixed(1)}% ${rising ? 'more' : 'less'} than earlier ones.`,
         });
       }
@@ -358,9 +358,9 @@ export default function YearlySummary() {
       const projectedYearEndSavings = projectedIncome - projectedSpend;
       insights.push({
         Icon: Sparkles,
-        bg: projectedYearEndSavings >= 0 ? '#f0fdf4' : '#fef2f2',
-        border: projectedYearEndSavings >= 0 ? '#bbf7d0' : '#fecaca',
-        color: projectedYearEndSavings >= 0 ? '#16a34a' : '#dc2626',
+        bg: projectedYearEndSavings >= 0 ? 'var(--green-50)' : 'var(--red-50)',
+        border: projectedYearEndSavings >= 0 ? 'var(--green-200)' : 'var(--red-200)',
+        color: projectedYearEndSavings >= 0 ? 'var(--success-text)' : 'var(--danger-text)',
         text:
           projectedYearEndSavings >= 0
             ? `At this pace you could save about ${formatCurrency(projectedYearEndSavings, currency)} by year end.`
@@ -462,7 +462,7 @@ export default function YearlySummary() {
     const up = pct >= 0;
     const good = up === goodWhenUp;
     return (
-      <p className="num-mono mt-1" style={{ fontSize: '0.6875rem', fontWeight: 700, color: good ? '#059669' : '#dc2626' }}>
+      <p className="num-mono mt-1" style={{ fontSize: '0.6875rem', fontWeight: 700, color: good ? 'var(--success-text)' : 'var(--danger-text)' }}>
         {up ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}% vs {compareLabel}
       </p>
     );
@@ -480,7 +480,7 @@ export default function YearlySummary() {
     <>
       <div className="flex items-center gap-3">
         <div className="w-1 h-7 rounded-full" style={{ background: 'linear-gradient(180deg, #6366f1, #4f46e5)' }} />
-        <h2 className="graffiti-font text-3xl" style={{ color: '#1e293b' }}>YEARLY OVERVIEW</h2>
+        <h2 className="graffiti-font text-3xl" style={{ color: 'var(--text-800)' }}>YEARLY OVERVIEW</h2>
         <div className="ml-auto flex items-center gap-1">
           <button
             onClick={() => canPrev && setYear(availableYears[yearIdx - 1])}
@@ -488,8 +488,8 @@ export default function YearlySummary() {
             aria-label="Previous year"
             className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
             style={{
-              background: canPrev ? '#eef2ff' : '#f8fafc',
-              color: canPrev ? '#6366f1' : '#cbd5e1',
+              background: canPrev ? 'var(--brand-50)' : 'var(--bg-subtle)',
+              color: canPrev ? 'var(--brand-text)' : 'var(--text-300)',
               cursor: canPrev ? 'pointer' : 'default',
             }}
           >
@@ -497,7 +497,7 @@ export default function YearlySummary() {
           </button>
           <span
             className="text-sm font-bold px-3 py-1 rounded-full num-mono"
-            style={{ background: '#eef2ff', color: '#6366f1', minWidth: 64, textAlign: 'center' }}
+            style={{ background: 'var(--brand-50)', color: 'var(--brand-text)', minWidth: 64, textAlign: 'center' }}
           >
             {year}
           </span>
@@ -507,8 +507,8 @@ export default function YearlySummary() {
             aria-label="Next year"
             className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
             style={{
-              background: canNext ? '#eef2ff' : '#f8fafc',
-              color: canNext ? '#6366f1' : '#cbd5e1',
+              background: canNext ? 'var(--brand-50)' : 'var(--bg-subtle)',
+              color: canNext ? 'var(--brand-text)' : 'var(--text-300)',
               cursor: canNext ? 'pointer' : 'default',
             }}
           >
@@ -516,7 +516,7 @@ export default function YearlySummary() {
           </button>
         </div>
       </div>
-      <p className="text-xs mb-6 mt-1.5" style={{ color: '#94a3b8', paddingLeft: 16 }}>
+      <p className="text-xs mb-6 mt-1.5" style={{ color: 'var(--text-400)', paddingLeft: 16 }}>
         {subtitle}
       </p>
     </>
@@ -526,7 +526,7 @@ export default function YearlySummary() {
     return (
       <div className="dark-card p-7" style={{ border: '1px solid rgba(99,102,241,0.15)' }}>
         {header}
-        <p className="text-center py-8 text-sm" style={{ color: '#94a3b8' }}>
+        <p className="text-center py-8 text-sm" style={{ color: 'var(--text-400)' }}>
           No data for {year}
         </p>
       </div>
@@ -539,59 +539,59 @@ export default function YearlySummary() {
 
       {/* ── Top Stats Row ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <div className="rounded-xl p-4" style={{ background: '#ecfdf5', border: '1px solid #d1fae5' }}>
+        <div className="rounded-xl p-4" style={{ background: 'var(--green-50)', border: '1px solid var(--green-100)' }}>
           <div className="flex items-center gap-2 mb-2">
-            <TrendingUp size={14} color="#059669" />
-            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#059669' }}>Total Income</span>
+            <TrendingUp size={14} color="var(--success-text)" />
+            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--success-text)' }}>Total Income</span>
           </div>
-          <p className="text-xl font-bold num-mono" style={{ color: '#065f46' }}>{formatCurrency(totalIncome, currency)}</p>
+          <p className="text-xl font-bold num-mono" style={{ color: 'var(--success-text)' }}>{formatCurrency(totalIncome, currency)}</p>
           {renderYoY(incomeYoY, true)}
         </div>
-        <div className="rounded-xl p-4" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
+        <div className="rounded-xl p-4" style={{ background: 'var(--red-50)', border: '1px solid var(--red-200)' }}>
           <div className="flex items-center gap-2 mb-2">
-            <TrendingDown size={14} color="#dc2626" />
-            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#dc2626' }}>Total Spent</span>
+            <TrendingDown size={14} color="var(--danger-text)" />
+            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--danger-text)' }}>Total Spent</span>
           </div>
-          <p className="text-xl font-bold num-mono" style={{ color: '#991b1b' }}>{formatCurrency(totalSpent, currency)}</p>
+          <p className="text-xl font-bold num-mono" style={{ color: 'var(--danger-text)' }}>{formatCurrency(totalSpent, currency)}</p>
           {renderYoY(spentYoY, false)}
         </div>
         <div
           className="rounded-xl p-4"
           style={{
-            background: totalSavings >= 0 ? '#f0fdf4' : '#fef2f2',
-            border: `1px solid ${totalSavings >= 0 ? '#bbf7d0' : '#fecaca'}`,
+            background: totalSavings >= 0 ? 'var(--green-50)' : 'var(--red-50)',
+            border: `1px solid ${totalSavings >= 0 ? 'var(--green-200)' : 'var(--red-200)'}`,
           }}
         >
           <div className="flex items-center gap-2 mb-2">
-            <PiggyBank size={14} color={totalSavings >= 0 ? '#16a34a' : '#dc2626'} />
+            <PiggyBank size={14} color={totalSavings >= 0 ? 'var(--success-text)' : 'var(--danger-text)'} />
             <span
               className="text-xs font-bold uppercase tracking-wider"
-              style={{ color: totalSavings >= 0 ? '#16a34a' : '#dc2626' }}
+              style={{ color: totalSavings >= 0 ? 'var(--success-text)' : 'var(--danger-text)' }}
             >
               Total Savings
             </span>
           </div>
-          <p className="text-xl font-bold num-mono" style={{ color: totalSavings >= 0 ? '#166534' : '#991b1b' }}>
+          <p className="text-xl font-bold num-mono" style={{ color: totalSavings >= 0 ? 'var(--success-text)' : 'var(--danger-text)' }}>
             {totalSavings >= 0 ? '+' : ''}
             {formatCurrency(totalSavings, currency)}
           </p>
           {renderYoY(savingsYoY, true)}
         </div>
-        <div className="rounded-xl p-4" style={{ background: '#eef2ff', border: '1px solid #c7d2fe' }}>
+        <div className="rounded-xl p-4" style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-200)' }}>
           <div className="flex items-center gap-2 mb-2">
-            <Calendar size={14} color="#6366f1" />
-            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#6366f1' }}>Savings Rate</span>
+            <Calendar size={14} color="var(--brand-text)" />
+            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--brand-text)' }}>Savings Rate</span>
           </div>
-          <p className="text-xl font-bold num-mono" style={{ color: rateOnTarget ? '#16a34a' : '#d97706' }}>
+          <p className="text-xl font-bold num-mono" style={{ color: rateOnTarget ? 'var(--success-text)' : 'var(--warning-text)' }}>
             {savingsRate.toFixed(1)}%
           </p>
-          <p className="num-mono mt-1" style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b' }}>
+          <p className="num-mono mt-1" style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-500)' }}>
             Target {savingsTarget}%
           </p>
           {rateDiff !== null && (
             <p
               className="num-mono"
-              style={{ fontSize: '0.6875rem', fontWeight: 700, color: rateDiff >= 0 ? '#059669' : '#dc2626' }}
+              style={{ fontSize: '0.6875rem', fontWeight: 700, color: rateDiff >= 0 ? 'var(--success-text)' : 'var(--danger-text)' }}
             >
               {rateDiff >= 0 ? '+' : '−'}
               {Math.abs(rateDiff).toFixed(1)} pts vs {compareLabel}
@@ -602,72 +602,72 @@ export default function YearlySummary() {
 
       {/* ── Secondary Stats Row ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="rounded-xl p-3" style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+        <div className="rounded-xl p-3" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--bg-muted)' }}>
           <div className="flex items-center gap-2 mb-1.5">
-            <BarChart3 size={13} color="#64748b" />
-            <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>
+            <BarChart3 size={13} color="var(--text-500)" />
+            <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-500)' }}>
               Avg Monthly Spend
             </span>
           </div>
-          <p className="text-base font-bold num-mono" style={{ color: '#1e293b' }}>
+          <p className="text-base font-bold num-mono" style={{ color: 'var(--text-800)' }}>
             {formatCurrency(avgMonthlySpend, currency)}
           </p>
-          <p style={{ fontSize: '0.6875rem', color: '#94a3b8' }}>
+          <p style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>
             across {activeExpenseMonths} month{activeExpenseMonths === 1 ? '' : 's'}
           </p>
         </div>
-        <div className="rounded-xl p-3" style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+        <div className="rounded-xl p-3" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--bg-muted)' }}>
           <div className="flex items-center gap-2 mb-1.5">
-            <Wallet size={13} color="#64748b" />
-            <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>
+            <Wallet size={13} color="var(--text-500)" />
+            <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-500)' }}>
               Avg Monthly Income
             </span>
           </div>
-          <p className="text-base font-bold num-mono" style={{ color: '#1e293b' }}>
+          <p className="text-base font-bold num-mono" style={{ color: 'var(--text-800)' }}>
             {formatCurrency(avgMonthlyIncome, currency)}
           </p>
-          <p style={{ fontSize: '0.6875rem', color: '#94a3b8' }}>
+          <p style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>
             across {activeIncomeMonths} month{activeIncomeMonths === 1 ? '' : 's'}
           </p>
         </div>
-        <div className="rounded-xl p-3" style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+        <div className="rounded-xl p-3" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--bg-muted)' }}>
           <div className="flex items-center gap-2 mb-1.5">
-            <Receipt size={13} color="#64748b" />
-            <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>
+            <Receipt size={13} color="var(--text-500)" />
+            <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-500)' }}>
               Transactions
             </span>
           </div>
-          <p className="text-base font-bold num-mono" style={{ color: '#1e293b' }}>{yearExpenses.length}</p>
-          <p style={{ fontSize: '0.6875rem', color: '#94a3b8' }}>
+          <p className="text-base font-bold num-mono" style={{ color: 'var(--text-800)' }}>{yearExpenses.length}</p>
+          <p style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>
             {txnsPerMonth.toFixed(1)}/month avg
           </p>
         </div>
-        <div className="rounded-xl p-3" style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+        <div className="rounded-xl p-3" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--bg-muted)' }}>
           {isCurrentYear && elapsed > 0 ? (
             <>
               <div className="flex items-center gap-2 mb-1.5">
-                <Sparkles size={13} color="#6366f1" />
-                <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6366f1' }}>
+                <Sparkles size={13} color="var(--brand-text)" />
+                <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--brand-text)' }}>
                   Projected Year-End Spend
                 </span>
               </div>
-              <p className="text-base font-bold num-mono" style={{ color: '#3730a3' }}>
+              <p className="text-base font-bold num-mono" style={{ color: 'var(--brand-text)' }}>
                 {formatCurrency(projectedSpend, currency)}
               </p>
-              <p style={{ fontSize: '0.6875rem', color: '#94a3b8' }}>at current pace</p>
+              <p style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>at current pace</p>
             </>
           ) : (
             <>
               <div className="flex items-center gap-2 mb-1.5">
-                <Flame size={13} color="#ea580c" />
-                <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#ea580c' }}>
+                <Flame size={13} color="var(--warning-text)" />
+                <span style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--warning-text)' }}>
                   Highest Month
                 </span>
               </div>
-              <p className="text-base font-bold num-mono" style={{ color: '#9a3412' }}>
+              <p className="text-base font-bold num-mono" style={{ color: 'var(--warning-text)' }}>
                 {highestMonth ? formatCurrency(highestMonth.expense, currency) : '—'}
               </p>
-              <p style={{ fontSize: '0.6875rem', color: '#94a3b8' }}>
+              <p style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>
                 {highestMonth ? `${highestMonth.name} ${year}` : 'No expenses'}
               </p>
             </>
@@ -678,11 +678,11 @@ export default function YearlySummary() {
       {/* ── Category Breakdown ── */}
       <div className="mb-6">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#94a3b8' }}>
+          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-400)' }}>
             Category Breakdown · {data.categoryRows.length}{' '}
             {data.categoryRows.length === 1 ? 'category' : 'categories'}
           </p>
-          <div className="flex items-center gap-1 rounded-full p-0.5" style={{ background: '#f1f5f9' }}>
+          <div className="flex items-center gap-1 rounded-full p-0.5" style={{ background: 'var(--bg-muted)' }}>
             {(
               [
                 ['amount', 'Amount'],
@@ -697,8 +697,8 @@ export default function YearlySummary() {
                 style={{
                   fontSize: '0.6875rem',
                   padding: '4px 10px',
-                  background: sortKey === key ? '#ffffff' : 'transparent',
-                  color: sortKey === key ? '#4f46e5' : '#64748b',
+                  background: sortKey === key ? 'var(--bg-surface)' : 'transparent',
+                  color: sortKey === key ? 'var(--brand-text)' : 'var(--text-500)',
                   boxShadow: sortKey === key ? '0 1px 2px rgba(15,23,42,0.08)' : 'none',
                 }}
               >
@@ -709,7 +709,7 @@ export default function YearlySummary() {
         </div>
 
         {data.categoryRows.length === 0 ? (
-          <p className="text-center py-4 text-sm" style={{ color: '#94a3b8' }}>
+          <p className="text-center py-4 text-sm" style={{ color: 'var(--text-400)' }}>
             No expenses recorded for {year}
           </p>
         ) : (
@@ -734,7 +734,7 @@ export default function YearlySummary() {
                         fontWeight: 700,
                         textTransform: 'uppercase',
                         letterSpacing: '0.06em',
-                        color: '#94a3b8',
+                        color: 'var(--text-400)',
                         textAlign: i === 0 ? 'left' : 'right',
                       }}
                     >
@@ -750,14 +750,14 @@ export default function YearlySummary() {
                 const catMax = Math.max(...row.monthly);
                 const yoy =
                   row.total === 0
-                    ? { text: '−100%', color: '#059669' }
+                    ? { text: '−100%', color: 'var(--success-text)' }
                     : row.yoyPct === null
-                      ? { text: 'New', color: '#6366f1' }
+                      ? { text: 'New', color: 'var(--brand-text)' }
                       : row.yoyPct >= 0
-                        ? { text: `▲ ${row.yoyPct.toFixed(1)}%`, color: '#dc2626' }
-                        : { text: `▼ ${Math.abs(row.yoyPct).toFixed(1)}%`, color: '#059669' };
+                        ? { text: `▲ ${row.yoyPct.toFixed(1)}%`, color: 'var(--danger-text)' }
+                        : { text: `▼ ${Math.abs(row.yoyPct).toFixed(1)}%`, color: 'var(--success-text)' };
                 return (
-                  <div key={row.key} style={{ borderTop: '1px solid #f1f5f9' }}>
+                  <div key={row.key} style={{ borderTop: '1px solid var(--bg-muted)' }}>
                     <button
                       onClick={() => setExpandedCat(open ? null : row.key)}
                       className="w-full text-left px-2 py-2.5 hover:bg-slate-50 transition-colors"
@@ -770,40 +770,40 @@ export default function YearlySummary() {
                     >
                       <span className="flex items-center gap-2 min-w-0">
                         <span style={{ fontSize: 14, flexShrink: 0 }}>{row.icon}</span>
-                        <span className="text-xs font-bold truncate" style={{ color: '#334155' }}>
+                        <span className="text-xs font-bold truncate" style={{ color: 'var(--text-700)' }}>
                           {row.name}
                         </span>
                         <ChevronDown
                           size={12}
                           style={{
-                            color: '#cbd5e1',
+                            color: 'var(--text-300)',
                             flexShrink: 0,
                             transform: open ? 'rotate(180deg)' : 'none',
                             transition: 'transform 0.2s',
                           }}
                         />
                       </span>
-                      <span className="text-xs font-bold num-mono text-right" style={{ color: '#1e293b' }}>
+                      <span className="text-xs font-bold num-mono text-right" style={{ color: 'var(--text-800)' }}>
                         {formatCurrency(row.total, currency)}
                       </span>
                       <span>
                         <span
                           className="block text-right num-mono mb-1"
-                          style={{ fontSize: '0.6875rem', color: '#64748b' }}
+                          style={{ fontSize: '0.6875rem', color: 'var(--text-500)' }}
                         >
                           {row.share.toFixed(1)}%
                         </span>
-                        <span className="block w-full rounded-full h-1.5" style={{ background: '#f1f5f9' }}>
+                        <span className="block w-full rounded-full h-1.5" style={{ background: 'var(--bg-muted)' }}>
                           <span
                             className="block h-1.5 rounded-full"
                             style={{ width: `${Math.min(100, row.share)}%`, background: row.color }}
                           />
                         </span>
                       </span>
-                      <span className="text-xs num-mono text-right" style={{ color: '#475569' }}>
+                      <span className="text-xs num-mono text-right" style={{ color: 'var(--text-600)' }}>
                         {formatCurrency(row.monthlyAvg, currency)}
                       </span>
-                      <span className="text-xs num-mono text-right" style={{ color: '#94a3b8' }}>
+                      <span className="text-xs num-mono text-right" style={{ color: 'var(--text-400)' }}>
                         {row.lastTotal > 0 ? formatCurrency(row.lastTotal, currency) : '—'}
                       </span>
                       <span
@@ -812,10 +812,10 @@ export default function YearlySummary() {
                       >
                         {yoy.text}
                       </span>
-                      <span className="text-xs num-mono text-right" style={{ color: '#64748b' }}>
+                      <span className="text-xs num-mono text-right" style={{ color: 'var(--text-500)' }}>
                         {row.txns}
                       </span>
-                      <span className="text-xs text-right" style={{ color: '#64748b' }}>
+                      <span className="text-xs text-right" style={{ color: 'var(--text-500)' }}>
                         {row.peakIdx >= 0 ? MONTH_NAMES[row.peakIdx] : '—'}
                       </span>
                     </button>
@@ -823,12 +823,12 @@ export default function YearlySummary() {
                     {open && (
                       <div
                         className="grid md:grid-cols-2 gap-4 px-3 py-3"
-                        style={{ background: '#f8fafc', borderTop: '1px dashed #e2e8f0' }}
+                        style={{ background: 'var(--bg-subtle)', borderTop: '1px dashed var(--border-default)' }}
                       >
                         <div>
                           <p
                             className="font-bold uppercase tracking-wider mb-2"
-                            style={{ fontSize: '0.625rem', color: '#94a3b8' }}
+                            style={{ fontSize: '0.625rem', color: 'var(--text-400)' }}
                           >
                             Monthly spend
                           </p>
@@ -845,7 +845,7 @@ export default function YearlySummary() {
                                     height:
                                       v > 0 && catMax > 0 ? `${Math.max(8, (v / catMax) * 100)}%` : 4,
                                     borderRadius: 3,
-                                    background: v > 0 ? (isFuture ? '#cbd5e1' : row.color) : '#e2e8f0',
+                                    background: v > 0 ? (isFuture ? 'var(--border-strong)' : row.color) : 'var(--bg-muted)',
                                   }}
                                 />
                               );
@@ -859,7 +859,7 @@ export default function YearlySummary() {
                                 <span
                                   key={m}
                                   className="flex-1 text-center"
-                                  style={{ fontSize: '0.5625rem', color: isFuture ? '#cbd5e1' : '#94a3b8' }}
+                                  style={{ fontSize: '0.5625rem', color: isFuture ? 'var(--text-300)' : 'var(--text-400)' }}
                                 >
                                   {m}
                                 </span>
@@ -870,26 +870,26 @@ export default function YearlySummary() {
                         <div>
                           <p
                             className="font-bold uppercase tracking-wider mb-2"
-                            style={{ fontSize: '0.625rem', color: '#94a3b8' }}
+                            style={{ fontSize: '0.625rem', color: 'var(--text-400)' }}
                           >
                             Top transactions
                           </p>
                           {row.top.length === 0 ? (
-                            <p className="text-xs" style={{ color: '#94a3b8' }}>
+                            <p className="text-xs" style={{ color: 'var(--text-400)' }}>
                               No transactions this year
                             </p>
                           ) : (
                             <div className="space-y-1.5">
                               {row.top.map((t) => (
                                 <div key={t.id} className="flex items-center justify-between gap-3 text-xs">
-                                  <span className="truncate" style={{ color: '#475569' }}>
+                                  <span className="truncate" style={{ color: 'var(--text-600)' }}>
                                     {t.description || 'Expense'} ·{' '}
                                     {new Date(t.date + 'T12:00:00').toLocaleDateString('en-IN', {
                                       day: 'numeric',
                                       month: 'short',
                                     })}
                                   </span>
-                                  <span className="num-mono font-semibold" style={{ color: '#334155' }}>
+                                  <span className="num-mono font-semibold" style={{ color: 'var(--text-700)' }}>
                                     {formatCurrency(t.amount, currency)}
                                   </span>
                                 </div>
@@ -911,34 +911,34 @@ export default function YearlySummary() {
                   gridTemplateColumns: BREAKDOWN_GRID,
                   columnGap: 8,
                   alignItems: 'center',
-                  borderTop: '2px solid #e2e8f0',
+                  borderTop: '2px solid var(--border-default)',
                 }}
               >
-                <span className="text-xs font-bold" style={{ color: '#1e293b' }}>
+                <span className="text-xs font-bold" style={{ color: 'var(--text-800)' }}>
                   Total
                 </span>
-                <span className="text-xs font-bold num-mono text-right" style={{ color: '#1e293b' }}>
+                <span className="text-xs font-bold num-mono text-right" style={{ color: 'var(--text-800)' }}>
                   {formatCurrency(totalSpent, currency)}
                 </span>
                 <span>
                   <span
                     className="block text-right num-mono mb-1"
-                    style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#334155' }}
+                    style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-700)' }}
                   >
                     100%
                   </span>
-                  <span className="block w-full rounded-full h-1.5" style={{ background: '#f1f5f9' }}>
+                  <span className="block w-full rounded-full h-1.5" style={{ background: 'var(--bg-muted)' }}>
                     <span className="block h-1.5 rounded-full" style={{ width: '100%', background: '#6366f1' }} />
                   </span>
                 </span>
-                <span className="text-xs font-bold num-mono text-right" style={{ color: '#334155' }}>
+                <span className="text-xs font-bold num-mono text-right" style={{ color: 'var(--text-700)' }}>
                   {formatCurrency(data.categoryRows.reduce((s, r) => s + r.monthlyAvg, 0), currency)}
                 </span>
-                <span className="text-xs font-bold num-mono text-right" style={{ color: '#94a3b8' }}>
+                <span className="text-xs font-bold num-mono text-right" style={{ color: 'var(--text-400)' }}>
                   {prevSpent > 0 ? formatCurrency(prevSpent, currency) : '—'}
                 </span>
                 <span />
-                <span className="text-xs font-bold num-mono text-right" style={{ color: '#334155' }}>
+                <span className="text-xs font-bold num-mono text-right" style={{ color: 'var(--text-700)' }}>
                   {yearExpenses.length}
                 </span>
                 <span />
@@ -955,12 +955,12 @@ export default function YearlySummary() {
             onClick={() => setShowHeatmap(!showHeatmap)}
             className="flex items-center justify-between w-full py-3 px-1"
           >
-            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#94a3b8' }}>
+            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-400)' }}>
               Category × Month Heatmap
             </p>
             <ChevronDown
               size={18}
-              style={{ color: '#94a3b8' }}
+              style={{ color: 'var(--text-400)' }}
               className={`transition-transform duration-300 ${showHeatmap ? 'rotate-180' : ''}`}
             />
           </button>
@@ -977,7 +977,7 @@ export default function YearlySummary() {
                         fontSize: '0.625rem',
                         fontWeight: 700,
                         textTransform: 'uppercase',
-                        color: '#94a3b8',
+                        color: 'var(--text-400)',
                         padding: '4px 0',
                       }}
                     >
@@ -990,7 +990,7 @@ export default function YearlySummary() {
                       fontSize: '0.625rem',
                       fontWeight: 700,
                       textTransform: 'uppercase',
-                      color: '#94a3b8',
+                      color: 'var(--text-400)',
                       padding: '4px 0',
                     }}
                   >
@@ -1005,7 +1005,7 @@ export default function YearlySummary() {
                         title={r.name}
                       >
                         <span style={{ fontSize: 12, flexShrink: 0 }}>{r.icon}</span>
-                        <span className="truncate" style={{ fontSize: '0.6875rem', fontWeight: 600, color: '#334155' }}>
+                        <span className="truncate" style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-700)' }}>
                           {r.name}
                         </span>
                       </div>
@@ -1021,8 +1021,8 @@ export default function YearlySummary() {
                               fontWeight: 600,
                               padding: '6px 0',
                               borderRadius: 4,
-                              background: v > 0 ? hexToRgba(r.color, alpha) : '#f8fafc',
-                              color: alpha > 0.55 ? '#ffffff' : '#475569',
+                              background: v > 0 ? hexToRgba(r.color, alpha) : 'var(--bg-subtle)',
+                              color: alpha > 0.55 ? '#ffffff' : 'var(--text-600)',
                             }}
                           >
                             {v > 0 ? compactAmount(v) : ''}
@@ -1036,8 +1036,8 @@ export default function YearlySummary() {
                           fontWeight: 700,
                           padding: '6px 0',
                           borderRadius: 4,
-                          background: '#f1f5f9',
-                          color: '#334155',
+                          background: 'var(--bg-muted)',
+                          color: 'var(--text-700)',
                         }}
                         title={`${r.name} · Total: ${formatCurrency(r.total, currency)}`}
                       >
@@ -1049,7 +1049,7 @@ export default function YearlySummary() {
                   {/* Column totals */}
                   <div
                     className="flex items-center"
-                    style={{ padding: '0 6px', fontSize: '0.6875rem', fontWeight: 700, color: '#1e293b' }}
+                    style={{ padding: '0 6px', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-800)' }}
                   >
                     Total
                   </div>
@@ -1062,8 +1062,8 @@ export default function YearlySummary() {
                         fontWeight: 700,
                         padding: '6px 0',
                         borderRadius: 4,
-                        background: '#eef2ff',
-                        color: '#4f46e5',
+                        background: 'var(--brand-50)',
+                        color: 'var(--brand-text)',
                       }}
                       title={`${MONTH_NAMES[mi]} total: ${formatCurrency(m.expense, currency)}`}
                     >
@@ -1077,8 +1077,8 @@ export default function YearlySummary() {
                       fontWeight: 800,
                       padding: '6px 0',
                       borderRadius: 4,
-                      background: '#e0e7ff',
-                      color: '#3730a3',
+                      background: 'var(--brand-100)',
+                      color: 'var(--brand-text)',
                     }}
                     title={`Year total: ${formatCurrency(totalSpent, currency)}`}
                   >
@@ -1094,7 +1094,7 @@ export default function YearlySummary() {
       {/* ── Key Insights ── */}
       {insights.length > 0 && (
         <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#94a3b8' }}>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-400)' }}>
             Key Insights
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
@@ -1105,7 +1105,7 @@ export default function YearlySummary() {
                 style={{ background: ins.bg, border: `1px solid ${ins.border}` }}
               >
                 <ins.Icon size={14} style={{ color: ins.color, marginTop: 1, flexShrink: 0 }} />
-                <p className="text-xs" style={{ color: '#334155', lineHeight: 1.5 }}>
+                <p className="text-xs" style={{ color: 'var(--text-700)', lineHeight: 1.5 }}>
                   {ins.text}
                 </p>
               </div>
@@ -1117,7 +1117,7 @@ export default function YearlySummary() {
       {/* ── Income Sources ── */}
       {incomeSources.length > 0 && (
         <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#94a3b8' }}>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-400)' }}>
             Income Sources
           </p>
           <div className="space-y-2">
@@ -1125,20 +1125,20 @@ export default function YearlySummary() {
               <div
                 key={s.name}
                 className="rounded-lg p-3"
-                style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}
+                style={{ background: 'var(--bg-subtle)', border: '1px solid var(--bg-muted)' }}
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold" style={{ color: '#334155' }}>
+                  <span className="text-xs font-bold" style={{ color: 'var(--text-700)' }}>
                     {s.name}{' '}
-                    <span style={{ color: '#94a3b8', fontWeight: 500 }}>
+                    <span style={{ color: 'var(--text-400)', fontWeight: 500 }}>
                       · {s.count} txn{s.count === 1 ? '' : 's'}
                     </span>
                   </span>
-                  <span className="text-xs num-mono font-semibold" style={{ color: '#059669' }}>
+                  <span className="text-xs num-mono font-semibold" style={{ color: 'var(--success-text)' }}>
                     +{formatCurrency(s.total, currency)} · {s.share.toFixed(1)}%
                   </span>
                 </div>
-                <div className="w-full rounded-full h-1.5" style={{ background: '#e2e8f0' }}>
+                <div className="w-full rounded-full h-1.5" style={{ background: 'var(--border-default)' }}>
                   <div
                     className="h-1.5 rounded-full"
                     style={{
@@ -1159,12 +1159,12 @@ export default function YearlySummary() {
           onClick={() => setShowBreakdown(!showBreakdown)}
           className="flex items-center justify-between w-full py-3 px-1"
         >
-          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#94a3b8' }}>
+          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-400)' }}>
             Monthly Breakdown
           </p>
           <ChevronDown
             size={18}
-            style={{ color: '#94a3b8' }}
+            style={{ color: 'var(--text-400)' }}
             className={`transition-transform duration-300 ${showBreakdown ? 'rotate-180' : ''}`}
           />
         </button>
@@ -1180,31 +1180,31 @@ export default function YearlySummary() {
                 <div
                   key={m.name}
                   className="rounded-lg p-3"
-                  style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}
+                  style={{ background: 'var(--bg-subtle)', border: '1px solid var(--bg-muted)' }}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold w-8" style={{ color: '#334155' }}>
+                    <span className="text-xs font-bold w-8" style={{ color: 'var(--text-700)' }}>
                       {m.name}
                     </span>
                     <div className="flex items-center gap-4 text-xs num-mono">
-                      <span style={{ color: '#059669' }}>+{formatCurrency(m.income, currency)}</span>
-                      <span style={{ color: '#dc2626' }}>-{formatCurrency(m.expense, currency)}</span>
+                      <span style={{ color: 'var(--success-text)' }}>+{formatCurrency(m.income, currency)}</span>
+                      <span style={{ color: 'var(--danger-text)' }}>-{formatCurrency(m.expense, currency)}</span>
                       <span
                         className="font-bold"
-                        style={{ color: monthlySavings >= 0 ? '#059669' : '#dc2626' }}
+                        style={{ color: monthlySavings >= 0 ? 'var(--success-text)' : 'var(--danger-text)' }}
                       >
                         {monthlySavings >= 0 ? '+' : ''}
                         {formatCurrency(monthlySavings, currency)}
                       </span>
                       {m.income > 0 && (
-                        <span style={{ color: '#94a3b8' }}>
+                        <span style={{ color: 'var(--text-400)' }}>
                           ({((m.savings / m.income) * 100).toFixed(1)}%)
                         </span>
                       )}
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <div className="w-full rounded-full h-1.5" style={{ background: '#e2e8f0' }}>
+                    <div className="w-full rounded-full h-1.5" style={{ background: 'var(--border-default)' }}>
                       <div
                         className="h-1.5 rounded-full"
                         style={{
@@ -1213,7 +1213,7 @@ export default function YearlySummary() {
                         }}
                       />
                     </div>
-                    <div className="w-full rounded-full h-1.5" style={{ background: '#e2e8f0' }}>
+                    <div className="w-full rounded-full h-1.5" style={{ background: 'var(--border-default)' }}>
                       <div
                         className="h-1.5 rounded-full"
                         style={{
@@ -1227,7 +1227,7 @@ export default function YearlySummary() {
               );
             })}
             {activeMonths === 0 && (
-              <p className="text-center py-4 text-sm" style={{ color: '#94a3b8' }}>
+              <p className="text-center py-4 text-sm" style={{ color: 'var(--text-400)' }}>
                 No data for {year}
               </p>
             )}
@@ -1239,7 +1239,7 @@ export default function YearlySummary() {
                   className="w-3 h-1.5 rounded-full"
                   style={{ background: 'linear-gradient(90deg, #34d399, #059669)' }}
                 />
-                <span className="text-xs" style={{ color: '#64748b' }}>
+                <span className="text-xs" style={{ color: 'var(--text-500)' }}>
                   Income
                 </span>
               </div>
@@ -1248,7 +1248,7 @@ export default function YearlySummary() {
                   className="w-3 h-1.5 rounded-full"
                   style={{ background: 'linear-gradient(90deg, #fb7185, #dc2626)' }}
                 />
-                <span className="text-xs" style={{ color: '#64748b' }}>
+                <span className="text-xs" style={{ color: 'var(--text-500)' }}>
                   Expenses
                 </span>
               </div>

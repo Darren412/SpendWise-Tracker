@@ -9,6 +9,9 @@ import {
 import { useBudgetStore } from '@/store/budgetStore';
 import { formatCurrencyShort, currencySymbol } from '@/utils/currency';
 import { getFinancialMonthRange, formatFinancialPeriodRange, getCurrentFinancialPeriod } from '@/utils/financialCycle';
+import { budgetTrackedSpend } from '@/lib/trends';
+import BudgetAlertsBanner from '@/components/BudgetAlertsBanner';
+import GoalsSummaryCard from '@/components/GoalsSummaryCard';
 
 interface OverviewWorkspaceProps {
   onNavigate: (workspace: string) => void;
@@ -231,16 +234,11 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
     [categories]);
 
   // Budget-tracked spending: only from selected budget categories
-  const budgetTrackedSpending = useMemo(() => {
-    if (budgetCategoryIds.length === 0) return 0;
-    return allExpenses
-      .filter(e =>
-        e.month === selectedMonth &&
-        e.year === selectedYear &&
-        budgetCategoryIds.includes(e.category)
-      )
-      .reduce((sum, e) => sum + e.amount, 0);
-  }, [allExpenses, selectedMonth, selectedYear, budgetCategoryIds]);
+  // (globalExpensesThisPeriod is already month/year-filtered — identical to
+  // the previous inline month+year+category filter)
+  const budgetTrackedSpending = useMemo(() =>
+    budgetTrackedSpend(globalExpensesThisPeriod, budgetCategoryIds),
+    [globalExpensesThisPeriod, budgetCategoryIds]);
 
   // Per-category breakdown for budget — only categories with spending
   const budgetCategoryBreakdown = useMemo(() => {
@@ -304,6 +302,9 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
           </button>
         </div>
       </div>
+
+      {/* ── Budget alerts (visible breaches for this period) ── */}
+      <BudgetAlertsBanner onNavigate={onNavigate} />
 
       {/* ── KPI cards ── */}
       <div className="ws-kpi-grid stagger-fade">
@@ -608,11 +609,11 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '8px 12px', marginTop: 10,
-                background: '#fef2f2', borderRadius: 8,
-                border: '1px solid #fecaca',
+                background: 'var(--red-50)', borderRadius: 8,
+                border: '1px solid var(--red-200)',
               }}>
-                <AlertTriangle size={14} style={{ color: '#ef4444', flexShrink: 0 }} />
-                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#991b1b' }}>
+                <AlertTriangle size={14} style={{ color: 'var(--danger-text)', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--danger-text)' }}>
                   You&apos;ve exceeded your budget by {sym}{Math.abs(Math.round(budgetRemaining)).toLocaleString('en-IN')}
                 </span>
               </div>
@@ -702,6 +703,9 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
           </div>
         )}
       </div>
+
+      {/* ── Savings goals summary ── */}
+      <GoalsSummaryCard onNavigate={onNavigate} />
 
       {/* ── Lower row ── */}
       <div className="ws-lower-grid stagger-fade" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>

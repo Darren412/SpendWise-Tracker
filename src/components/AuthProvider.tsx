@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useBudgetStore, flushPendingSync } from '@/store/budgetStore';
+import { useTheme } from '@/hooks/useTheme';
 
 interface AuthContextType {
   user: User | null;
@@ -24,6 +25,9 @@ export const useAuth = () => useContext(AuthContext);
 export default function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  // Applies data-theme + tracks OS scheme changes — mounted here so the
+  // login and reset-password pages theme correctly too.
+  useTheme();
 
   useEffect(() => {
     supabase.auth.getSession()
