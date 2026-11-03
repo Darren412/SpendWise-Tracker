@@ -9,6 +9,7 @@ import {
 import { useBudgetStore } from '@/store/budgetStore';
 import { formatCurrencyShort, currencySymbol } from '@/utils/currency';
 import { getFinancialMonthRange, formatFinancialPeriodRange, getCurrentFinancialPeriod } from '@/utils/financialCycle';
+import { budgetTrackedSpend } from '@/lib/trends';
 
 interface OverviewWorkspaceProps {
   onNavigate: (workspace: string) => void;
@@ -231,16 +232,11 @@ export default function OverviewWorkspace({ onNavigate }: OverviewWorkspaceProps
     [categories]);
 
   // Budget-tracked spending: only from selected budget categories
-  const budgetTrackedSpending = useMemo(() => {
-    if (budgetCategoryIds.length === 0) return 0;
-    return allExpenses
-      .filter(e =>
-        e.month === selectedMonth &&
-        e.year === selectedYear &&
-        budgetCategoryIds.includes(e.category)
-      )
-      .reduce((sum, e) => sum + e.amount, 0);
-  }, [allExpenses, selectedMonth, selectedYear, budgetCategoryIds]);
+  // (globalExpensesThisPeriod is already month/year-filtered — identical to
+  // the previous inline month+year+category filter)
+  const budgetTrackedSpending = useMemo(() =>
+    budgetTrackedSpend(globalExpensesThisPeriod, budgetCategoryIds),
+    [globalExpensesThisPeriod, budgetCategoryIds]);
 
   // Per-category breakdown for budget — only categories with spending
   const budgetCategoryBreakdown = useMemo(() => {
