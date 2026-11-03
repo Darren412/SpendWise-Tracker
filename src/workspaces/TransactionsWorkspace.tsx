@@ -5,11 +5,15 @@ import {
   Search, Plus, Trash2, ChevronDown, ChevronUp, X,
   TrendingUp, TrendingDown, Minus, ArrowDownRight, ArrowUpRight,
   CheckSquare, Square, Download, MapPin, SlidersHorizontal,
-  Pencil, Check, RotateCcw, Zap, Calendar,
+  Pencil, Check, RotateCcw, Zap, Calendar, Repeat,
 } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { currencySymbol, formatCurrency } from '@/utils/currency';
 import { getFinancialMonthRange, getFinancialPeriod } from '@/utils/financialCycle';
+import { applyTransactionFilters, countActiveFilters, EMPTY_FILTERS, TransactionFilters, TxnRow } from '@/lib/transactionFilters';
+import { getEffectiveTax } from '@/lib/tax';
+import { RecurrenceFrequency } from '@/types';
+import RecurringManager from '@/components/RecurringManager';
 import DateInput from '@/components/DateInput';
 
 interface TransactionsWorkspaceProps {
@@ -17,9 +21,17 @@ interface TransactionsWorkspaceProps {
   onAddIncome: () => void;
 }
 
-type Tab = 'all' | 'expenses' | 'income';
+type Tab = 'all' | 'expenses' | 'income' | 'recurring';
 type SortKey = 'date' | 'amount' | 'description';
 type SortDir = 'asc' | 'desc';
+
+const TAB_TO_TYPE: Record<'all' | 'expenses' | 'income', TransactionFilters['type']> = {
+  all: 'all', expenses: 'expense', income: 'income',
+};
+
+const FREQ_SHORT: Record<RecurrenceFrequency, string> = {
+  weekly: 'Weekly', monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly',
+};
 
 // ── Inline edit state ─────────────────────────────────────────────────────
 interface EditState {
@@ -29,15 +41,18 @@ interface EditState {
   amount: string;
   date: string;
   category: string;
+  payee: string;
+  notes: string;
 }
 
 export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: TransactionsWorkspaceProps) {
   const {
-    expenses, income, categories,
+    expenses, income, categories, recurring,
     selectedMonth, selectedYear, selectedCity,
     excludedCategoryIds,
     financialCycleStart, currency,
     deleteExpense, deleteIncome, updateExpense, updateIncome,
+    convertToRecurring,
   } = useBudgetStore();
 
   const sym = currencySymbol(currency);
@@ -45,14 +60,20 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [tab, setTab]           = useState<Tab>('all');
-  const [search, setSearch]     = useState('');
   const [sortKey, setSortKey]   = useState<SortKey>('date');
   const [sortDir, setSortDir]   = useState<SortDir>('desc');
-  const [filterCat, setFilterCat] = useState<string>('');   // '' = all
-  const [filterCity, setFilterCity] = useState<string>(''); // '' = all
-  const [amtMin, setAmtMin]     = useState('');
-  const [amtMax, setAmtMax]     = useState('');
+  const [filters, setFilters]   = useState<TransactionFilters>(EMPTY_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
+  const [recurringPickerId, setRecurringPickerId] = useState<string | null>(null);
+
+  const updateFilter = (patch: Partial<TransactionFilters>) =>
+    setFilters(f => ({ ...f, ...patch }));
+
+  // The tab IS the type filter — keep filters.type in sync
+  const selectTab = (t: Tab) => {
+    setTab(t);
+    if (t !== 'recurring') updateFilter({ type: TAB_TO_TYPE[t] });
+  };
 
   // ── Selection state ───────────────────────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -79,36 +100,18 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
     [categories]);
 
   // ── Filtered datasets ─────────────────────────────────────────────────────
-  const filteredExpenses = useMemo(() => expenses.filter(e => {
-    const d = new Date(e.date + 'T00:00:00');
-    if (d < start || d > end) return false;
-    if (selectedCity !== 'Both' && e.city && e.city !== selectedCity) return false;
-    if (excludedCategoryIds.length > 0 && excludedCategoryIds.includes(e.category)) return false;
-    if (filterCat && e.category !== filterCat) return false;
-    if (filterCity && (e.city ?? 'Bangalore') !== filterCity) return false;
-    if (amtMin && e.amount < parseFloat(amtMin)) return false;
-    if (amtMax && e.amount > parseFloat(amtMax)) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      if (!e.description.toLowerCase().includes(q) &&
-          !getCatName(e.category).toLowerCase().includes(q) &&
-          !(e.city ?? '').toLowerCase().includes(q)) return false;
-    }
-    return true;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [expenses, start, end, selectedCity, excludedCategoryIds, filterCat, filterCity, amtMin, amtMax, search]);
+  // All filtering funnels through the pure lib function. KPI sets ignore the
+  // tab (type) filter so the cards always describe the filtered period.
+  const allFilteredRows = useMemo(() => applyTransactionFilters(
+    expenses, income, { ...filters, type: 'all' },
+    { periodStart: start, periodEnd: end, selectedCity, excludedCategoryIds, categories }
+  ), [expenses, income, filters, start, end, selectedCity, excludedCategoryIds, categories]);
 
-  const filteredIncome = useMemo(() => income.filter(i => {
-    const d = new Date(i.date + 'T00:00:00');
-    if (d < start || d > end) return false;
-    if (amtMin && i.amount < parseFloat(amtMin)) return false;
-    if (amtMax && i.amount > parseFloat(amtMax)) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      if (!i.source?.toLowerCase().includes(q)) return false;
-    }
-    return true;
-  }), [income, start, end, amtMin, amtMax, search]);
+  const filteredExpenses = useMemo(() => allFilteredRows.filter(r => r._type === 'expense'), [allFilteredRows]);
+  const filteredIncome   = useMemo(() => allFilteredRows.filter(r => r._type === 'income'), [allFilteredRows]);
+  const filteredRows     = useMemo(() =>
+    filters.type === 'all' ? allFilteredRows : allFilteredRows.filter(r => r._type === filters.type),
+    [allFilteredRows, filters.type]);
 
   const totalExpAmt = filteredExpenses.reduce((s, e) => s + e.amount, 0);
   const totalIncAmt = filteredIncome.reduce((s, i) => s + i.amount, 0);
@@ -126,18 +129,12 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
   }, [filteredExpenses, totalExpAmt]);
 
   // ── Sorted + merged rows ──────────────────────────────────────────────────
-  type ExpRow = typeof filteredExpenses[number] & { _type: 'expense' };
-  type IncRow = typeof filteredIncome[number] & { _type: 'income' };
-  type AnyRow = ExpRow | IncRow;
+  type ExpRow = TxnRow & { _type: 'expense' };
+  type IncRow = TxnRow & { _type: 'income' };
+  type AnyRow = TxnRow;
 
   const sortedRows = useMemo((): AnyRow[] => {
-    const exp: AnyRow[] = filteredExpenses.map(e => ({ ...e, _type: 'expense' as const }));
-    const inc: AnyRow[] = filteredIncome.map(i => ({ ...i, _type: 'income' as const }));
-    const base = tab === 'all' ? [...exp, ...inc]
-      : tab === 'expenses' ? exp
-      : inc;
-
-    return [...base].sort((a, b) => {
+    return [...filteredRows].sort((a, b) => {
       let cmp = 0;
       if (sortKey === 'date')        cmp = new Date(a.date).getTime() - new Date(b.date).getTime();
       else if (sortKey === 'amount') cmp = a.amount - b.amount;
@@ -148,7 +145,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
       }
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [filteredExpenses, filteredIncome, tab, sortKey, sortDir]);
+  }, [filteredRows, sortKey, sortDir]);
 
   // Grouped by date for display
   const grouped = useMemo(() => {
@@ -185,10 +182,10 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
   const startEdit = (row: AnyRow) => {
     if (row._type === 'expense') {
       const r = row as ExpRow;
-      setEditState({ id: r.id, type: 'expense', description: r.description, amount: String(r.amount), date: r.date, category: r.category });
+      setEditState({ id: r.id, type: 'expense', description: r.description, amount: String(r.amount), date: r.date, category: r.category, payee: r.payee ?? '', notes: r.notes ?? '' });
     } else {
       const r = row as IncRow;
-      setEditState({ id: r.id, type: 'income', description: r.source ?? '', amount: String(r.amount), date: r.date, category: r.category ?? '' });
+      setEditState({ id: r.id, type: 'income', description: r.source ?? '', amount: String(r.amount), date: r.date, category: r.category ?? '', payee: '', notes: r.notes ?? '' });
     }
     setExpandedId(row.id);
   };
@@ -204,6 +201,8 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
         amount: amt,
         date: editState.date,
         category: editState.category,
+        payee: editState.payee.trim() || undefined,
+        notes: editState.notes.trim() || undefined,
         ...period,
       });
     } else {
@@ -211,6 +210,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
         source: editState.description.trim(),
         amount: amt,
         date: editState.date,
+        notes: editState.notes.trim() || undefined,
         ...period,
       });
     }
@@ -224,14 +224,23 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
   };
 
   // ── Filter chips ──────────────────────────────────────────────────────────
+  const TAX_FILTER_LABELS: Record<TransactionFilters['tax'], string> = {
+    all: 'All', only: 'Tax-related', deductible: 'Tax deductible',
+    'non-deductible': 'Tax non-deductible', exclude: 'Not tax-related',
+  };
   const activeFilters: { label: string; onRemove: () => void }[] = [];
-  if (filterCat)  activeFilters.push({ label: getCatName(filterCat),    onRemove: () => setFilterCat('') });
-  if (filterCity) activeFilters.push({ label: filterCity,               onRemove: () => setFilterCity('') });
-  if (amtMin)     activeFilters.push({ label: `≥ ${sym}${amtMin}`,      onRemove: () => setAmtMin('') });
-  if (amtMax)     activeFilters.push({ label: `≤ ${sym}${amtMax}`,      onRemove: () => setAmtMax('') });
+  if (filters.search.trim()) activeFilters.push({ label: `“${filters.search.trim()}”`, onRemove: () => updateFilter({ search: '' }) });
+  if (filters.dateFrom || filters.dateTo) activeFilters.push({ label: 'Using custom range', onRemove: () => updateFilter({ dateFrom: undefined, dateTo: undefined }) });
+  filters.categoryIds.forEach(id => activeFilters.push({ label: getCatName(id), onRemove: () => updateFilter({ categoryIds: filters.categoryIds.filter(c => c !== id) }) }));
+  if (filters.city) activeFilters.push({ label: filters.city, onRemove: () => updateFilter({ city: undefined }) });
+  if (filters.amountMin !== undefined) activeFilters.push({ label: `≥ ${sym}${filters.amountMin}`, onRemove: () => updateFilter({ amountMin: undefined }) });
+  if (filters.amountMax !== undefined) activeFilters.push({ label: `≤ ${sym}${filters.amountMax}`, onRemove: () => updateFilter({ amountMax: undefined }) });
+  if (filters.recurring !== 'all') activeFilters.push({ label: filters.recurring === 'only' ? 'Recurring only' : 'Non-recurring', onRemove: () => updateFilter({ recurring: 'all' }) });
+  if (filters.tax !== 'all') activeFilters.push({ label: TAX_FILTER_LABELS[filters.tax], onRemove: () => updateFilter({ tax: 'all' }) });
 
-  const resetFilters = () => { setFilterCat(''); setFilterCity(''); setAmtMin(''); setAmtMax(''); setSearch(''); };
-  const hasFilters = !!(filterCat || filterCity || amtMin || amtMax || search);
+  const resetFilters = () => setFilters(f => ({ ...EMPTY_FILTERS, type: f.type }));
+  // The type/tab isn't counted — it has its own visible control
+  const hasFilters = countActiveFilters({ ...filters, type: 'all' }) > 0;
 
   // ── Export selected ───────────────────────────────────────────────────────
   const exportSelected = () => {
@@ -319,8 +328,9 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          KPI STRIP
+          KPI STRIP (transactions only — hidden on the Recurring tab)
       ══════════════════════════════════════════════════════════════════════ */}
+      {tab !== 'recurring' && (
       <div className="stagger-fade" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
         {[
           {
@@ -380,11 +390,12 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
           </div>
         ))}
       </div>
+      )}
 
       {/* ══════════════════════════════════════════════════════════════════════
           SMART INSIGHTS BAR
       ══════════════════════════════════════════════════════════════════════ */}
-      {insights && (
+      {tab !== 'recurring' && insights && (
         <div style={{
           display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16,
           padding: '10px 14px',
@@ -422,26 +433,28 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
         {/* Primary row: tabs + search + filter toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
 
-          {/* Tabs */}
+          {/* Tabs — the type filter; 'Recurring' shows the rules manager */}
           <div className="ws-tab-bar">
-            {(['all', 'expenses', 'income'] as Tab[]).map(t => (
-              <button key={t} className={`ws-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
-                {t === 'all'      ? `All (${filteredExpenses.length + filteredIncome.length})`
+            {(['all', 'expenses', 'income', 'recurring'] as Tab[]).map(t => (
+              <button key={t} className={`ws-tab${tab === t ? ' active' : ''}`} onClick={() => selectTab(t)}>
+                {t === 'all'       ? `All (${filteredExpenses.length + filteredIncome.length})`
                   : t === 'expenses' ? `Expenses (${filteredExpenses.length})`
-                  : `Income (${filteredIncome.length})`}
+                  : t === 'income'   ? `Income (${filteredIncome.length})`
+                  : `Recurring (${recurring.length})`}
               </button>
             ))}
           </div>
 
+          {tab !== 'recurring' && (<>
           {/* Search */}
           <div style={{ position: 'relative', flex: 1, minWidth: 160, maxWidth: 320 }}>
             <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-400)', pointerEvents: 'none' }} />
             <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+              value={filters.search}
+              onChange={e => updateFilter({ search: e.target.value })}
               placeholder="Search transactions…"
               style={{
-                width: '100%', paddingLeft: 32, paddingRight: search ? 28 : 10, paddingTop: 7, paddingBottom: 7,
+                width: '100%', paddingLeft: 32, paddingRight: filters.search ? 28 : 10, paddingTop: 7, paddingBottom: 7,
                 border: '1.5px solid var(--border-default)', borderRadius: 'var(--r-md)',
                 fontSize: '0.8125rem', background: 'var(--bg-surface)', color: 'var(--text-900)',
                 outline: 'none', fontFamily: 'inherit', transition: 'border-color 0.15s, box-shadow 0.15s',
@@ -449,8 +462,8 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
               onFocus={e => { e.target.style.borderColor = 'var(--brand-500)'; e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)'; }}
               onBlur={e => { e.target.style.borderColor = 'var(--border-default)'; e.target.style.boxShadow = 'none'; }}
             />
-            {search && (
-              <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-400)', padding: 0 }}>
+            {filters.search && (
+              <button onClick={() => updateFilter({ search: '' })} aria-label="Clear search" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-400)', padding: 0 }}>
                 <X size={12} />
               </button>
             )}
@@ -509,13 +522,14 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                 border: '1px solid var(--red-100)', fontFamily: 'inherit',
               }}
             >
-              <RotateCcw size={11} /> Reset
+              <RotateCcw size={11} /> Clear all
             </button>
           )}
+          </>)}
         </div>
 
         {/* Advanced filter panel */}
-        {showFilters && (
+        {showFilters && tab !== 'recurring' && (
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10,
             padding: '12px 14px',
@@ -524,21 +538,26 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
             borderRadius: 'var(--r-lg)',
             marginBottom: 8,
           }}>
-            {/* Category filter */}
+            {/* Custom date range — replaces the selected financial period */}
             <div>
               <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
-                Category
+                From
               </label>
-              <select
-                value={filterCat}
-                onChange={e => setFilterCat(e.target.value)}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--r-sm)', fontSize: '0.8125rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-700)', fontFamily: 'inherit', outline: 'none' }}
-              >
-                <option value="">All categories</option>
-                {expenseCats.map(c => (
-                  <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-                ))}
-              </select>
+              <DateInput
+                value={filters.dateFrom ?? ''}
+                onChange={d => updateFilter({ dateFrom: d || undefined })}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--r-sm)', fontSize: '0.8125rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-700)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                To
+              </label>
+              <DateInput
+                value={filters.dateTo ?? ''}
+                onChange={d => updateFilter({ dateTo: d || undefined })}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--r-sm)', fontSize: '0.8125rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-700)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+              />
             </div>
 
             {/* City filter */}
@@ -548,8 +567,8 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                   City
                 </label>
                 <select
-                  value={filterCity}
-                  onChange={e => setFilterCity(e.target.value)}
+                  value={filters.city ?? ''}
+                  onChange={e => updateFilter({ city: e.target.value || undefined })}
                   style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--r-sm)', fontSize: '0.8125rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-700)', fontFamily: 'inherit', outline: 'none' }}
                 >
                   <option value="">All cities</option>
@@ -564,7 +583,9 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                 Min Amount ({sym})
               </label>
               <input
-                type="number" min="0" value={amtMin} onChange={e => setAmtMin(e.target.value)}
+                type="number" min="0"
+                value={filters.amountMin ?? ''}
+                onChange={e => updateFilter({ amountMin: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
                 placeholder="0"
                 style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--r-sm)', fontSize: '0.8125rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-700)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
               />
@@ -574,16 +595,87 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                 Max Amount ({sym})
               </label>
               <input
-                type="number" min="0" value={amtMax} onChange={e => setAmtMax(e.target.value)}
+                type="number" min="0"
+                value={filters.amountMax ?? ''}
+                onChange={e => updateFilter({ amountMax: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
                 placeholder="∞"
                 style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--r-sm)', fontSize: '0.8125rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-700)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
               />
+            </div>
+
+            {/* Recurring */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                Recurring
+              </label>
+              <select
+                value={filters.recurring}
+                onChange={e => updateFilter({ recurring: e.target.value as TransactionFilters['recurring'] })}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--r-sm)', fontSize: '0.8125rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-700)', fontFamily: 'inherit', outline: 'none' }}
+              >
+                <option value="all">All</option>
+                <option value="only">Only recurring</option>
+                <option value="exclude">Exclude recurring</option>
+              </select>
+            </div>
+
+            {/* Tax */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                Tax
+              </label>
+              <select
+                value={filters.tax}
+                onChange={e => updateFilter({ tax: e.target.value as TransactionFilters['tax'] })}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--r-sm)', fontSize: '0.8125rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-700)', fontFamily: 'inherit', outline: 'none' }}
+              >
+                <option value="all">All</option>
+                <option value="only">Tax-related</option>
+                <option value="deductible">Deductible</option>
+                <option value="non-deductible">Non-deductible</option>
+                <option value="exclude">Not tax-related</option>
+              </select>
+            </div>
+
+            {/* Category chips — multi-select across expense + income categories */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                Categories
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {categories.map(c => {
+                  const active = filters.categoryIds.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => updateFilter({
+                        categoryIds: active
+                          ? filters.categoryIds.filter(id => id !== c.id)
+                          : [...filters.categoryIds, c.id],
+                      })}
+                      aria-pressed={active}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '4px 10px', borderRadius: 99, cursor: 'pointer', fontFamily: 'inherit',
+                        fontSize: '0.72rem', fontWeight: 600,
+                        background: active ? 'var(--brand-600)' : 'var(--bg-surface)',
+                        color: active ? '#fff' : 'var(--text-600)',
+                        border: active ? '1px solid var(--brand-600)' : '1px solid var(--border-default)',
+                        transition: 'all 0.12s',
+                      }}
+                    >
+                      {c.icon} {c.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
 
         {/* Active filter chips */}
-        {activeFilters.length > 0 && (
+        {activeFilters.length > 0 && tab !== 'recurring' && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {activeFilters.map(f => (
               <span
@@ -604,6 +696,15 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
           </div>
         )}
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          RECURRING TAB — rule manager replaces the transaction views
+      ══════════════════════════════════════════════════════════════════════ */}
+      {tab === 'recurring' ? (
+        <div className="panel" style={{ padding: '20px 24px' }}>
+          <RecurringManager />
+        </div>
+      ) : (<>
 
       {/* ══════════════════════════════════════════════════════════════════════
           BULK ACTION BAR
@@ -687,12 +788,12 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
           <div style={{ padding: '48px 24px', textAlign: 'center' }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>📭</div>
             <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-700)', marginBottom: 6 }}>
-              No transactions found
+              {hasFilters ? 'No transactions match your filters' : 'No transactions found'}
             </div>
             <div style={{ fontSize: '0.8125rem', color: 'var(--text-400)', marginBottom: 20 }}>
-              {hasFilters || search ? 'Try adjusting your filters' : 'Add your first transaction to get started'}
+              {hasFilters ? 'Try adjusting your filters' : 'Add your first transaction to get started'}
             </div>
-            {(hasFilters || search) && (
+            {hasFilters && (
               <button
                 onClick={resetFilters}
                 style={{ padding: '8px 18px', borderRadius: 'var(--r-md)', fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', background: 'var(--brand-600)', color: '#fff', border: 'none', fontFamily: 'inherit' }}
@@ -740,6 +841,8 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                     const isSelecting = selected.has(row.id);
                     const isDelConfirm = deleteConfirm === row.id;
                     const catColor = isExp ? getCatColor(catId) : '#16a34a';
+                    const effTax   = getEffectiveTax(row, categories);
+                    const rule     = row.recurringId ? recurring.find(r => r.id === row.recurringId) : undefined;
 
                     return (
                       <div key={row.id} style={{ borderBottom: '1px solid var(--border-default)' }}>
@@ -909,16 +1012,65 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                                     </div>
                                   </div>
                                 )}
+                                {isExp && (row as ExpRow).payee && (
+                                  <div>
+                                    <div style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Payee</div>
+                                    <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-700)' }}>{(row as ExpRow).payee}</div>
+                                  </div>
+                                )}
+                                {row.notes && (
+                                  <div>
+                                    <div style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Notes</div>
+                                    <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-700)' }}>{row.notes}</div>
+                                  </div>
+                                )}
                                 <div>
                                   <div style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Amount</div>
                                   <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: isExp ? 'var(--red-500)' : 'var(--green-600)', fontVariantNumeric: 'tabular-nums' }}>
                                     {isExp ? '−' : '+'}{formatCurrency(row.amount, currency)}
                                   </div>
                                 </div>
+                                {effTax?.isTaxRelated && (
+                                  <div>
+                                    <div style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Tax</div>
+                                    <span style={{
+                                      display: 'inline-flex', alignItems: 'center',
+                                      padding: '2px 8px', borderRadius: 99,
+                                      fontSize: '0.6875rem', fontWeight: 700,
+                                      background: 'var(--amber-50)', color: 'var(--amber-600)',
+                                      border: '1px solid var(--amber-100)',
+                                    }}>
+                                      🧾 {effTax.taxCategory ?? 'Tax-related'}{effTax.deductible ? ' · deductible' : ''}
+                                    </span>
+                                  </div>
+                                )}
+                                {row.recurringId && (
+                                  <div>
+                                    <div style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Repeats</div>
+                                    <span style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                                      padding: '2px 8px', borderRadius: 99,
+                                      fontSize: '0.6875rem', fontWeight: 700,
+                                      background: 'var(--brand-50)', color: 'var(--brand-600)',
+                                      border: '1px solid var(--brand-100)',
+                                    }}>
+                                      <Repeat size={10} /> {rule ? FREQ_SHORT[rule.frequency] : 'Recurring'}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
 
                               {/* Action buttons */}
                               <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', flexShrink: 0 }}>
+                                {!row.recurringId && (
+                                  <button
+                                    onClick={() => setRecurringPickerId(recurringPickerId === row.id ? null : row.id)}
+                                    title="Repeat this transaction on a schedule"
+                                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 'var(--r-sm)', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', background: 'var(--bg-surface)', color: 'var(--text-600)', border: '1px solid var(--border-default)', fontFamily: 'inherit' }}
+                                  >
+                                    <Repeat size={11} /> Make recurring
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => startEdit(row)}
                                   style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 'var(--r-sm)', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', background: 'var(--brand-600)', color: '#fff', border: 'none', fontFamily: 'inherit' }}
@@ -933,6 +1085,34 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                                 </button>
                               </div>
                             </div>
+
+                            {/* Frequency picker — convert this transaction into a rule */}
+                            {recurringPickerId === row.id && (
+                              <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-500)' }}>Repeat:</span>
+                                {(['weekly', 'monthly', 'quarterly', 'yearly'] as RecurrenceFrequency[]).map(f => (
+                                  <button
+                                    key={f}
+                                    onClick={() => { convertToRecurring(row.id, row._type, f); setRecurringPickerId(null); setExpandedId(null); }}
+                                    style={{
+                                      padding: '5px 12px', borderRadius: 'var(--r-sm)',
+                                      border: '1px solid var(--brand-100)', background: 'var(--brand-50)',
+                                      color: 'var(--brand-600)', fontSize: '0.75rem', fontWeight: 700,
+                                      cursor: 'pointer', fontFamily: 'inherit',
+                                    }}
+                                  >
+                                    {FREQ_SHORT[f]}
+                                  </button>
+                                ))}
+                                <button
+                                  onClick={() => setRecurringPickerId(null)}
+                                  aria-label="Cancel make recurring"
+                                  style={{ padding: '5px 8px', border: 'none', background: 'none', color: 'var(--text-400)', cursor: 'pointer', fontSize: '0.875rem', fontFamily: 'inherit' }}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -992,6 +1172,30 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
                                   </select>
                                 </div>
                               )}
+                              {/* Payee (expense only) */}
+                              {editState!.type === 'expense' && (
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-500)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Payee</label>
+                                  <input
+                                    value={editState!.payee}
+                                    onChange={e => setEditState(s => s && ({ ...s, payee: e.target.value }))}
+                                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(); }}
+                                    placeholder="e.g., DMart"
+                                    style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--r-sm)', fontSize: '0.8125rem', background: 'var(--bg-surface)', border: '1.5px solid var(--brand-300)', color: 'var(--text-900)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+                                  />
+                                </div>
+                              )}
+                              {/* Notes */}
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-500)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Notes</label>
+                                <input
+                                  value={editState!.notes}
+                                  onChange={e => setEditState(s => s && ({ ...s, notes: e.target.value }))}
+                                  onKeyDown={e => { if (e.key === 'Enter') saveEdit(); }}
+                                  placeholder="Optional note…"
+                                  style={{ width: '100%', padding: '7px 10px', borderRadius: 'var(--r-sm)', fontSize: '0.8125rem', background: 'var(--bg-surface)', border: '1.5px solid var(--brand-300)', color: 'var(--text-900)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+                                />
+                              </div>
                             </div>
                             <div style={{ display: 'flex', gap: 8 }}>
                               <button
@@ -1045,6 +1249,7 @@ export default function TransactionsWorkspace({ onAddExpense, onAddIncome }: Tra
           </>
         )}
       </div>
+      </>)}
     </div>
   );
 }

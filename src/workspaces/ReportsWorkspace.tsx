@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FileSpreadsheet, Download, Calendar, MapPin, Tag, FileText } from 'lucide-react';
 import YearlySummary from '@/components/YearlySummary';
 import ExportModal from '@/components/ExportModal';
+import TaxSummaryPanel from '@/components/TaxSummaryPanel';
 
 export default function ReportsWorkspace() {
   const [showExport, setShowExport] = useState(false);
@@ -130,6 +131,9 @@ export default function ReportsWorkspace() {
 
       {/* ── Annual summary ── */}
       <YearlySummary />
+
+      {/* ── Tax summary (deductible / non-deductible per tax year) ── */}
+      <TaxSummaryPanel />
 
       <ExportModal isOpen={showExport} onClose={() => setShowExport(false)} />
     </div>

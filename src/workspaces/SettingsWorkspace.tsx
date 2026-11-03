@@ -5,8 +5,9 @@ import { useAuth } from '@/components/AuthProvider';
 import { currencies } from '@/utils/currency';
 import { formatFinancialPeriodRange, ordinalSuffix } from '@/utils/financialCycle';
 import CategoryFilterBar from '@/components/CategoryFilterBar';
+import CategoryOrderList from '@/components/CategoryOrderList';
 import FinancialCycleSettings from '@/components/FinancialCycleSettings';
-import { Settings, User, DollarSign, Calendar, MapPin, Tag, LogOut, PiggyBank } from 'lucide-react';
+import { Settings, User, DollarSign, Calendar, MapPin, Tag, ListOrdered, LogOut, PiggyBank } from 'lucide-react';
 
 export default function SettingsWorkspace() {
   const {
@@ -221,6 +222,24 @@ export default function SettingsWorkspace() {
           </p>
           <p style={{ fontSize: '0.72rem', color: 'var(--text-300)', marginBottom: 14 }}>Current period: {periodRange}</p>
           <FinancialCycleSettings />
+        </div>
+
+        {/* ── Categories (order + tax defaults) ── */}
+        <div className="settings-card" style={{ gridColumn: 'span 2' }}>
+          <div className="settings-card-title">
+            <div style={{
+              width: 28, height: 28, borderRadius: 'var(--r-sm)',
+              background: 'var(--brand-50)', border: '1px solid var(--brand-100)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <ListOrdered size={14} style={{ color: 'var(--brand-600)' }} />
+            </div>
+            Categories
+          </div>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-400)', marginBottom: 14 }}>
+            Reorder categories and set per-category tax defaults
+          </p>
+          <CategoryOrderList />
         </div>
 
         {/* ── Location Filter (Darren only) ── */}
