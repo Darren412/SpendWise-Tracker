@@ -7,6 +7,19 @@ import { getFinancialPeriod, getCurrentFinancialPeriod, todayLocalISO } from '@/
 import { generateDue, resumeRule, mergeRecurringRules } from '@/lib/recurring';
 import { moveById } from '@/lib/categoryOrder';
 import { validateThresholds, pruneKeys } from '@/lib/budgetAlerts';
+import {
+  getStoredTheme, setStoredTheme, applyTheme, resolveTheme, ThemePreference,
+} from '@/lib/theme';
+
+function prefersDarkNow(): boolean {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function isValidTheme(v: unknown): v is ThemePreference {
+  return v === 'light' || v === 'dark' || v === 'system';
+}
 
 interface BudgetStore {
   expenses: Expense[];
@@ -59,6 +72,8 @@ interface BudgetStore {
   setAlertsEnabled: (enabled: boolean) => void;
   acknowledgeAlert: (key: string) => void;
   markAlertsNotified: (keys: string[]) => void;
+  themePreference: ThemePreference;
+  setThemePreference: (p: ThemePreference) => void;
   selectedCategoryIds: string[];
   setSelectedCategoryIds: (ids: string[]) => void;
   excludedCategoryIds: string[];
@@ -181,6 +196,7 @@ interface UserSettings {
   alertsEnabled?: boolean;
   acknowledgedAlerts?: string[];
   notifiedAlerts?: string[];
+  themePreference?: ThemePreference;
 }
 
 const DEFAULT_ALERT_THRESHOLDS: BudgetAlertThresholds = { warning: 80, exceeded: 100 };
@@ -342,14 +358,14 @@ function getLatestSyncPayload(): RemoteData {
     expenses, income, categories, recurring, goals,
     currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
     selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
-    acknowledgedAlerts, notifiedAlerts,
+    acknowledgedAlerts, notifiedAlerts, themePreference,
   } = useBudgetStore.getState();
   return {
     expenses, income, categories, recurring, goals,
     settings: {
       currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
       selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
-      acknowledgedAlerts, notifiedAlerts,
+      acknowledgedAlerts, notifiedAlerts, themePreference,
     },
   };
 }
@@ -603,7 +619,7 @@ async function loadFromSupabase() {
     const {
       currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
       selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
-      acknowledgedAlerts, notifiedAlerts,
+      acknowledgedAlerts, notifiedAlerts, themePreference,
     } = useBudgetStore.getState();
     const migrated: RemoteData = {
       expenses:   cycled.expenses,
@@ -614,7 +630,7 @@ async function loadFromSupabase() {
       settings:   {
         currency, financialCycleStart, monthlyBudgets, budgetCategoryIds, excludedCategoryIds,
         selectedCity, savingsTarget, categoryBudgets, alertThresholds, alertsEnabled,
-        acknowledgedAlerts, notifiedAlerts,
+        acknowledgedAlerts, notifiedAlerts, themePreference,
       },
     };
 
@@ -706,6 +722,14 @@ async function loadFromSupabase() {
     }
     if (Array.isArray(remoteSettings.notifiedAlerts)) {
       settingsUpdate.notifiedAlerts = remoteSettings.notifiedAlerts.filter(k => typeof k === 'string');
+    }
+    if (isValidTheme(remoteSettings.themePreference)
+        && remoteSettings.themePreference !== useBudgetStore.getState().themePreference) {
+      // Remote preference wins — apply it and persist locally so the next
+      // boot (before hydration) resolves the same theme
+      settingsUpdate.themePreference = remoteSettings.themePreference;
+      setStoredTheme(remoteSettings.themePreference);
+      applyTheme(resolveTheme(remoteSettings.themePreference, prefersDarkNow()));
     }
     useBudgetStore.setState(settingsUpdate);
   }
@@ -816,6 +840,7 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
   alertsEnabled: true,
   acknowledgedAlerts: [],
   notifiedAlerts: [],
+  themePreference: getStoredTheme(),
   financialCycleStart: initCycleStart,
   monthlyBudgets: typeof window !== 'undefined' ? (() => { try { const raw = localStorage.getItem('spendwise_monthly_budgets'); if (raw) return JSON.parse(raw); const legacy = parseFloat(localStorage.getItem('spendwise_monthly_budget') ?? '0'); return legacy > 0 ? { _default: legacy } : {}; } catch { return {}; } })() : {},
   budgetCategoryIds: typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('spendwise_budget_categories') ?? '[]'); } catch { return []; } })() : [],
@@ -1200,6 +1225,15 @@ export const useBudgetStore = create<BudgetStore & { networkError: boolean }>((s
     set((state) => ({
       notifiedAlerts: pruneKeys([...state.notifiedAlerts, ...keys], alertKeepPeriods(state)),
     }));
+    scheduleSyncToSupabase();
+  },
+
+  // Theme: stored locally (instant on next boot) and synced via settings
+  setThemePreference: (p: ThemePreference) => {
+    if (!isValidTheme(p)) return;
+    set({ themePreference: p });
+    setStoredTheme(p);
+    applyTheme(resolveTheme(p, prefersDarkNow()));
     scheduleSyncToSupabase();
   },
 
