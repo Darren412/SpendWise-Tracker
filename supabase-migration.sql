@@ -1,49 +1,41 @@
 -- ============================================================
--- Run this in your Supabase SQL Editor (Dashboard → SQL Editor)
+-- SpendWise — Supabase schema for public.budget_data
+--
+-- Reflects the live database as of 2026-11-03 (migration
+-- "secure_budget_data_rls"). Safe to re-run on a fresh project.
+-- Run in Supabase Dashboard → SQL Editor.
 -- ============================================================
 
--- 1. Add a user_id column (UUID referencing auth.users)
-ALTER TABLE budget_data
-  ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+-- 1. Table: one row per user, all data stored as JSONB
+create table if not exists public.budget_data (
+  user_id    uuid  primary key references auth.users(id) on delete cascade,
+  expenses   jsonb not null default '[]'::jsonb,
+  income     jsonb not null default '[]'::jsonb,
+  categories jsonb not null default '[]'::jsonb,
+  settings   jsonb          default '{}'::jsonb
+);
 
--- 2. Migrate your existing data row to your own user account.
---    Replace 'YOUR_EMAIL@example.com' with the email you'll sign up with.
---    Run this AFTER you've signed up so the user exists in auth.users.
---
---    UPDATE budget_data
---    SET user_id = (SELECT id FROM auth.users WHERE email = 'YOUR_EMAIL@example.com')
---    WHERE id = 1;
+-- 2. Row Level Security: logged-in users can only touch their own row
+alter table public.budget_data enable row level security;
 
--- 3. Make user_id unique (one row per user) and NOT NULL
---    (Run step 2 first, then uncomment and run these)
---
---    ALTER TABLE budget_data ALTER COLUMN user_id SET NOT NULL;
---    ALTER TABLE budget_data ADD CONSTRAINT budget_data_user_id_unique UNIQUE (user_id);
+drop policy if exists "Users can view own data"   on public.budget_data;
+drop policy if exists "Users can insert own data" on public.budget_data;
+drop policy if exists "Users can update own data" on public.budget_data;
+drop policy if exists "Users can delete own data" on public.budget_data;
 
--- 4. Enable Row Level Security
-ALTER TABLE budget_data ENABLE ROW LEVEL SECURITY;
+create policy "Users can view own data" on public.budget_data
+  for select to authenticated using ((select auth.uid()) = user_id);
+create policy "Users can insert own data" on public.budget_data
+  for insert to authenticated with check ((select auth.uid()) = user_id);
+create policy "Users can update own data" on public.budget_data
+  for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create policy "Users can delete own data" on public.budget_data
+  for delete to authenticated using ((select auth.uid()) = user_id);
 
--- 5. Policy: users can only see their own data
-CREATE POLICY "Users can view own data"
-  ON budget_data
-  FOR SELECT
-  USING (auth.uid() = user_id);
+-- 3. Privileges: anonymous visitors get nothing; TRUNCATE bypasses RLS so remove it
+revoke all on public.budget_data from anon;
+revoke truncate, references, trigger on public.budget_data from authenticated;
+grant select, insert, update, delete on public.budget_data to authenticated;
 
--- 6. Policy: users can insert their own data
-CREATE POLICY "Users can insert own data"
-  ON budget_data
-  FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
--- 7. Policy: users can update their own data
-CREATE POLICY "Users can update own data"
-  ON budget_data
-  FOR UPDATE
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
--- 8. Policy: users can delete their own data
-CREATE POLICY "Users can delete own data"
-  ON budget_data
-  FOR DELETE
-  USING (auth.uid() = user_id);
+-- NEVER add a permissive "using (true)" policy to this table — it exposes
+-- every user's financial data to anyone holding the public anon key.
