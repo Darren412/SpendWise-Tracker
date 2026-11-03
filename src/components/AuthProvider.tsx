@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { useBudgetStore, flushPendingSync } from '@/store/budgetStore';
 
 interface AuthContextType {
   user: User | null;
@@ -46,8 +47,15 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    // Flush pending local changes BEFORE signOut revokes the token
+    try {
+      await flushPendingSync();
+    } catch {
+      // best-effort — proceed with sign-out regardless
+    }
     await supabase.auth.signOut();
     setSession(null);
+    useBudgetStore.getState().resetForLogout();
   };
 
   return (

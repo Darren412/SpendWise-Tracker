@@ -51,9 +51,19 @@ export default function Home() {
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace>('overview');
   const [addModal, setAddModal] = useState<{ open: boolean; tab: 'expense' | 'income' }>({ open: false, tab: 'expense' });
 
+  // Depend on the user id only — token refreshes hand us a new `user` object
+  // for the same person and must not trigger a reload.
+  const userId = user?.id;
   useEffect(() => {
-    if (user) { setUserId(user.id); loadFromLocalStorage(); }
-  }, [user, loadFromLocalStorage, setUserId]);
+    if (userId) { setUserId(userId); loadFromLocalStorage(); }
+  }, [userId, loadFromLocalStorage, setUserId]);
+
+  // Session expired or signed out in another tab — clear the previous user's data
+  useEffect(() => {
+    if (!authLoading && !userId && useBudgetStore.getState().userId) {
+      useBudgetStore.getState().resetForLogout();
+    }
+  }, [authLoading, userId]);
 
   const handleWorkspaceChange = (id: string) => {
     setActiveWorkspace(id as Workspace);
