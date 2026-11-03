@@ -583,18 +583,33 @@ export default function YearlySummary() {
           {/* Statement */}
           <div className="num-mono" style={{ fontSize: '0.85rem' }}>
             {[
-              { l: year > openingBalance.startYear ? `Opening balance` : 'Opening balance', v: yearBalance.opening, sub: year > openingBalance.startYear ? `Carried forward from ${year - 1}` : 'Baseline' },
+              { l: 'Opening balance', v: yearBalance.opening, sub: year > openingBalance.startYear ? `Carried forward from ${year - 1}` : 'Baseline' },
               { l: '+ Total income', v: yearBalance.income },
-              { l: '− Total expenses', v: -yearBalance.expenses },
+              yearBalance.reserveExpenses > 0
+                ? { l: '− Regular expenses', v: -yearBalance.regularExpenses, sub: 'monthly budget' }
+                : { l: '− Total expenses', v: -yearBalance.expenses },
+              ...(yearBalance.reserveExpenses > 0
+                ? [{ l: '− Reserve expenses', v: -yearBalance.reserveExpenses, sub: 'paid from reserve' }]
+                : []),
             ].map((r, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '5px 0', color: 'var(--text-700)' }}>
                 <span>
                   {r.l}
-                  {r.sub && <span style={{ display: 'block', fontSize: '0.625rem', fontFamily: 'inherit', color: 'var(--text-400)' }}>{r.sub}</span>}
+                  {'sub' in r && r.sub && <span style={{ display: 'block', fontSize: '0.625rem', fontFamily: 'inherit', color: 'var(--text-400)' }}>{r.sub}</span>}
                 </span>
                 <span style={{ fontWeight: 700 }}>{formatCurrency(r.v, currency)}</span>
               </div>
             ))}
+            {yearBalance.reserveExpenses > 0 && (
+              <div style={{ textAlign: 'right', fontSize: '0.68rem', color: 'var(--text-400)', marginTop: 2 }}>
+                Total actual expenses: {formatCurrency(yearBalance.expenses, currency)}
+              </div>
+            )}
+            {(yearBalance.reserveIn > 0 || yearBalance.reserveOut > 0) && (
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-400)', marginTop: 8, fontFamily: 'inherit' }}>
+                Allocations (not income/expense): +{formatCurrency(yearBalance.reserveIn, currency)} to reserve, −{formatCurrency(yearBalance.reserveOut, currency)} released.
+              </p>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '7px 0 2px', borderTop: '2px solid var(--border-strong)', color: 'var(--text-900)' }}>
               <span style={{ fontWeight: 800 }}>
                 Closing balance{isCurrentYear ? ' (to date)' : ''}
@@ -1435,6 +1450,11 @@ export default function YearlySummary() {
                       )}
                     </div>
                   </div>
+                  {hasBalance && mb!.reserveExpenses > 0 && (
+                    <div className="num-mono" style={{ fontSize: '0.6875rem', color: 'var(--text-400)', marginBottom: 6 }}>
+                      Regular {formatCurrency(mb!.regularExpenses, currency)} · Reserve {formatCurrency(mb!.reserveExpenses, currency)}
+                    </div>
+                  )}
                   <div className="space-y-1">
                     <div className="w-full rounded-full h-1.5" style={{ background: 'var(--border-default)' }}>
                       <div

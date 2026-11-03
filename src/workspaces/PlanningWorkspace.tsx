@@ -13,8 +13,10 @@ import { formatCurrency } from '@/utils/currency';
 import GoalCard from '@/components/goals/GoalCard';
 import GoalForm from '@/components/goals/GoalForm';
 import SavingsTab from '@/components/savings/SavingsTab';
+import ReserveTab from '@/components/reserve/ReserveTab';
+import { Landmark } from 'lucide-react';
 
-type Tab = 'save' | 'goals' | 'budgets';
+type Tab = 'save' | 'reserve' | 'goals' | 'budgets';
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '8px 11px', borderRadius: 'var(--r-sm)',
@@ -32,7 +34,7 @@ const sectionTitle: React.CSSProperties = {
   textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 12,
 };
 
-export default function PlanningWorkspace({ initialTab }: { initialTab?: Tab }) {
+export default function PlanningWorkspace({ initialTab, onNavigate }: { initialTab?: Tab; onNavigate?: (workspace: string, subTab?: string) => void }) {
   const {
     goals, addGoal, updateGoal, deleteGoal,
     expenses, categories,
@@ -124,6 +126,7 @@ export default function PlanningWorkspace({ initialTab }: { initialTab?: Tab }) 
         <div className="ws-tab-bar" role="group" aria-label="Planning sections">
           {([
             { id: 'save', label: 'Where Can I Save?', Icon: Sparkles },
+            { id: 'reserve', label: 'Reserve', Icon: Landmark },
             { id: 'goals', label: 'Savings Goals', Icon: PiggyBank },
             { id: 'budgets', label: 'Budgets & Alerts', Icon: Bell },
           ] as const).map(({ id, label, Icon }) => (
@@ -136,6 +139,9 @@ export default function PlanningWorkspace({ initialTab }: { initialTab?: Tab }) 
 
       {/* ══════════ TAB: WHERE CAN I SAVE? ══════════ */}
       {tab === 'save' && <SavingsTab />}
+
+      {/* ══════════ TAB: RESERVE ══════════ */}
+      {tab === 'reserve' && <ReserveTab onNavigate={onNavigate} />}
 
       {/* ══════════ TAB: SAVINGS GOALS ══════════ */}
       {tab === 'goals' && (
