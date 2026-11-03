@@ -462,7 +462,7 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
       reasons.push(`${m.cat.name} is a new spending category — ${money(m.currentToDate)} so far this month with no prior history.`);
     } else if (m.pctVsAvg !== null) {
       const dir = m.pctVsAvg >= 0 ? 'higher' : 'lower';
-      reasons.push(`${m.cat.name} spending is ${money(m.currentToDate)} so far this month, ${Math.abs(round1(m.pctVsAvg))}% ${dir} than your ${windowText} for this point in the month (${money(m.avgToDate)}).`);
+      reasons.push(`${m.cat.name} spending is ${money(m.currentToDate)} so far this month, ${Math.abs(round1(m.pctVsAvg))}% ${dir} than the ${windowText} for this point in the month (${money(m.avgToDate)}).`);
     }
     if (m.frequentSmall) {
       reasons.push(`You spent ${money(m.smallTxns.reduce((s, e) => s + e.amount, 0))} on ${m.smallTxns.length} small purchases (≤ ${money(smallThreshold)} each).`);
