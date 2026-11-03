@@ -37,6 +37,12 @@ describe('spec example ledger', () => {
   const ledger = buildBalanceLedger(specExpenses, specIncome, mkBaseline(), OPTS);
 
   it('2026 → closing ₹8,00,000; 2027 → opening ₹8,00,000, closing ₹11,00,000; 2028 → opening ₹11,00,000', () => {
+    // eslint-disable-next-line no-console
+    console.log(JSON.stringify(ledger.map(y => ({
+      year: y.year, opening: y.opening, income: y.income, expenses: y.expenses,
+      net: y.net, closing: y.closing,
+      months: y.year === 2026 ? y.months.map(m => [m.label, m.opening, m.income, m.expenses, m.closing]).slice(0, 4) : undefined,
+    })), null, 1));
     const [y26, y27, y28] = ledger;
     expect(y26.opening).toBe(500000);
     expect(y26.income).toBe(1200000);

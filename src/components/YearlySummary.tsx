@@ -1,7 +1,15 @@
 'use client';
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ReferenceLine,
+} from 'recharts';
 import { useBudgetStore } from '@/store/budgetStore';
+import { useBalanceLedger } from '@/hooks/useBalanceLedger';
+import { getYearBalance } from '@/lib/balance';
+import { useChartTheme } from '@/components/charts/chartTheme';
+import OpeningBalanceModal from '@/components/balance/OpeningBalanceModal';
 import { formatCurrency } from '@/utils/currency';
 import type { Expense } from '@/types';
 import {
@@ -75,13 +83,16 @@ interface Insight {
 }
 
 export default function YearlySummary() {
-  const { expenses, income, categories, selectedYear, currency, savingsTarget } = useBudgetStore();
+  const { expenses, income, categories, selectedYear, currency, savingsTarget, openingBalance } = useBudgetStore();
+  const ledger = useBalanceLedger();
+  const chartTheme = useChartTheme();
 
   const [year, setYear] = useState(selectedYear);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [sortKey, setSortKey] = useState<'amount' | 'yoy' | 'name'>('amount');
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
+  const [balanceModal, setBalanceModal] = useState(false);
 
   useEffect(() => {
     setYear(selectedYear);
@@ -476,6 +487,215 @@ export default function YearlySummary() {
   const isCurrentYear = year === currentYear;
   const rateOnTarget = savingsRate >= savingsTarget;
 
+  // ── Running balance (derived ledger) ──────────────────────────────────────
+  const yearBalance = getYearBalance(ledger, year);
+  const monthBalanceAt = (idx: number) => yearBalance?.months[idx] ?? null;
+
+  const trendPoints = useMemo(() => {
+    if (!yearBalance) return [];
+    const pts: { name: string; balance: number; mb?: typeof yearBalance.months[number] }[] = [
+      { name: 'Opening', balance: yearBalance.opening },
+    ];
+    for (const m of yearBalance.months) {
+      if (m.beforeBaseline || m.isFuture || m.closing === null) continue;
+      pts.push({ name: m.label.slice(0, 3), balance: m.closing, mb: m });
+    }
+    pts.push({ name: 'Closing', balance: yearBalance.closing });
+    return pts;
+  }, [yearBalance]);
+
+  const BalanceTooltip = ({ active, label, payload }: {
+    active?: boolean; label?: string;
+    payload?: { payload?: { mb?: { opening: number | null; income: number; expenses: number; closing: number | null } }; value?: number }[];
+  }) => {
+    if (!active || !payload?.length) return null;
+    const mb = payload[0].payload?.mb;
+    return (
+      <div style={{
+        background: chartTheme.tooltipBg, border: `1px solid ${chartTheme.tooltipBorder}`,
+        borderRadius: 8, padding: '8px 12px', fontSize: '0.72rem', minWidth: 150,
+      }}>
+        <div style={{ fontWeight: 700, color: chartTheme.tooltipText, marginBottom: 4 }}>{label}</div>
+        {mb ? (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, color: chartTheme.textMuted }}>
+              <span>Opening</span><span className="num-mono" style={{ color: chartTheme.tooltipText }}>{formatCurrency(mb.opening ?? 0, currency)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, color: chartTheme.textMuted }}>
+              <span>+ Income</span><span className="num-mono" style={{ color: 'var(--success-text)' }}>+{formatCurrency(mb.income, currency)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, color: chartTheme.textMuted }}>
+              <span>− Expenses</span><span className="num-mono" style={{ color: 'var(--danger-text)' }}>−{formatCurrency(mb.expenses, currency)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, fontWeight: 800, color: chartTheme.tooltipText, borderTop: `1px solid ${chartTheme.tooltipBorder}`, marginTop: 4, paddingTop: 4 }}>
+              <span>Closing</span><span className="num-mono">{formatCurrency(mb.closing ?? 0, currency)}</span>
+            </div>
+          </>
+        ) : (
+          <div style={{ fontWeight: 800, color: chartTheme.tooltipText }} className="num-mono">
+            {formatCurrency(payload[0].value ?? 0, currency)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const balanceSection = openingBalance === null ? (
+    /* ── No baseline: CTA ── */
+    <div className="rounded-xl p-4 mb-6" style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-200)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <Wallet size={18} style={{ color: 'var(--brand-text)', flexShrink: 0 }} />
+      <span style={{ flex: 1, minWidth: 180, fontSize: '0.8125rem', color: 'var(--text-700)' }}>
+        Track your running balance — set an opening balance
+      </span>
+      <button
+        onClick={() => setBalanceModal(true)}
+        style={{ padding: '7px 14px', borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.8125rem', fontWeight: 700, background: 'var(--brand-600)', color: '#fff' }}
+      >
+        Set opening balance
+      </button>
+    </div>
+  ) : !yearBalance ? (
+    /* ── Before startYear ── */
+    <div className="rounded-xl p-4 mb-6" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)', fontSize: '0.8125rem', color: 'var(--text-500)' }}>
+      Before your opening balance (set from {openingBalance.startYear}).{' '}
+      <button onClick={() => setBalanceModal(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--brand-text)', padding: 0 }}>
+        Edit baseline
+      </button>
+    </div>
+  ) : (
+    /* ── Statement + trend + YoY table ── */
+    <div className="mb-6">
+      <div className="rounded-xl p-4 md:p-5" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+          <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-500)' }}>
+            Balance
+          </span>
+          <button
+            onClick={() => setBalanceModal(true)}
+            className="flex items-center gap-1"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-text)', padding: '2px 4px' }}
+          >
+            Edit
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+          {/* Statement */}
+          <div className="num-mono" style={{ fontSize: '0.85rem' }}>
+            {[
+              { l: year > openingBalance.startYear ? `Opening balance` : 'Opening balance', v: yearBalance.opening, sub: year > openingBalance.startYear ? `Carried forward from ${year - 1}` : 'Baseline' },
+              { l: '+ Total income', v: yearBalance.income },
+              { l: '− Total expenses', v: -yearBalance.expenses },
+            ].map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '5px 0', color: 'var(--text-700)' }}>
+                <span>
+                  {r.l}
+                  {r.sub && <span style={{ display: 'block', fontSize: '0.625rem', fontFamily: 'inherit', color: 'var(--text-400)' }}>{r.sub}</span>}
+                </span>
+                <span style={{ fontWeight: 700 }}>{formatCurrency(r.v, currency)}</span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '7px 0 2px', borderTop: '2px solid var(--border-strong)', color: 'var(--text-900)' }}>
+              <span style={{ fontWeight: 800 }}>
+                Closing balance{isCurrentYear ? ' (to date)' : ''}
+              </span>
+              <span style={{ fontWeight: 800, fontSize: '1rem', color: yearBalance.closing < 0 ? 'var(--danger-text)' : 'var(--text-900)' }}>
+                {formatCurrency(yearBalance.closing, currency)}
+              </span>
+            </div>
+            {yearBalance.opening !== 0 && (
+              <div style={{ textAlign: 'right', fontSize: '0.72rem', marginTop: 2, color: yearBalance.net >= 0 ? 'var(--success-text)' : 'var(--danger-text)', fontWeight: 700 }}>
+                {yearBalance.net >= 0 ? '+' : '−'}{formatCurrency(Math.abs(yearBalance.net), currency)} this year
+                {' '}({((yearBalance.net / Math.abs(yearBalance.opening)) * 100).toFixed(1)}% of opening)
+              </div>
+            )}
+            {yearBalance.excludedBeforeEffective.count > 0 && (
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-400)', marginTop: 10, fontFamily: 'inherit' }}>
+                {yearBalance.excludedBeforeEffective.count} transaction{yearBalance.excludedBeforeEffective.count === 1 ? '' : 's'} before {openingBalance.effectiveDate} aren&apos;t included in the balance
+                (income {formatCurrency(yearBalance.excludedBeforeEffective.income, currency)}, expenses {formatCurrency(yearBalance.excludedBeforeEffective.expenses, currency)}).
+              </p>
+            )}
+          </div>
+
+          {/* Balance trend */}
+          <div role="img" aria-label={`Running balance trend for ${year}: opens at ${formatCurrency(yearBalance.opening, currency)} and closes at ${formatCurrency(yearBalance.closing, currency)}`} style={{ height: 190, minWidth: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trendPoints} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 9, fill: chartTheme.axis }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 9, fill: chartTheme.axis }} tickLine={false} axisLine={false} />
+                <Tooltip content={<BalanceTooltip />} />
+                {trendPoints.some(p => p.balance < 0) && (
+                  <ReferenceLine y={0} stroke={chartTheme.expenses} strokeDasharray="4 3" />
+                )}
+                <Area type="monotone" dataKey="balance" name="Balance" stroke={chartTheme.savings} strokeWidth={2}
+                  fill={chartTheme.savings} fillOpacity={0.12} dot={{ r: 2, fill: chartTheme.savings }} />
+              </AreaChart>
+            </ResponsiveContainer>
+            <span className="sr-only">
+              {yearBalance.months.filter(m => !m.beforeBaseline && !m.isFuture).map(m => `${m.label} closes at ${Math.round(m.closing ?? 0)}`).join('; ')}.
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Year-over-year balance */}
+      {ledger.length > 1 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-400)' }}>
+            Year-over-year balance
+          </p>
+          <div style={{ overflowX: 'auto' }}>
+            <div role="table" aria-label="Year-over-year balance" style={{ minWidth: 560 }}>
+              <div role="row" style={{ display: 'grid', gridTemplateColumns: '70px 1fr 1fr 1fr 1fr 1fr', gap: 8, padding: '6px 10px', fontSize: '0.625rem', fontWeight: 800, color: 'var(--text-400)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                <span role="columnheader">Year</span>
+                <span role="columnheader" style={{ textAlign: 'right' }}>Opening</span>
+                <span role="columnheader" style={{ textAlign: 'right' }}>Income</span>
+                <span role="columnheader" style={{ textAlign: 'right' }}>Expenses</span>
+                <span role="columnheader" style={{ textAlign: 'right' }}>Net</span>
+                <span role="columnheader" style={{ textAlign: 'right' }}>Closing</span>
+              </div>
+              {ledger.map(yb => {
+                const sel = yb.year === year;
+                return (
+                  <button
+                    key={yb.year}
+                    role="row"
+                    aria-current={sel || undefined}
+                    onClick={() => setYear(yb.year)}
+                    className="w-full text-left rounded-lg num-mono"
+                    style={{
+                      display: 'grid', gridTemplateColumns: '70px 1fr 1fr 1fr 1fr 1fr', gap: 8,
+                      padding: '8px 10px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                      fontSize: '0.8125rem',
+                      background: sel ? 'var(--brand-50)' : 'transparent',
+                      color: 'var(--text-700)',
+                      outline: sel ? '1.5px solid var(--brand-300)' : 'none',
+                    }}
+                  >
+                    <span role="cell" style={{ fontWeight: sel ? 800 : 600 }}>{yb.year}</span>
+                    <span role="cell" style={{ textAlign: 'right' }}>{formatCurrency(yb.opening, currency)}</span>
+                    <span role="cell" style={{ textAlign: 'right', color: 'var(--success-text)' }}>{formatCurrency(yb.income, currency)}</span>
+                    <span role="cell" style={{ textAlign: 'right', color: 'var(--danger-text)' }}>{formatCurrency(yb.expenses, currency)}</span>
+                    <span role="cell" style={{ textAlign: 'right', color: yb.net >= 0 ? 'var(--success-text)' : 'var(--danger-text)' }}>
+                      {yb.net >= 0 ? '+' : '−'}{formatCurrency(Math.abs(yb.net), currency)}
+                    </span>
+                    <span role="cell" style={{ textAlign: 'right', fontWeight: 800, color: yb.closing < 0 ? 'var(--danger-text)' : 'var(--text-900)' }}>
+                      {formatCurrency(yb.closing, currency)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <p style={{ fontSize: '0.68rem', color: 'var(--text-300)', marginTop: 6 }}>
+            Each year&apos;s opening = previous year&apos;s closing.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+
   const header = (
     <>
       <div className="flex items-center gap-3">
@@ -526,9 +746,11 @@ export default function YearlySummary() {
     return (
       <div className="dark-card p-7" style={{ border: '1px solid rgba(99,102,241,0.15)' }}>
         {header}
+        {balanceSection}
         <p className="text-center py-8 text-sm" style={{ color: 'var(--text-400)' }}>
           No data for {year}
         </p>
+        {balanceModal && <OpeningBalanceModal onClose={() => setBalanceModal(false)} />}
       </div>
     );
   }
@@ -536,6 +758,9 @@ export default function YearlySummary() {
   return (
     <div className="dark-card p-7" style={{ border: '1px solid rgba(99,102,241,0.15)' }}>
       {header}
+
+      {/* ── Balance ── */}
+      {balanceSection}
 
       {/* ── Top Stats Row ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
@@ -1170,9 +1395,11 @@ export default function YearlySummary() {
         </button>
         {showBreakdown && (
           <div className="space-y-2 mt-1">
-            {monthlyData.map((m) => {
+            {monthlyData.map((m, mi) => {
               const hasData = m.income > 0 || m.expense > 0;
-              if (!hasData) return null;
+              const mb = monthBalanceAt(mi);
+              const hasBalance = !!mb && !mb.beforeBaseline && !mb.isFuture;
+              if (!hasData && !hasBalance) return null;
               const incomeWidth = (m.income / maxBar) * 100;
               const expenseWidth = (m.expense / maxBar) * 100;
               const monthlySavings = m.savings;
@@ -1187,6 +1414,11 @@ export default function YearlySummary() {
                       {m.name}
                     </span>
                     <div className="flex items-center gap-4 text-xs num-mono">
+                      {hasBalance && (
+                        <span style={{ color: 'var(--text-400)', fontSize: '0.6875rem' }}>
+                          {formatCurrency(mb!.opening ?? 0, currency)} → <span style={{ fontWeight: 700, color: 'var(--text-700)' }}>{formatCurrency(mb!.closing ?? 0, currency)}</span>
+                        </span>
+                      )}
                       <span style={{ color: 'var(--success-text)' }}>+{formatCurrency(m.income, currency)}</span>
                       <span style={{ color: 'var(--danger-text)' }}>-{formatCurrency(m.expense, currency)}</span>
                       <span
@@ -1256,6 +1488,8 @@ export default function YearlySummary() {
           </div>
         )}
       </div>
+
+      {balanceModal && <OpeningBalanceModal onClose={() => setBalanceModal(false)} />}
     </div>
   );
 }

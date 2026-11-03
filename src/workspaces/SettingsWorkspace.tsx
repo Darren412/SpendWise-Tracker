@@ -1,15 +1,17 @@
 'use client';
 
+import { useState } from 'react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { useAuth } from '@/components/AuthProvider';
 import { useTheme } from '@/hooks/useTheme';
-import { currencies } from '@/utils/currency';
+import { currencies, formatCurrency } from '@/utils/currency';
 import { formatFinancialPeriodRange, ordinalSuffix } from '@/utils/financialCycle';
 import CategoryFilterBar from '@/components/CategoryFilterBar';
 import CategoryOrderList from '@/components/CategoryOrderList';
 import FinancialCycleSettings from '@/components/FinancialCycleSettings';
+import OpeningBalanceModal from '@/components/balance/OpeningBalanceModal';
 import type { ThemePreference } from '@/lib/theme';
-import { Settings, User, DollarSign, Calendar, MapPin, Tag, ListOrdered, LogOut, PiggyBank, Sun, Moon, Monitor } from 'lucide-react';
+import { Settings, User, DollarSign, Calendar, MapPin, Tag, ListOrdered, LogOut, PiggyBank, Sun, Moon, Monitor, Wallet } from 'lucide-react';
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; Icon: typeof Sun }[] = [
   { value: 'light',  label: 'Light',  Icon: Sun },
@@ -25,7 +27,9 @@ export default function SettingsWorkspace() {
     selectedCity, setSelectedCity,
     setExcludedCategoryIds,
     savingsTarget, setSavingsTarget,
+    openingBalance,
   } = useBudgetStore();
+  const [balanceModal, setBalanceModal] = useState(false);
   const { user, signOut } = useAuth();
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
 
@@ -301,6 +305,56 @@ export default function SettingsWorkspace() {
           <FinancialCycleSettings />
         </div>
 
+        {/* ── Opening Balance ── */}
+        <div className="settings-card">
+          <div className="settings-card-title">
+            <div style={{
+              width: 28, height: 28, borderRadius: 'var(--r-sm)',
+              background: 'var(--green-50)', border: '1px solid var(--green-100)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Wallet size={14} style={{ color: 'var(--green-600)' }} />
+            </div>
+            Opening Balance
+          </div>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-400)', marginBottom: 14 }}>
+            Money you started with — carried forward year over year on the Yearly Overview
+          </p>
+          {openingBalance ? (
+            <div style={{ fontSize: '0.8125rem', color: 'var(--text-700)', lineHeight: 1.9 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-400)' }}>Balance</span>
+                <span className="num-mono" style={{ fontWeight: 700 }}>{formatCurrency(openingBalance.amount, currency)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-400)' }}>From year</span>
+                <span style={{ fontWeight: 600 }}>{openingBalance.startYear}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-400)' }}>Effective date</span>
+                <span className="num-mono">{openingBalance.effectiveDate}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-400)' }}>Last updated</span>
+                <span className="num-mono">{new Date(openingBalance.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              </div>
+            </div>
+          ) : (
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-500)', marginBottom: 4 }}>Not set — balances aren&apos;t shown yet.</p>
+          )}
+          <button
+            onClick={() => setBalanceModal(true)}
+            style={{
+              marginTop: 12, width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
+              border: '1px solid var(--border-default)', background: 'var(--bg-subtle)',
+              color: 'var(--text-700)', fontSize: '0.8125rem', cursor: 'pointer',
+              fontFamily: 'inherit', fontWeight: 600,
+            }}
+          >
+            {openingBalance ? 'Edit opening balance' : 'Set opening balance'}
+          </button>
+        </div>
+
         {/* ── Categories (order + tax defaults) ── */}
         <div className="settings-card" style={{ gridColumn: 'span 2' }}>
           <div className="settings-card-title">
@@ -397,6 +451,8 @@ export default function SettingsWorkspace() {
         </div>
 
       </div>
+
+      {balanceModal && <OpeningBalanceModal onClose={() => setBalanceModal(false)} />}
     </div>
   );
 }
