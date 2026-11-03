@@ -60,3 +60,16 @@ export interface Category {
   type?: 'expense' | 'income' | 'both';   // undefined treated as 'expense' for backward compat
   tax?: TaxInfo; // category-level default; a transaction's own tax overrides it
 }
+
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  savedAmount: number;
+  targetDate?: string;   // YYYY-MM-DD
+  archived: boolean;
+  createdAt: string;     // ISO
+  updatedAt: string;     // ISO
+}
+
+export interface BudgetAlertThresholds { warning: number; exceeded: number; }  // percents, defaults 80 / 100
