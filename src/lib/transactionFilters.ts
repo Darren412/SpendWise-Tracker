@@ -1,6 +1,6 @@
 import { Category, Expense, Income } from '@/types';
 import { getEffectiveTax } from '@/lib/tax';
-import { fundingSource } from '@/lib/reserve';
+import { fundingSource } from '@/lib/funding';
 
 export interface TransactionFilters {
   search: string;
@@ -11,7 +11,7 @@ export interface TransactionFilters {
   recurring: 'all' | 'only' | 'exclude';
   tax: 'all' | 'only' | 'deductible' | 'non-deductible' | 'exclude';
   city?: string;                         // '' / undefined = all
-  funding: 'all' | 'budget' | 'reserve' | 'split';  // expenses only — income excluded when non-'all'
+  funding: 'all' | 'budget' | 'balance' | 'split';  // expenses only — income excluded when non-'all'
 }
 
 export const EMPTY_FILTERS: TransactionFilters = {
@@ -99,7 +99,7 @@ export function applyTransactionFilters(
       if (!amountPass(e.amount)) continue;
       if (!recurringPass(e)) continue;
       if (!taxPass(e)) continue;
-      if (filters.funding !== 'all' && fundingSource(e) !== filters.funding) continue;
+      if (filters.funding !== 'all' && fundingSource(e) !== filters.funding) continue;  // legacy 'reserve' rows normalise to 'balance'
       if (q) {
         const eff = getEffectiveTax(e, ctx.categories);
         if (!matchesSearch(
@@ -167,7 +167,7 @@ export function describeFilters(
   };
   if (f.tax !== 'all') out.push(`Tax: ${taxLabels[f.tax]}`);
   const fundingLabels: Record<TransactionFilters['funding'], string> = {
-    budget: 'monthly budget', reserve: 'reserve', split: 'split', all: '',
+    budget: 'monthly budget', balance: 'existing balance', split: 'split', all: '',
   };
   if (f.funding !== 'all') out.push(`Funding: ${fundingLabels[f.funding]}`);
   if (f.city) out.push(`City: ${f.city}`);

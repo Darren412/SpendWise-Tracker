@@ -4,16 +4,16 @@ import { useState } from 'react';
 import { FileSpreadsheet, Download, Calendar, MapPin, Tag, FileText, FileDown, Loader2 } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
 import { formatCurrency } from '@/utils/currency';
-import { formatFinancialPeriodRange, getFinancialMonthRange } from '@/utils/financialCycle';
+import { formatFinancialPeriodRange, getFinancialMonthRange, todayLocalISO } from '@/utils/financialCycle';
 import { applyTransactionFilters, EMPTY_FILTERS, TxnRow } from '@/lib/transactionFilters';
 import { buildMonthlySeries, withMoM } from '@/lib/trends';
 import { useBalanceLedger } from '@/hooks/useBalanceLedger';
 import { summarizeTax } from '@/lib/tax';
-import { buildReserveLedger } from '@/lib/reserve';
+import { availableBalanceOn } from '@/lib/balance';
 import { toCSV } from '@/lib/export/csv';
 import {
   transactionsDataset, monthlySummaryDataset, categorySpendingDataset,
-  budgetReportDataset, taxDataset, reserveLedgerDataset, Dataset, BudgetReportDataset,
+  budgetReportDataset, taxDataset, majorExpensesDataset, Dataset, BudgetReportDataset,
 } from '@/lib/export/datasets';
 import { buildReportHTML } from '@/lib/export/pdfReport';
 import { downloadText } from '@/lib/export/download';
@@ -22,12 +22,12 @@ import DateInput from '@/components/DateInput';
 import ExportModal from '@/components/ExportModal';
 import TaxSummaryPanel from '@/components/TaxSummaryPanel';
 
-type ReportType = 'transactions' | 'monthly' | 'category' | 'budget' | 'reserve' | 'tax';
+type ReportType = 'transactions' | 'monthly' | 'category' | 'budget' | 'major' | 'tax';
 type ReportRange = 'period' | '3' | '6' | '12' | 'custom';
 
 const REPORT_LABELS: Record<ReportType, string> = {
   transactions: 'Transactions', monthly: 'Monthly summary', category: 'Category spending',
-  budget: 'Budget report', reserve: 'Reserve ledger', tax: 'Tax report',
+  budget: 'Budget report', major: 'Major expenses', tax: 'Tax report',
 };
 
 const RANGE_OPTIONS: { value: ReportRange; label: string }[] = [
@@ -43,7 +43,7 @@ export default function ReportsWorkspace() {
     expenses, income, categories,
     selectedMonth, selectedYear, selectedCity, excludedCategoryIds,
     budgetCategoryIds, getMonthlyBudget, financialCycleStart, currency,
-    categoryBudgets, reserveTransfers,
+    categoryBudgets, openingBalance,
   } = useBudgetStore();
   const ledger = useBalanceLedger();
 
@@ -106,7 +106,7 @@ export default function ReportsWorkspace() {
     return s.length ? `${s[0].start} → ${s[s.length - 1].end}` : '—';
   };
 
-  /** Date bounds for report types that filter entries by date (reserve ledger). */
+  /** Date bounds for report types that filter entries by date (major expenses). */
   const rangeBounds = (): { from: string; to: string } | undefined => {
     if (range === 'custom') return { from: customFrom, to: customTo };
     const s = rangeSeries();
@@ -121,13 +121,19 @@ export default function ReportsWorkspace() {
       case 'transactions':
         return { title, rangeText, dataset: transactionsDataset(rangeRows(), categories) };
       case 'monthly':
-        return { title, rangeText, dataset: monthlySummaryDataset(withMoM(rangeSeries()), ledger, reserveTransfers) };
+        return { title, rangeText, dataset: monthlySummaryDataset(withMoM(rangeSeries()), ledger) };
       case 'category':
         return { title, rangeText, dataset: categorySpendingDataset(rangeRows(), categories) };
       case 'budget':
         return { title, rangeText, dataset: budgetReportDataset(rangeSeries(), categoryBudgets, categories) };
-      case 'reserve':
-        return { title, rangeText, dataset: reserveLedgerDataset(buildReserveLedger(reserveTransfers, expenses), rangeBounds()) };
+      case 'major': {
+        const b = rangeBounds();
+        const expensesOnly = rangeRows()
+          .filter((r): r is Extract<TxnRow, { _type: 'expense' }> => r._type === 'expense');
+        const atEnd = availableBalanceOn(
+          { baseline: openingBalance, expenses, income, financialCycleStart }, b?.to ?? todayLocalISO());
+        return { title, rangeText, dataset: majorExpensesDataset(expensesOnly, categories, b, atEnd) };
+      }
       case 'tax':
         return { title, rangeText, dataset: taxDataset(summarizeTax(rangeRows(), categories)) };
     }

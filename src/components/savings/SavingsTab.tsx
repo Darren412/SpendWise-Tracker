@@ -303,13 +303,13 @@ export default function SavingsTab() {
             {analysis.whatIf.text} <span style={{ fontStyle: 'normal', fontWeight: 600, color: 'var(--text-400)' }}>(not included in the total)</span>
           </div>
         )}
-        {/* Reserve outflows — informational, never treated as overspending */}
-        {analysis.reserveOutflows.length > 0 && (
+        {/* Balance-funded outflows — informational, never treated as overspending */}
+        {analysis.majorOutflows.length > 0 && (
           <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--amber-50, var(--bg-muted))', border: '1px solid var(--border-default)', borderRadius: 'var(--r-md)', fontSize: '0.75rem', color: 'var(--text-600)' }}>
             <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--amber-600)' }}>
-              Major reserve outflows — not treated as overspending
+              Major expenses from existing balance — not treated as overspending
             </div>
-            {analysis.reserveOutflows.map(r => (
+            {analysis.majorOutflows.map(r => (
               <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '2px 0', flexWrap: 'wrap' }}>
                 <span>{r.date} · {r.description} · {r.categoryName}</span>
                 <span className="num-mono" style={{ fontWeight: 600 }}>{formatCurrency(r.amount, currency)}</span>

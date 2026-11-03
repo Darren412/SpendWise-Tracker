@@ -6,9 +6,9 @@ import { Expense, RecurrenceFrequency, RecurringRule, TaxInfo, FundingSource } f
 import CategorySelect from '@/components/CategorySelect';
 import DateInput from '@/components/DateInput';
 import TaxFields from '@/components/TaxFields';
-import FundingPicker, { ReserveShortfallDialog } from '@/components/balance/FundingPicker';
-import { useReserve } from '@/hooks/useReserve';
-import { validateFunding } from '@/lib/reserve';
+import FundingPicker, { BalanceShortfallDialog } from '@/components/balance/FundingPicker';
+import { useMajorExpenses } from '@/hooks/useMajorExpenses';
+import { validateFunding } from '@/lib/funding';
 import { todayLocalISO } from '@/utils/financialCycle';
 import { ChevronDown } from 'lucide-react';
 
@@ -37,15 +37,15 @@ export default function ExpenseForm() {
   const [endDate, setEndDate] = useState(todayLocalISO());
   const [tax, setTax] = useState<TaxInfo | undefined>(undefined);
   const [error, setError] = useState('');
-  const [funding, setFunding] = useState<{ source: FundingSource; reserveAmount: string }>({ source: 'budget', reserveAmount: '' });
-  const [shortfall, setShortfall] = useState<{ requested: number; available: number } | null>(null);
-  const { availableOn } = useReserve();
+  const [funding, setFunding] = useState<{ source: FundingSource; balanceAmount: string }>({ source: 'budget', balanceAmount: '' });
+  const [shortfall, setShortfall] = useState<{ requested: number; available: number; date: string } | null>(null);
+  const { availableOn } = useMajorExpenses();
   const { currency } = useBudgetStore();
 
   const resetMore = () => {
     setPayee(''); setNotes(''); setRepeat(false);
     setFrequency('monthly'); setHasEnd(false); setTax(undefined); setError('');
-    setFunding({ source: 'budget', reserveAmount: '' });
+    setFunding({ source: 'budget', balanceAmount: '' });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -61,36 +61,38 @@ export default function ExpenseForm() {
     }
     const fundingErr = validateFunding({
       amount: parsedAmount, source: funding.source,
-      reserveAmount: funding.source === 'split' ? parseFloat(funding.reserveAmount) : undefined,
+      balanceAmount: funding.source === 'split' ? parseFloat(funding.balanceAmount) : undefined,
     });
     if (fundingErr) { setError(fundingErr); return; }
     setError('');
 
-    const requestedReserve = funding.source === 'reserve' ? parsedAmount
-      : funding.source === 'split' ? parseFloat(funding.reserveAmount) : 0;
+    const requestedBalance = funding.source === 'balance' ? parsedAmount
+      : funding.source === 'split' ? parseFloat(funding.balanceAmount) : 0;
 
-    // One-off expenses must not drive the reserve negative — the shortfall
-    // dialog offers a budget+reserve fallback. Rules aren't checked: future
+    // One-off expenses must not take the available balance below zero — the
+    // shortfall dialog offers a budget fallback. Only enforced when a baseline
+    // exists (otherwise there is no bound); rules aren't checked: future
     // occurrences are validated when they appear.
-    if (!repeat && requestedReserve > 0 && requestedReserve > availableOn(formData.date)) {
-      setShortfall({ requested: requestedReserve, available: availableOn(formData.date) });
+    const avail = availableOn(formData.date);
+    if (!repeat && avail !== null && requestedBalance > 0 && requestedBalance > avail) {
+      setShortfall({ requested: requestedBalance, available: avail, date: formData.date });
       return;
     }
 
     doSave(null);
   };
 
-  /** Actually writes the txn/rule. `reservePart` overrides the split input when
-   *  the shortfall dialog downgraded a full-reserve spend to a partial one. */
-  const doSave = (reservePart: number | null) => {
+  /** Actually writes the txn/rule. `balancePart` overrides the split input when
+   *  the shortfall dialog downgraded a full-balance spend to a partial one. */
+  const doSave = (balancePart: number | null) => {
     const parsedAmount = parseFloat(formData.amount);
     const buildFunding = (): Expense['funding'] => {
       if (funding.source === 'budget') return undefined;
-      if (reservePart !== null) {
-        return reservePart > 0 ? { source: 'split', reserveAmount: reservePart } : undefined;
+      if (balancePart !== null) {
+        return balancePart > 0 ? { source: 'split', balanceAmount: balancePart } : undefined;
       }
-      if (funding.source === 'reserve') return { source: 'reserve' };
-      return { source: 'split', reserveAmount: parseFloat(funding.reserveAmount) };
+      if (funding.source === 'balance') return { source: 'balance' };
+      return { source: 'split', balanceAmount: parseFloat(funding.balanceAmount) };
     };
 
     if (repeat) {
@@ -263,7 +265,7 @@ export default function ExpenseForm() {
         amount={parseFloat(formData.amount)}
         date={formData.date}
         source={funding.source}
-        reserveAmount={funding.reserveAmount}
+        balanceAmount={funding.balanceAmount}
         onChange={setFunding}
       />
 
@@ -397,7 +399,7 @@ export default function ExpenseForm() {
       </button>
 
       {shortfall && (
-        <ReserveShortfallDialog
+        <BalanceShortfallDialog
           shortfall={shortfall}
           currency={currency}
           onUseAvailable={() => { setShortfall(null); doSave(shortfall.available); }}

@@ -2,7 +2,7 @@ import { Category, Expense, RecurringRule } from '@/types';
 import { getFinancialMonthRange } from '@/utils/financialCycle';
 import { formatCurrency } from '@/utils/currency';
 import { getSpendClass, SpendClass } from './spendClass';
-import { budgetPortionExpenses, fundingParts } from './reserve';
+import { budgetPortionExpenses, fundingParts } from './funding';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -102,8 +102,8 @@ export type SavingsAnalysis =
       split: SavingsSplitEntry[];
       potentialMonthly: number;
       potentialAnnual: number;
-      /** reserve-funded outflows in the analysed period — informational only */
-      reserveOutflows: { id: string; date: string; description: string; categoryName: string; amount: number }[];
+      /** balance-funded outflows in the analysed period — informational only */
+      majorOutflows: { id: string; date: string; description: string; categoryName: string; amount: number }[];
     }
   | { status: 'insufficient'; monthsAvailable: number; monthsNeeded: 3 };
 
@@ -191,9 +191,9 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
   const today = input.today;
 
   // ── Scope expenses exactly like buildMonthlySeries ────────────────────────
-  // All savings logic runs on REGULAR spend: reserve-funded portions are
+  // All savings logic runs on REGULAR spend: balance-funded portions are
   // stripped out (split txns keep only their budget part) and reported
-  // separately as reserveOutflows.
+  // separately as majorOutflows.
   const scopedActual = input.expenses.filter(e =>
     (input.selectedCity === 'Both' || (e.city ?? 'Bangalore') === input.selectedCity) &&
     (input.excludedCategoryIds.length === 0 || !input.excludedCategoryIds.includes(e.category)));
@@ -734,14 +734,14 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
 
   const potentialMonthly = opportunities.filter(o => o.includedInTotal).reduce((s, o) => s + o.estMonthly, 0);
 
-  // Reserve-funded outflows in the analysed period — reported, never analysed
+  // Balance-funded outflows in the analysed period — reported, never analysed
   const catName = (id: string) => input.categories.find(c => c.id === id)?.name ?? 'Unknown';
-  const reserveOutflows = scopedActual
+  const majorOutflows = scopedActual
     .filter(e => {
       const d = new Date(e.date + 'T00:00:00');
-      return d >= analysed.start && d <= analysed.end && fundingParts(e).reserve > 0;
+      return d >= analysed.start && d <= analysed.end && fundingParts(e).balance > 0;
     })
-    .map(e => ({ id: e.id, date: e.date, description: e.description, categoryName: catName(e.category), amount: fundingParts(e).reserve }))
+    .map(e => ({ id: e.id, date: e.date, description: e.description, categoryName: catName(e.category), amount: fundingParts(e).balance }))
     .sort((a, b) => b.amount - a.amount);
 
   return {
@@ -761,6 +761,6 @@ export function analyzeSavings(input: SavingsInput): SavingsAnalysis {
     split,
     potentialMonthly,
     potentialAnnual: potentialMonthly * 12,
-    reserveOutflows,
+    majorOutflows,
   };
 }

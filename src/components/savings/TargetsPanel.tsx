@@ -27,7 +27,7 @@ export default function TargetsPanel() {
     selectedMonth, selectedYear, financialCycleStart, alertThresholds,
     removeSpendingTarget, categoryBudgets,
   } = useBudgetStore();
-  // Target progress measures REGULAR spend — a reserve-funded expense must
+  // Target progress measures REGULAR spend — a balance-funded expense must
   // never worsen a target's status.
   const expenses = useRegularExpenses();
   const [removeFor, setRemoveFor] = useState<string | null>(null);

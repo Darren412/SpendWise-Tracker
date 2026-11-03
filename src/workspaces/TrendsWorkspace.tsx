@@ -261,7 +261,7 @@ export default function TrendsWorkspace() {
             <div style={panelTitle}>Income · Expenses · Operating savings</div>
             <ChartBox
               label="Monthly income, expenses and savings chart"
-              summary={`Bar chart of monthly income, regular expenses and reserve-funded expenses with an operating-savings line for the last ${months} months.`}
+              summary={`Bar chart of monthly income, regular expenses and balance-funded expenses with an operating-savings line for the last ${months} months.`}
             >
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={series} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
@@ -272,7 +272,7 @@ export default function TrendsWorkspace() {
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey="income" name="Income" fill={theme.income} radius={[4, 4, 0, 0]} maxBarSize={36} />
                   <Bar dataKey="expenses" name="Regular expenses" stackId="exp" fill={theme.expenses} maxBarSize={36} />
-                  <Bar dataKey="reserveExpenses" name="Paid from reserve" stackId="exp" fill={theme.reserve} radius={[4, 4, 0, 0]} maxBarSize={36} />
+                  <Bar dataKey="majorExpenses" name="Paid from existing balance" stackId="exp" fill={theme.major} radius={[4, 4, 0, 0]} maxBarSize={36} />
                   <Line type="monotone" dataKey="savings" name="Operating savings" stroke={theme.savings} strokeWidth={2.4} dot={{ r: 3, fill: theme.savings }} />
                 </ComposedChart>
               </ResponsiveContainer>
@@ -289,7 +289,7 @@ export default function TrendsWorkspace() {
                     <th style={{ ...thStyle, textAlign: 'left' }}>Month</th>
                     <th style={thStyle}>Income</th>
                     <th style={thStyle}>Regular</th>
-                    <th style={thStyle}>Reserve</th>
+                    <th style={thStyle}>Existing Bal.</th>
                     <th style={thStyle}>Actual</th>
                     <th style={thStyle}>Operating</th>
                     <th style={thStyle}>Net cash flow</th>
@@ -307,8 +307,8 @@ export default function TrendsWorkspace() {
                       </td>
                       <td style={{ ...tdStyle, color: 'var(--green-600)', fontWeight: 600 }}>{formatCurrencyShort(p.income, currency)}</td>
                       <td style={{ ...tdStyle, color: 'var(--red-500)', fontWeight: 600 }}>{formatCurrencyShort(p.expenses, currency)}</td>
-                      <td style={{ ...tdStyle, color: p.reserveExpenses > 0 ? 'var(--amber-600)' : 'var(--text-300)', fontWeight: 600 }}>
-                        {p.reserveExpenses > 0 ? formatCurrencyShort(p.reserveExpenses, currency) : '—'}
+                      <td style={{ ...tdStyle, color: p.majorExpenses > 0 ? 'var(--amber-600)' : 'var(--text-300)', fontWeight: 600 }}>
+                        {p.majorExpenses > 0 ? formatCurrencyShort(p.majorExpenses, currency) : '—'}
                       </td>
                       <td style={{ ...tdStyle, color: 'var(--red-500)' }}>{formatCurrencyShort(p.actualExpenses, currency)}</td>
                       <td style={{ ...tdStyle, color: p.savings >= 0 ? 'var(--green-600)' : 'var(--red-500)', fontWeight: 700 }}>{formatCurrencyShort(p.savings, currency)}</td>
@@ -416,7 +416,7 @@ export default function TrendsWorkspace() {
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       <Bar dataKey="income" name="Income" fill={theme.income} radius={[3, 3, 0, 0]} maxBarSize={24} />
                       <Bar dataKey="expenses" name="Regular" stackId="exp" fill={theme.expenses} maxBarSize={24} />
-                      <Bar dataKey="reserveExpenses" name="Paid from reserve" stackId="exp" fill={theme.reserve} radius={[3, 3, 0, 0]} maxBarSize={24} />
+                      <Bar dataKey="majorExpenses" name="Paid from existing balance" stackId="exp" fill={theme.major} radius={[3, 3, 0, 0]} maxBarSize={24} />
                     </BarChart>
                   </ResponsiveContainer>
                 </ChartBox>
@@ -568,7 +568,7 @@ export default function TrendsWorkspace() {
                   <span>
                     <strong style={{ color: 'var(--text-600)' }}>{fc.method}</strong>
                     {' — '}estimates based on your past {fc.basis.length} complete months, not a guarantee.
-                    {' '}Reserve-funded major expenses are excluded from forecasts.
+                    {' '}Major expenses paid from the existing balance are excluded from forecasts.
                   </span>
                 </div>
               </div>

@@ -5,7 +5,7 @@ import { MonthPoint } from '@/lib/trends';
 const pt = (over: Partial<MonthPoint>): MonthPoint => ({
   key: '2026-01', month: '01', year: 2026, label: "Jan '26",
   start: '2026-01-01', end: '2026-01-31',
-  income: 0, expenses: 0, reserveExpenses: 0, reserveTxnTotal: 0, splitTxnTotal: 0,
+  income: 0, expenses: 0, majorExpenses: 0, majorTxnTotal: 0, splitTxnTotal: 0,
   actualExpenses: 0, netCashFlow: 0, savings: 0, savingsRate: null,
   budget: null, budgetSpent: 0, budgetUsedPct: null,
   txnCount: 0, byCategory: {}, isComplete: true, isCurrent: false,

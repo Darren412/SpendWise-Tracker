@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { Expense, Income, Category } from '@/types';
 import { safeCell } from '@/lib/export/sanitize';
-import { fundingSource, fundingParts } from '@/lib/reserve';
+import { fundingSource, fundingParts } from '@/lib/funding';
 import { currencySymbol } from '@/utils/currency';
 
 export type ExportFilter =
@@ -35,16 +35,16 @@ type AnyRow = Record<string, string | number>;
 
 function buildExpenseSheet(filtered: Expense[], categories: Category[], label: string, sym: string) {
   const resolveName = (id: string) => categories.find((c) => c.id === id)?.name ?? id;
-  const FUNDING_LABEL = { budget: 'Monthly Budget', reserve: 'Reserve', split: 'Split' } as const;
+  const FUNDING_LABEL = { budget: 'Monthly Budget', balance: 'Existing Balance', split: 'Split' } as const;
 
   const rows: AnyRow[] = [
     { '': `Expenses — ${label}` },
     { '': '' },
-    { 'No.': 'No.', Date: 'Date', Category: 'Category', Description: 'Description', [`Amount (${sym})`]: `Amount (${sym})`, 'Pay From': 'Pay From', 'Budget Portion': 'Budget Portion', 'Reserve Portion': 'Reserve Portion' },
+    { 'No.': 'No.', Date: 'Date', Category: 'Category', Description: 'Description', [`Amount (${sym})`]: `Amount (${sym})`, 'Pay From': 'Pay From', 'Budget Portion': 'Budget Portion', 'Balance Portion': 'Existing Balance Portion' },
   ];
 
   if (filtered.length === 0) {
-    rows.push({ 'No.': '', Date: '', Category: '', Description: 'No expenses recorded', [`Amount (${sym})`]: '', 'Pay From': '', 'Budget Portion': '', 'Reserve Portion': '' });
+    rows.push({ 'No.': '', Date: '', Category: '', Description: 'No expenses recorded', [`Amount (${sym})`]: '', 'Pay From': '', 'Budget Portion': '', 'Balance Portion': '' });
   } else {
     filtered.forEach((e, i) => {
       const parts = fundingParts(e);
@@ -56,11 +56,11 @@ function buildExpenseSheet(filtered: Expense[], categories: Category[], label: s
         [`Amount (${sym})`]: e.amount,
         'Pay From': FUNDING_LABEL[fundingSource(e)],
         'Budget Portion': parts.budget,
-        'Reserve Portion': parts.reserve,
+        'Balance Portion': parts.balance,
       });
     });
     const total = filtered.reduce((s, e) => s + e.amount, 0);
-    rows.push({ 'No.': '', Date: '', Category: '', Description: 'TOTAL', [`Amount (${sym})`]: total, 'Pay From': '', 'Budget Portion': '', 'Reserve Portion': '' });
+    rows.push({ 'No.': '', Date: '', Category: '', Description: 'TOTAL', [`Amount (${sym})`]: total, 'Pay From': '', 'Budget Portion': '', 'Balance Portion': '' });
   }
 
   const ws = XLSX.utils.json_to_sheet(rows, { skipHeader: true });

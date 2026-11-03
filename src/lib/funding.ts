@@ -1,39 +1,39 @@
 import { Expense, Category, FundingSource } from '@/types';
 import { getSpendClass } from '@/lib/spendClass';
 import { getFinancialMonthRange, getFinancialPeriod } from '@/utils/financialCycle';
+import { availableBalanceOn, BalanceLedgerInputs } from '@/lib/balance';
 
-export interface ReserveTransfer {
-  id: string;
-  date: string;                 // 'YYYY-MM-DD'
-  amount: number;               // > 0
-  direction: 'in' | 'out';      // in = allocate to reserve, out = release back
-  note?: string;
-  createdAt: string;            // ISO timestamp — same-date ordering tiebreak
-}
+export type { BalanceLedgerInputs } from '@/lib/balance';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // ── Funding decomposition ───────────────────────────────────────────────────
 
+/**
+ * 'reserve' / `reserveAmount` are legacy aliases (pre-refactor data) — they
+ * normalise to 'balance' / `balanceAmount`.
+ */
 export function fundingSource(e: Pick<Expense, 'funding'>): FundingSource {
-  return e.funding?.source ?? 'budget';
+  const s = e.funding?.source;
+  if (s === 'reserve') return 'balance';
+  return s ?? 'budget';
 }
 
-/** budget + reserve === amount exactly; any rounding residue lands in budget. */
-export function fundingParts(e: Pick<Expense, 'amount' | 'funding'>): { budget: number; reserve: number } {
+/** budget + balance === amount exactly; any rounding residue lands in budget. */
+export function fundingParts(e: Pick<Expense, 'amount' | 'funding'>): { budget: number; balance: number } {
   const source = fundingSource(e);
-  if (source === 'reserve') return { budget: 0, reserve: e.amount };
+  if (source === 'balance') return { budget: 0, balance: e.amount };
   if (source === 'split') {
-    const reserve = round2(Math.min(Math.max(0, e.funding?.reserveAmount ?? 0), e.amount));
-    return { budget: round2(e.amount - reserve), reserve };
+    const balance = round2(Math.min(Math.max(0, e.funding?.balanceAmount ?? e.funding?.reserveAmount ?? 0), e.amount));
+    return { budget: round2(e.amount - balance), balance };
   }
-  return { budget: e.amount, reserve: 0 };
+  return { budget: e.amount, balance: 0 };
 }
 
 /**
  * Expenses reduced to their budget ("regular") portions — the ONE helper all
- * budget/behaviour analysis uses for regular spending. Pure-reserve records
- * drop out entirely.
+ * budget/behaviour analysis uses for regular spending. Pure balance-funded
+ * records drop out entirely.
  */
 export function budgetPortionExpenses(expenses: Expense[]): Expense[] {
   return expenses
@@ -43,111 +43,30 @@ export function budgetPortionExpenses(expenses: Expense[]): Expense[] {
 
 /** Validation message for a funding choice, or null when valid. */
 export function validateFunding(input: {
-  amount: number; source: FundingSource; reserveAmount?: number;
+  amount: number; source: FundingSource; balanceAmount?: number;
 }): string | null {
   if (input.source === 'split') {
-    const r = input.reserveAmount;
-    if (r === undefined || !Number.isFinite(r)) return 'Enter the amount paid from reserve.';
+    const r = input.balanceAmount;
+    if (r === undefined || !Number.isFinite(r)) return 'Enter the amount paid from your existing balance.';
     if (round2(r) !== r) return 'Use at most two decimals.';
-    if (r <= 0) return 'The reserve portion must be greater than 0.';
-    if (r >= input.amount) return 'The reserve portion must be less than the total — use "Reserve" for the full amount.';
+    if (r <= 0) return 'The existing-balance portion must be greater than 0.';
+    if (r >= input.amount) return 'The existing-balance portion must be less than the total — use "Existing Balance" for the full amount.';
     if (round2(input.amount - r) <= 0) return 'The budget portion must be greater than 0.';
   }
   return null;
 }
 
-// ── Reserve ledger ──────────────────────────────────────────────────────────
+// ── Major expense usage ─────────────────────────────────────────────────────
 
-export interface ReserveEntry {
-  date: string;
-  kind: 'in' | 'out' | 'spend';   // in = transfer in, spend = reserve-funded expense, out = transfer out
-  amount: number;               // positive magnitude; in adds, spend/out subtract
-  refId: string;                // transfer id or expense id
-  label: string;
-  balanceAfter: number;
-}
-
-/** Chronological ledger; same-date order: in → spend → out; ties by createdAt/id. */
-export function buildReserveLedger(
-  transfers: ReserveTransfer[],
-  expenses: Expense[],
-): ReserveEntry[] {
-  const raw: { date: string; kind: ReserveEntry['kind']; amount: number; refId: string; label: string; sortKey: string }[] = [];
-
-  for (const t of transfers) {
-    raw.push({
-      date: t.date, kind: t.direction, amount: t.amount, refId: t.id,
-      label: t.note?.trim() || (t.direction === 'in' ? 'Added to reserve' : 'Released from reserve'),
-      sortKey: `t:${t.createdAt}:${t.id}`,
-    });
-  }
-  for (const e of expenses) {
-    const reserve = fundingParts(e).reserve;
-    if (reserve > 0) {
-      raw.push({
-        date: e.date, kind: 'spend', amount: reserve, refId: e.id,
-        label: e.description || 'Reserve expense',
-        sortKey: `e:${e.id}`,
-      });
-    }
-  }
-
-  const KIND_ORDER: Record<ReserveEntry['kind'], number> = { in: 0, spend: 1, out: 2 };
-  raw.sort((a, b) =>
-    a.date !== b.date ? a.date.localeCompare(b.date)
-    : KIND_ORDER[a.kind] !== KIND_ORDER[b.kind] ? KIND_ORDER[a.kind] - KIND_ORDER[b.kind]
-    : a.sortKey.localeCompare(b.sortKey));
-
-  let balance = 0;
-  return raw.map(r => {
-    balance += r.kind === 'in' ? r.amount : -r.amount;
-    const { sortKey: _sk, ...entry } = r;
-    return { ...entry, balanceAfter: balance };
-  });
-}
-
-/** Reserve balance after all entries dated ≤ asOf (default: everything). */
-export function reserveBalance(ledger: ReserveEntry[], asOf?: string): number {
-  let b = 0;
-  for (const e of ledger) {
-    if (asOf !== undefined && e.date > asOf) break;
-    b = e.balanceAfter;
-  }
-  return b;
-}
-
-/**
- * Max amount drawable on `date` without the running balance going negative at
- * that date OR at any later ledger entry = min(balance as of `date`,
- * balanceAfter of every entry dated ≥ `date`). Options exclude a transfer or
- * expense (for edit flows). Floored at 0.
- */
-export function reserveAvailableOn(
-  transfers: ReserveTransfer[],
-  expenses: Expense[],
-  date: string,
-  opts?: { excludeExpenseId?: string; excludeTransferId?: string },
-): number {
-  const ledger = buildReserveLedger(
-    transfers.filter(t => t.id !== opts?.excludeTransferId),
-    expenses.filter(e => e.id !== opts?.excludeExpenseId),
-  );
-  let avail = reserveBalance(ledger, date);
-  for (const e of ledger) {
-    if (e.date >= date && e.balanceAfter < avail) avail = e.balanceAfter;
-  }
-  return Math.max(0, avail);
-}
-
-/** Reserve-funded portions of expenses in a date range. */
-export function reserveUsage(
+/** Balance-funded portions of expenses in a date range. */
+export function majorExpenseUsage(
   expenses: Expense[],
   range: { from: string; to: string },
 ): { total: number; count: number; items: Expense[] } {
   const items = expenses.filter(e =>
-    e.date >= range.from && e.date <= range.to && fundingParts(e).reserve > 0);
+    e.date >= range.from && e.date <= range.to && fundingParts(e).balance > 0);
   return {
-    total: round2(items.reduce((s, e) => s + fundingParts(e).reserve, 0)),
+    total: round2(items.reduce((s, e) => s + fundingParts(e).balance, 0)),
     count: items.length,
     items,
   };
@@ -155,13 +74,13 @@ export function reserveUsage(
 
 // ── Coverage ────────────────────────────────────────────────────────────────
 
-export function reserveCoverage(
-  reserve: number,
+export function balanceCoverage(
+  balance: number,
   essentialMonthlyAvg: number | null,
 ): { months: number | null; status: 'ok' | 'insufficient-data' | 'no-essential-spend' } {
   if (essentialMonthlyAvg === null) return { months: null, status: 'insufficient-data' };
   if (essentialMonthlyAvg <= 0) return { months: null, status: 'no-essential-spend' };
-  return { months: Math.round((reserve / essentialMonthlyAvg) * 10) / 10, status: 'ok' };
+  return { months: Math.round((balance / essentialMonthlyAvg) * 10) / 10, status: 'ok' };
 }
 
 const ISO = (d: Date) =>
@@ -170,7 +89,7 @@ const ISO = (d: Date) =>
 /**
  * Average monthly essential spending over the last `months` COMPLETE
  * financial periods (essential-class categories, budget portions only —
- * regular essential spending, not reserve-funded spikes). `avg` is null when
+ * regular essential spending, not balance-funded spikes). `avg` is null when
  * fewer than `months` complete periods exist since the first expense.
  */
 export function essentialMonthlyAverage(
@@ -221,31 +140,35 @@ export function essentialMonthlyAverage(
 
 // ── Recurring-generation capping ────────────────────────────────────────────
 
-export interface ReserveShortfallNotice { ruleId: string; date: string; description: string; shortBy: number; }
+export interface MajorFundingNotice { ruleId: string; date: string; description: string; shortBy: number; }
 
 /**
- * Caps reserve portions of newly generated recurring expenses so no occurrence
- * drives the reserve negative. Processes txns in date order; each occurrence is
- * checked against the ledger INCLUDING earlier generated items. A capped txn
- * becomes a split (or budget when nothing is available) and yields a notice.
- * Pure — the store applies the result.
+ * Caps balance portions of newly generated recurring expenses so no occurrence
+ * would take the available balance below zero. Processes txns in date order;
+ * each occurrence is checked against the balance INCLUDING earlier generated
+ * items. A capped txn becomes a split (or budget when nothing is available)
+ * and yields a notice. Pure — the store applies the result. No baseline →
+ * no capping (the available balance is unbounded).
  */
-export function capReserveFunding<T extends Omit<Expense, 'month' | 'year'>>(
+export function capBalanceFunding<T extends Omit<Expense, 'month' | 'year'>>(
   newTxns: T[],
-  transfers: ReserveTransfer[],
-  existingExpenses: Expense[],
-): { expenses: T[]; notices: ReserveShortfallNotice[] } {
-  const notices: ReserveShortfallNotice[] = [];
+  ledger: BalanceLedgerInputs,
+): { expenses: T[]; notices: MajorFundingNotice[] } {
+  if (!ledger.baseline) return { expenses: [...newTxns].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0), notices: [] };
+  const notices: MajorFundingNotice[] = [];
   const processed: T[] = [];
   const sorted = [...newTxns].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
   for (const e of sorted) {
-    const part = fundingParts(e).reserve;
+    const part = fundingParts(e).balance;
     if (part <= 0) { processed.push(e); continue; }
-    const avail = reserveAvailableOn(transfers, [...existingExpenses, ...processed] as Expense[], e.date);
-    if (part <= avail) { processed.push(e); continue; }
+    const avail = availableBalanceOn(
+      { ...ledger, expenses: [...ledger.expenses, ...(processed as unknown as Expense[])] },
+      e.date,
+    );
+    if (avail === null || part <= avail) { processed.push(e); continue; }
     const capped: T = {
       ...e,
-      funding: avail <= 0 ? undefined : { source: 'split', reserveAmount: Math.round(avail * 100) / 100 },
+      funding: avail <= 0 ? undefined : { source: 'split', balanceAmount: Math.round(avail * 100) / 100 },
     };
     notices.push({
       ruleId: e.recurringId ?? '',
@@ -264,9 +187,8 @@ export interface PositionSummaryInput {
   monthlyBudget: number | null;          // this period's overall budget (null = none set)
   operatingSurplus: number;              // income − regular expenses for the period
   regularSpend?: number;                 // needed to compare vs monthlyBudget
-  reserveUsed: number;                   // reserve outflows this period
-  majorCount: number;                    // reserve-funded txns this period
-  reserveBalance: number;
+  majorUsed: number;                     // balance-funded outflows this period
+  majorCount: number;                    // balance-funded txns this period
   overallBalance: number | null;         // current-period closing to date (null w/o baseline)
   format: (v: number) => string;
 }
@@ -290,9 +212,9 @@ export function buildPositionSummary(s: PositionSummaryInput): string[] {
     }
   }
 
-  // 2 — reserve outflows this period
-  if (s.reserveUsed > 0 && s.majorCount > 0) {
-    lines.push(`You used ${s.format(s.reserveUsed)} from your Reserve for ${s.majorCount === 1 ? 'a major expense' : `${s.majorCount} major expenses`}. Your remaining Reserve is ${s.format(s.reserveBalance)}.`);
+  // 2 — major expenses paid from the existing balance this period
+  if (s.majorUsed > 0 && s.majorCount > 0) {
+    lines.push(`You paid ${s.format(s.majorUsed)} for ${s.majorCount === 1 ? 'a major expense' : `${s.majorCount} major expenses`} from your existing balance.`);
   }
 
   // 3 — actual overall balance

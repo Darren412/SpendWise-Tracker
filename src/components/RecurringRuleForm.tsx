@@ -7,7 +7,7 @@ import CategorySelect from '@/components/CategorySelect';
 import DateInput from '@/components/DateInput';
 import TaxFields from '@/components/TaxFields';
 import FundingPicker from '@/components/balance/FundingPicker';
-import { validateFunding } from '@/lib/reserve';
+import { validateFunding } from '@/lib/funding';
 import { todayLocalISO } from '@/utils/financialCycle';
 
 const FREQUENCIES: { value: RecurrenceFrequency; label: string }[] = [
@@ -53,9 +53,11 @@ export default function RecurringRuleForm({ initial, onSave, onCancel }: Recurri
   const [endDate, setEndDate] = useState(initial?.endDate ?? todayLocalISO());
   const [formCity, setFormCity] = useState(initial?.city ?? (selectedCity === 'Both' ? 'Bangalore' : selectedCity));
   const [tax, setTax] = useState<TaxInfo | undefined>(initial?.tax);
-  const [funding, setFunding] = useState<{ source: FundingSource; reserveAmount: string }>({
-    source: initial?.funding?.source ?? 'budget',
-    reserveAmount: initial?.funding?.reserveAmount !== undefined ? String(initial.funding.reserveAmount) : '',
+  const [funding, setFunding] = useState<{ source: FundingSource; balanceAmount: string }>({
+    // legacy 'reserve' / reserveAmount → 'balance' / balanceAmount
+    source: initial?.funding?.source === 'reserve' ? 'balance' : (initial?.funding?.source ?? 'budget'),
+    balanceAmount: (initial?.funding?.balanceAmount ?? initial?.funding?.reserveAmount) !== undefined
+      ? String(initial!.funding!.balanceAmount ?? initial!.funding!.reserveAmount) : '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -73,7 +75,7 @@ export default function RecurringRuleForm({ initial, onSave, onCancel }: Recurri
     if (type === 'expense' && !isNaN(amt) && amt > 0) {
       const fErr = validateFunding({
         amount: amt, source: funding.source,
-        reserveAmount: funding.source === 'split' ? parseFloat(funding.reserveAmount) : undefined,
+        balanceAmount: funding.source === 'split' ? parseFloat(funding.balanceAmount) : undefined,
       });
       if (fErr) e.funding = fErr;
     }
@@ -100,7 +102,7 @@ export default function RecurringRuleForm({ initial, onSave, onCancel }: Recurri
       tax,
       funding: type === 'expense' && funding.source !== 'budget'
         ? funding.source === 'split'
-          ? { source: 'split', reserveAmount: parseFloat(funding.reserveAmount) }
+          ? { source: 'split', balanceAmount: parseFloat(funding.balanceAmount) }
           : { source: funding.source }
         : undefined,
     });
@@ -246,7 +248,7 @@ export default function RecurringRuleForm({ initial, onSave, onCancel }: Recurri
             amount={parseFloat(amount)}
             date={startDate}
             source={funding.source}
-            reserveAmount={funding.reserveAmount}
+            balanceAmount={funding.balanceAmount}
             onChange={setFunding}
             compact
           />

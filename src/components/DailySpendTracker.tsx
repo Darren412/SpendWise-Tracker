@@ -138,7 +138,7 @@ export default function DailySpendTracker() {
     categories, excludedCategoryIds, setExcludedCategoryIds,
     selectedMonth, selectedYear, selectedCity, currency, financialCycleStart,
   } = useBudgetStore();
-  // Daily spend tracks REGULAR spend — reserve outflows aren't behaviour
+  // Daily spend tracks REGULAR spend — balance-funded outflows aren'tt behaviour
   const expenses = useRegularExpenses();
   const [pinnedDay, setPinnedDay] = useState<number | null>(null);
 

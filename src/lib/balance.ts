@@ -1,7 +1,6 @@
 import { Expense, Income, OpeningBalanceBaseline } from '@/types';
 import { getFinancialMonthRange } from '@/utils/financialCycle';
-import { fundingParts } from '@/lib/reserve';
-import type { ReserveTransfer } from '@/lib/reserve';
+import { fundingParts } from '@/lib/funding';
 
 export interface MonthBalance {
   month: string;            // '01'–'12' financial month label
@@ -10,9 +9,7 @@ export interface MonthBalance {
   income: number;           // counted txns only (see counting rules)
   expenses: number;         // ALL actual expenses (full amounts, any funding)
   regularExpenses: number;  // budget portions — monthly-budget performance
-  reserveExpenses: number;  // reserve portions — paid from the reserve
-  reserveIn: number;        // transfers in this month (informational — not in closing)
-  reserveOut: number;
+  majorExpenses: number;    // balance-funded portions — paid from the existing balance
   net: number;
   closing: number | null;
   beforeBaseline: boolean;
@@ -25,9 +22,7 @@ export interface YearBalance {
   income: number;
   expenses: number;
   regularExpenses: number;
-  reserveExpenses: number;
-  reserveIn: number;
-  reserveOut: number;
+  majorExpenses: number;
   net: number;
   closing: number;          // December closing; invariant: opening + income − expenses
   months: MonthBalance[];
@@ -96,7 +91,6 @@ export function buildBalanceLedger(
   income: Income[],
   baseline: OpeningBalanceBaseline | null,
   opts: BalanceLedgerOptions,
-  transfers: ReserveTransfer[] = [],
 ): YearBalance[] {
   if (!baseline) return [];
   const { financialCycleStart, throughYear, today } = opts;
@@ -109,7 +103,7 @@ export function buildBalanceLedger(
   for (let year = startYear; year <= throughYear; year++) {
     const isStartYear = year === startYear;
     let yearOpening = 0;
-    let yIncome = 0, yExpenses = 0, yRegular = 0, yReserve = 0, yIn = 0, yOut = 0;
+    let yIncome = 0, yExpenses = 0, yRegular = 0, yMajor = 0;
     const months: MonthBalance[] = [];
     const excluded = { income: 0, expenses: 0, count: 0 };
     let yearOpeningSet = false;
@@ -126,21 +120,16 @@ export function buildBalanceLedger(
       const beforeBaseline = isStartYear && endISO < effectiveDate;
       const isFuture = startISO > today;
 
-      let inc = 0, exp = 0, regular = 0, reserve = 0, reserveIn = 0, reserveOut = 0;
+      let inc = 0, exp = 0, regular = 0, major = 0;
       if (!beforeBaseline && !isFuture) {
         inc = monthIncome.reduce((s, i) => s + (i.date >= effectiveDate ? i.amount : 0), 0);
         exp = monthExpenses.reduce((s, e) => {
           if (e.date < effectiveDate) return s;
           const p = fundingParts(e);
           regular += p.budget;
-          reserve += p.reserve;
+          major += p.balance;
           return s + e.amount;
         }, 0);
-        for (const t of transfers) {
-          if (t.date >= effectiveDate && t.date >= startISO && t.date <= endISO) {
-            if (t.direction === 'in') reserveIn += t.amount; else reserveOut += t.amount;
-          }
-        }
       }
       if (isStartYear) {
         // txns labelled in startYear but dated before the effective date
@@ -157,15 +146,13 @@ export function buildBalanceLedger(
         month: mm,
         label: `${MONTH_NAMES[m - 1]} '${String(year).slice(2)}`,
         opening, income: inc, expenses: exp,
-        regularExpenses: regular, reserveExpenses: reserve,
-        reserveIn, reserveOut,
+        regularExpenses: regular, majorExpenses: major,
         net: inc - exp, closing,
         beforeBaseline, isFuture,
       });
       yIncome += inc;
       yExpenses += exp;
-      yRegular += regular; yReserve += reserve;
-      yIn += reserveIn; yOut += reserveOut;
+      yRegular += regular; yMajor += major;
     }
 
     // If every month were beforeBaseline (impossible per validation — the
@@ -176,9 +163,7 @@ export function buildBalanceLedger(
       income: yIncome,
       expenses: yExpenses,
       regularExpenses: yRegular,
-      reserveExpenses: yReserve,
-      reserveIn: yIn,
-      reserveOut: yOut,
+      majorExpenses: yMajor,
       net: yIncome - yExpenses,
       closing: carried,
       months,
@@ -192,4 +177,41 @@ export function buildBalanceLedger(
 /** Ledger row for a year, or null when it precedes startYear / is beyond the chain. */
 export function getYearBalance(ledger: YearBalance[], year: number): YearBalance | null {
   return ledger.find(y => y.year === year) ?? null;
+}
+
+// ── Available (overall) balance at a date ───────────────────────────────────
+
+/** Inputs needed to compute the overall balance at a point in time. */
+export interface BalanceLedgerInputs {
+  baseline: OpeningBalanceBaseline | null;
+  expenses: Expense[];
+  income: Income[];
+  financialCycleStart: number;
+}
+
+/**
+ * The overall (real) balance on `date`: opening + counted income − counted
+ * expenses where counted = label year ≥ startYear AND date ≥ effectiveDate
+ * (same rule as buildBalanceLedger). Returns null without a baseline.
+ * `excludeExpenseId` removes an expense — used by the edit flow.
+ */
+export function availableBalanceOn(
+  ledger: BalanceLedgerInputs,
+  date: string,
+  opts?: { excludeExpenseId?: string },
+): number | null {
+  const { baseline } = ledger;
+  if (!baseline) return null;
+  const counted = (d: string) =>
+    d >= baseline.effectiveDate && d <= date;
+
+  let bal = baseline.amount;
+  for (const i of ledger.income) {
+    if (i.year >= baseline.startYear && counted(i.date)) bal += i.amount;
+  }
+  for (const e of ledger.expenses) {
+    if (e.id === opts?.excludeExpenseId) continue;
+    if (e.year >= baseline.startYear && counted(e.date)) bal -= e.amount;
+  }
+  return Math.round(bal * 100) / 100;
 }

@@ -26,7 +26,7 @@ export function useBudgetAlerts(): BudgetAlerts {
     budgetCategoryIds, categoryBudgets, alertThresholds, alertsEnabled,
     acknowledgedAlerts, notifiedAlerts, getMonthlyBudget, spendingTargets,
   } = useBudgetStore();
-  // Budget alerts measure REGULAR spend — a reserve-funded expense must
+  // Budget alerts measure REGULAR spend — a balance-funded expense must
   // never trigger or worsen an alert.
   const regularExpenses = useRegularExpenses();
 

@@ -45,4 +45,5 @@ grant select, insert, update, delete on public.budget_data to authenticated;
 -- every user's financial data to anyone holding the public anon key.
 
 -- 1c. Added 2026-11-03 (migration add_reserve_transfers_column)
+-- DEPRECATED 2026-11-03: unused since the existing-balance refactor; safe to drop later.
 alter table public.budget_data add column if not exists reserve_transfers jsonb not null default '[]'::jsonb;

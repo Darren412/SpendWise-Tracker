@@ -2,46 +2,47 @@
 
 import { X } from 'lucide-react';
 import { useBudgetStore } from '@/store/budgetStore';
-import { useReserve } from '@/hooks/useReserve';
-import { validateFunding } from '@/lib/reserve';
+import { useMajorExpenses } from '@/hooks/useMajorExpenses';
+import { validateFunding } from '@/lib/funding';
 import { formatCurrency } from '@/utils/currency';
 import type { FundingSource } from '@/types';
 
 export const FUNDING_OPTIONS: { value: FundingSource; label: string; helper: string }[] = [
   { value: 'budget', label: 'Monthly Budget', helper: 'Count this expense against this month\u2019s normal spending budget.' },
-  { value: 'reserve', label: 'Reserve / Saved Money', helper: 'Pay this expense from your accumulated savings. It will reduce your overall balance but will not affect your monthly budget.' },
-  { value: 'split', label: 'Split Between Budget & Reserve', helper: 'Pay part of this expense from your monthly budget and the remaining amount from your reserve.' },
+  { value: 'balance', label: 'Existing / Accumulated Balance', helper: 'Pay this from money you\u2019ve accumulated over time. It reduces your overall balance but doesn\u2019t count against this month\u2019s budget.' },
+  { value: 'split', label: 'Split Between Budget & Balance', helper: 'Pay part from this month\u2019s budget and the rest from your existing balance.' },
 ];
 
 interface FundingPickerProps {
   amount: number;                       // parsed total amount (NaN-safe)
   date: string;
   source: FundingSource;
-  reserveAmount: string;                // split reserve portion (raw input)
-  onChange: (next: { source: FundingSource; reserveAmount: string }) => void;
+  balanceAmount: string;                // split balance portion (raw input)
+  onChange: (next: { source: FundingSource; balanceAmount: string }) => void;
   excludeExpenseId?: string;            // editing — the txn's own draw is excluded
   error?: string | null;                // external error display
   onError?: (msg: string | null) => void;
+  onSetOpeningBalance?: () => void;     // link when no baseline exists
   compact?: boolean;
 }
 
 /**
- * "Pay from" radiogroup — Monthly Budget / Reserve / Split with live portion
- * split and the reserve available on the transaction's date.
+ * "Pay from" radiogroup — Monthly Budget / Existing Balance / Split with live
+ * portion split and the available balance on the transaction's date.
  */
 export default function FundingPicker({
-  amount, date, source, reserveAmount, onChange, excludeExpenseId, error, onError, compact,
+  amount, date, source, balanceAmount, onChange, excludeExpenseId, error, onError, onSetOpeningBalance, compact,
 }: FundingPickerProps) {
   const { currency } = useBudgetStore();
-  const { availableOn } = useReserve();
-  const avail = date ? availableOn(date, { excludeExpenseId }) : 0;
+  const { availableOn, hasBaseline } = useMajorExpenses();
+  const avail = date ? availableOn(date, { excludeExpenseId }) : null;
 
-  const reservePortion = source === 'reserve' ? (Number.isFinite(amount) ? amount : 0)
-    : source === 'split' ? (parseFloat(reserveAmount) || 0) : 0;
+  const balancePortion = source === 'balance' ? (Number.isFinite(amount) ? amount : 0)
+    : source === 'split' ? (parseFloat(balanceAmount) || 0) : 0;
   const fundingErr = Number.isFinite(amount)
-    ? validateFunding({ amount, source, reserveAmount: source === 'split' ? parseFloat(reserveAmount) : undefined })
+    ? validateFunding({ amount, source, balanceAmount: source === 'split' ? parseFloat(balanceAmount) : undefined })
     : null;
-  const budgetPart = Number.isFinite(amount) ? amount - reservePortion : 0;
+  const budgetPart = Number.isFinite(amount) ? amount - balancePortion : 0;
 
   return (
     <div>
@@ -68,7 +69,7 @@ export default function FundingPicker({
                 name="funding-source"
                 value={opt.value}
                 checked={sel}
-                onChange={() => { onChange({ source: opt.value, reserveAmount }); onError?.(null); }}
+                onChange={() => { onChange({ source: opt.value, balanceAmount }); onError?.(null); }}
                 style={{ marginTop: 2, accentColor: 'var(--brand-600)', flexShrink: 0 }}
               />
               <span style={{ minWidth: 0 }}>
@@ -89,14 +90,14 @@ export default function FundingPicker({
       {source === 'split' && (
         <div style={{ marginTop: 8, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 120 }}>
-            <label htmlFor="funding-reserve-amount" style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-500)', marginBottom: 4 }}>
-              From reserve
+            <label htmlFor="funding-balance-amount" style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-500)', marginBottom: 4 }}>
+              From existing balance
             </label>
             <input
-              id="funding-reserve-amount"
+              id="funding-balance-amount"
               type="number" step="0.01" min="0"
-              value={reserveAmount}
-              onChange={e => { onChange({ source, reserveAmount: e.target.value }); onError?.(null); }}
+              value={balanceAmount}
+              onChange={e => { onChange({ source, balanceAmount: e.target.value }); onError?.(null); }}
               placeholder="0.00"
               style={{
                 width: '100%', padding: '8px 10px', borderRadius: 'var(--r-sm)',
@@ -119,9 +120,27 @@ export default function FundingPicker({
       )}
 
       {source !== 'budget' && (
-        <div style={{ fontSize: '0.72rem', color: 'var(--text-400)', marginTop: 6 }}>
-          Reserve available on {date}: <span className="num-mono" style={{ fontWeight: 700, color: avail >= reservePortion ? 'var(--success-text)' : 'var(--danger-text)' }}>{formatCurrency(avail, currency)}</span>
-        </div>
+        hasBaseline ? (
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-400)', marginTop: 6 }}>
+            Available balance on {date}:{' '}
+            <span className="num-mono" style={{ fontWeight: 700, color: (avail ?? 0) >= balancePortion ? 'var(--success-text)' : 'var(--danger-text)' }}>
+              {formatCurrency(avail ?? 0, currency)}
+            </span>
+          </div>
+        ) : (
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-400)', marginTop: 6 }}>
+            Set an opening balance to see your available balance.{' '}
+            {onSetOpeningBalance && (
+              <button
+                type="button"
+                onClick={onSetOpeningBalance}
+                style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', color: 'var(--brand-600)', fontWeight: 700, textDecoration: 'underline' }}
+              >
+                Set opening balance
+              </button>
+            )}
+          </div>
+        )
       )}
     </div>
   );
@@ -130,18 +149,20 @@ export default function FundingPicker({
 // ── Shortfall dialog ────────────────────────────────────────────────────────
 
 interface ShortfallInfo {
-  requested: number;   // reserve portion the user tried to spend
-  available: number;   // reserve available on that date
+  requested: number;   // balance portion the user tried to spend
+  available: number;   // available balance on that date
+  date: string;        // 'YYYY-MM-DD' — shown in the message
 }
 
 /**
- * Shown when the reserve portion requested exceeds the reserve available.
- * Returns the user's choice.
+ * Shown when the balance portion requested exceeds the available balance on
+ * the transaction date. Only rendered when a baseline exists. Returns the
+ * user's choice.
  */
-export function ReserveShortfallDialog({
+export function BalanceShortfallDialog({
   shortfall,
   currency,
-  onUseAvailable,   // () => void — split with reserveAmount = available (0 → budget)
+  onUseAvailable,   // () => void — split with balanceAmount = available (0 → budget)
   onChange,         // () => void — back to the form
   onCancel,         // () => void — discard
 }: {
@@ -151,25 +172,25 @@ export function ReserveShortfallDialog({
   onChange: () => void;
   onCancel: () => void;
 }) {
-  const { requested, available } = shortfall;
+  const { requested, available, date } = shortfall;
   const budgetRest = Math.max(0, requested - available);
   return (
     <div className="sw-overlay" onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div className="sw-modal-box" role="dialog" aria-modal="true" aria-label="Not enough in reserve" style={{ maxWidth: 440 }}>
+      <div className="sw-modal-box" role="dialog" aria-modal="true" aria-label="Not enough in your balance" style={{ maxWidth: 440 }}>
         <div style={{ padding: '20px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <h2 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-900)' }}>Not enough in reserve</h2>
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-900)' }}>Not enough in your balance</h2>
             <button onClick={onCancel} className="sw-modal-close" aria-label="Close"><X size={14} /></button>
           </div>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-600)', lineHeight: 1.55, marginBottom: 16 }}>
-            Your available reserve is {formatCurrency(available, currency)}, which is {formatCurrency(requested - available, currency)} less than this expense.
+            Your available balance on {date} is {formatCurrency(available, currency)}, which is {formatCurrency(requested - available, currency)} less than this expense.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button
               onClick={onUseAvailable}
               style={{ padding: '10px 14px', borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.8125rem', fontWeight: 700, background: 'var(--brand-600)', color: '#fff', textAlign: 'left', lineHeight: 1.4 }}
             >
-              Use available reserve ({formatCurrency(available, currency)}) and pay {formatCurrency(budgetRest, currency)} from monthly budget
+              Use available balance ({formatCurrency(available, currency)}) and pay {formatCurrency(budgetRest, currency)} from monthly budget
             </button>
             <button
               onClick={onChange}
