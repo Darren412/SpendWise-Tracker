@@ -453,7 +453,7 @@ export default function CategoryFilterBar() {
                             .map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
                         </select>
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <button onClick={confirmDelete} style={{ flex: 1, padding: '6px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                          <button onClick={confirmDelete} style={{ flex: 1, padding: '6px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'var(--red-500)', color: '#fff', border: 'none', cursor: 'pointer' }}>
                             Delete &amp; Reassign
                           </button>
                           <button onClick={() => setDeleteState(null)} style={{ flex: 1, padding: '6px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: 'var(--bg-muted)', color: 'var(--text-500)', border: '1px solid var(--border-default)', cursor: 'pointer' }}>
@@ -503,7 +503,7 @@ export default function CategoryFilterBar() {
                 />
                 <div style={{ display: 'flex', gap: 6 }}>
                   {(['expense', 'income', 'both'] as const).map(t => (
-                    <button key={t} onClick={() => setAddState({ ...addState, type: t })} style={{ flex: 1, padding: '5px 4px', borderRadius: 7, fontSize: 10, fontWeight: 600, background: addState.type === t ? '#4f46e5' : 'var(--bg-muted)', color: addState.type === t ? '#fff' : 'var(--text-500)', border: addState.type === t ? '1px solid #4f46e5' : '1px solid var(--border-default)', cursor: 'pointer', textTransform: 'capitalize', fontFamily: 'inherit' }}>
+                    <button key={t} onClick={() => setAddState({ ...addState, type: t })} style={{ flex: 1, padding: '5px 4px', borderRadius: 7, fontSize: 10, fontWeight: 600, background: addState.type === t ? 'var(--brand-600)' : 'var(--bg-muted)', color: addState.type === t ? '#fff' : 'var(--text-500)', border: addState.type === t ? '1px solid var(--brand-600)' : '1px solid var(--border-default)', cursor: 'pointer', textTransform: 'capitalize', fontFamily: 'inherit' }}>
                       {t}
                     </button>
                   ))}
@@ -519,7 +519,7 @@ export default function CategoryFilterBar() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={confirmAdd} disabled={!addState.name.trim()} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 700, background: addState.name.trim() ? '#4f46e5' : 'var(--border-default)', color: addState.name.trim() ? '#fff' : 'var(--text-400)', border: 'none', cursor: addState.name.trim() ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+                  <button onClick={confirmAdd} disabled={!addState.name.trim()} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 700, background: addState.name.trim() ? 'var(--brand-600)' : 'var(--border-default)', color: addState.name.trim() ? '#fff' : 'var(--text-400)', border: 'none', cursor: addState.name.trim() ? 'pointer' : 'default', fontFamily: 'inherit' }}>
                     Add
                   </button>
                   <button onClick={() => setAddState(null)} style={{ flex: 1, padding: '7px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'var(--bg-muted)', color: 'var(--text-500)', border: '1px solid var(--border-default)', cursor: 'pointer', fontFamily: 'inherit' }}>
